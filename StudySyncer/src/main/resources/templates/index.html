@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StudySync</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}" />
+</head>
+<body>
+
+<header>
+    <h1>StudySync</h1>
+    <p class="tagline">Stay focused. Study smarter.</p>
+
+    <nav class="header-nav">
+        <a href="/tracker" class="header-nav-link">Study Tracker</a>
+    </nav>
+
+    <!-- Auth bar — guest sees login/signup, logged-in sees name + logout.
+         auth-guest is the default visible state; initAuth() swaps to auth-user
+         if the session check succeeds, avoiding a flash of empty nav. -->
+    <div id="auth-bar" class="auth-bar">
+        <div id="auth-guest" class="auth-guest">
+            <button class="auth-link-btn" onclick="openModal('login')">Log in</button>
+            <button class="auth-link-btn accent" onclick="openModal('register')">Sign up</button>
+        </div>
+        <div id="auth-user" class="auth-user hidden">
+            <span id="auth-username" class="auth-username"></span>
+            <button class="auth-link-btn" onclick="logout()">Log out</button>
+        </div>
+    </div>
+</header>
+
+<!-- Post-auth notification banner (email verified, OAuth errors, etc.) -->
+<div id="auth-banner" class="auth-banner hidden">
+    <span id="auth-banner-msg"></span>
+    <button class="auth-banner-close" onclick="dismissBanner()" aria-label="Dismiss">&times;</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     Auth modal — Login + Register panels in one overlay
+     ══════════════════════════════════════════════════════════ -->
+<div id="auth-modal" class="auth-modal hidden" onclick="closeModalOnOverlay(event)">
+    <div class="auth-modal-box" id="auth-modal-box">
+        <button class="auth-modal-close" onclick="closeModal()" aria-label="Close">&times;</button>
+        <h3 id="auth-modal-title">Log in</h3>
+
+        <!-- ── LOGIN PANEL ── -->
+        <div id="login-panel">
+
+            <div class="auth-field">
+                <label class="auth-label" for="login-identifier">Username or Email</label>
+                <input type="text" id="login-identifier" class="field-input"
+                       placeholder="username or email@example.com"
+                       autocomplete="username" />
+                <span class="auth-field-error hidden" id="login-identifier-error"></span>
+            </div>
+
+            <div class="auth-field">
+                <label class="auth-label" for="login-password">Password</label>
+                <div class="password-wrap">
+                    <input type="password" id="login-password" class="field-input"
+                           placeholder="Password" autocomplete="current-password" />
+                    <button type="button" class="toggle-pw"
+                            onclick="togglePassword('login-password', this)"
+                            aria-label="Show password">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
+                <span class="auth-field-error hidden" id="login-password-error"></span>
+            </div>
+
+            <div id="login-error" class="auth-error hidden"></div>
+
+            <button id="login-submit-btn" class="save-btn auth-submit-btn" onclick="doLogin()">Log in</button>
+
+            <p class="auth-switch">
+                No account? <button class="auth-link-btn" onclick="switchModal()">Sign up</button>
+            </p>
+        </div><!-- /login-panel -->
+
+        <!-- ── REGISTER PANEL ── -->
+        <div id="register-panel" class="hidden">
+
+            <div class="auth-field">
+                <label class="auth-label" for="reg-username">Username</label>
+                <input type="text" id="reg-username" class="field-input"
+                       placeholder="letters, numbers, underscores"
+                       autocomplete="username" maxlength="50"
+                       oninput="validateRegUsername()" />
+                <span class="auth-field-error hidden" id="reg-username-error"></span>
+            </div>
+
+            <div class="auth-field">
+                <label class="auth-label" for="reg-email">Email</label>
+                <input type="email" id="reg-email" class="field-input"
+                       placeholder="you@example.com"
+                       autocomplete="email"
+                       oninput="validateRegEmail()" />
+                <span class="auth-field-error hidden" id="reg-email-error"></span>
+            </div>
+
+            <div class="auth-field">
+                <label class="auth-label" for="reg-password">Password</label>
+                <div class="password-wrap">
+                    <input type="password" id="reg-password" class="field-input"
+                           placeholder="At least 8 characters"
+                           autocomplete="new-password"
+                           oninput="validateRegPassword()" />
+                    <button type="button" class="toggle-pw"
+                            onclick="togglePassword('reg-password', this)"
+                            aria-label="Show password">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
+                <div class="password-strength hidden" id="pw-strength">
+                    <div class="pw-strength-bar" id="pw-strength-bar"></div>
+                    <span class="pw-strength-label" id="pw-strength-label"></span>
+                </div>
+                <span class="auth-field-error hidden" id="reg-password-error"></span>
+            </div>
+
+            <div class="auth-field">
+                <label class="auth-label" for="reg-confirm">Confirm Password</label>
+                <div class="password-wrap">
+                    <input type="password" id="reg-confirm" class="field-input"
+                           placeholder="Re-enter password"
+                           autocomplete="new-password"
+                           oninput="validateRegConfirm()" />
+                    <button type="button" class="toggle-pw"
+                            onclick="togglePassword('reg-confirm', this)"
+                            aria-label="Show password">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
+                <span class="auth-field-error hidden" id="reg-confirm-error"></span>
+            </div>
+
+            <div id="register-error" class="auth-error hidden"></div>
+
+            <button id="register-submit-btn" class="save-btn auth-submit-btn" onclick="doRegister()">Sign up</button>
+
+            <p class="auth-switch">
+                Have an account? <button class="auth-link-btn" onclick="switchModal()">Log in</button>
+            </p>
+        </div><!-- /register-panel -->
+
+    </div><!-- /auth-modal-box -->
+</div><!-- /auth-modal -->
+
+<main>
+    <!-- Top panel: Timer + Syllabus side by side -->
+    <div class="top-panel">
+
+        <!-- LEFT: Timer -->
+        <section class="timer-card">
+            <h2>Study Timer</h2>
+            <div class="mode-toggle">
+                <button id="btn-pomodoro" class="mode-btn active" onclick="setMode('pomodoro')"
+                        title="25-min focus blocks followed by 5-min breaks, auto-cycling">Pomodoro</button>
+                <button id="btn-countdown" class="mode-btn" onclick="setMode('countdown')"
+                        title="Single countdown session — set any duration">Countdown</button>
+            </div>
+            <p class="card-hint">Completed work sessions are logged automatically in Session Results below</p>
+
+            <div class="timer-display" id="timer-display">25:00</div>
+
+            <div class="duration-input">
+                <label for="duration">Duration (min)</label>
+                <input type="number" id="duration" min="1" value="25" />
+                <button class="apply-btn" onclick="applyDuration()">Apply</button>
+            </div>
+
+            <div class="timer-controls">
+                <button class="ctrl-btn start"  onclick="startTimer()">Start</button>
+                <button class="ctrl-btn pause"  onclick="pauseTimer()">Pause</button>
+                <button class="ctrl-btn skip"   onclick="skipTimer()">Skip</button>
+            </div>
+
+            <div id="pomodoro-info" class="pomodoro-info">
+                Session <span id="session-count">1</span> of 4 &mdash; work for 25 min, then take a 5 min break.
+            </div>
+        </section>
+
+        <!-- RIGHT: Study Material panel -->
+        <section class="syllabus-card">
+            <div class="syllabus-header">
+                <h2>Study Material</h2>
+                <button class="clear-btn" style="margin-left: auto;" onclick="startNewMaterial()">Start New Material</button>
+            </div>
+            <p class="card-hint">Paste your notes or upload a PDF — AI will estimate how long to study</p>
+
+            <div id="document-input-panel">
+
+                <div class="subject-field">
+                    <input type="text" id="doc-subject-name" class="field-input"
+                           placeholder="Topic / subject name (optional)" />
+                </div>
+
+                <div class="doc-section">
+                    <label class="doc-label">Paste notes or syllabus text</label>
+                    <textarea id="doc-notes-input" class="field-input doc-notes-textarea"
+                              placeholder="Paste your lecture notes, topics, or syllabus here..."></textarea>
+                </div>
+
+                <div class="doc-section">
+                    <label class="doc-label">Or upload a PDF <span class="doc-limit-note">(max 10 MB)</span></label>
+                    <div class="doc-upload-row">
+                        <input type="file" id="doc-pdf-input" accept=".pdf" class="doc-file-input" />
+                        <button id="btn-extract-pdf" class="apply-btn" onclick="extractPdfText()">Extract Text from PDF</button>
+                    </div>
+                    <span id="doc-file-error" class="field-error hidden"></span>
+                    <span id="doc-extract-status" class="save-status"></span>
+                </div>
+
+                <div class="syllabus-footer">
+                    <button id="btn-estimate" class="save-btn" onclick="estimateStudyTime()"
+                            title="AI estimates how long to study based on your notes">Estimate Study Time</button>
+                    <span id="doc-save-status" class="save-status"></span>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Study time estimation options -->
+    <section id="estimation-card" class="estimation-card hidden">
+        <div class="estimation-header">
+            <h2>Study Time Options</h2>
+            <span id="estimate-source-badge" class="estimate-source-badge"></span>
+            <span id="estimation-rationale" class="estimation-rationale"></span>
+        </div>
+        <div id="estimation-options" class="estimation-options"></div>
+
+        <div id="custom-time-card" class="custom-time-card">
+            <span class="est-label">Custom Time</span>
+            <div class="custom-time-inputs">
+                <input type="number" id="custom-hours" class="field-input custom-time-input"
+                       placeholder="0" min="0" max="23" />
+                <span class="custom-time-sep">h</span>
+                <input type="number" id="custom-minutes" class="field-input custom-time-input"
+                       placeholder="0" min="0" max="59" />
+                <span class="custom-time-sep">m</span>
+            </div>
+            <span id="custom-time-error" class="field-error hidden"></span>
+            <button class="apply-btn" onclick="applyCustomTime()">Apply Custom Time</button>
+        </div>
+    </section>
+
+    <!-- Study plan output -->
+    <section id="study-plan-card" class="study-plan-card hidden">
+        <div class="study-plan-header">
+            <h2>Study Plan</h2>
+            <span id="study-plan-total" class="study-plan-total"></span>
+        </div>
+        <div id="plan-stale-notice" class="plan-stale-notice hidden">
+            Inputs changed &mdash; click <strong>Save Subjects</strong> to refresh the plan.
+        </div>
+        <div id="study-plan-items" class="study-plan-items"></div>
+    </section>
+
+    <!-- Session results / log -->
+    <section class="results-card">
+        <h2>Session Results</h2>
+        <div id="progress-summary" class="progress-summary"></div>
+        <div id="results-empty" class="results-empty">No sessions completed yet. Start a timer to track your progress.</div>
+        <div class="table-wrap">
+        <table id="results-table" class="results-table hidden">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Subject</th>
+                    <th>Mode</th>
+                    <th>Duration</th>
+                    <th>Completed At</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="results-body"></tbody>
+        </table>
+        </div>
+        <button class="clear-btn" onclick="clearResults()">Clear Results</button>
+    </section>
+</main>
+
+<script th:src="@{/js/subjects.js}"></script>
+<script th:src="@{/js/timer.js}"></script>
+<script th:src="@{/js/auth.js}"></script>
+</body>
+</html>

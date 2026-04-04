@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Study Tracker — StudySync</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}" />
+</head>
+<body>
+
+<header class="tracker-page-header">
+    <div class="tracker-header-row">
+        <div>
+            <h1>StudySync</h1>
+            <p class="tagline">Study Tracker</p>
+        </div>
+        <a href="/" class="apply-btn tracker-back-btn">&#8592; Back to App</a>
+    </div>
+</header>
+
+<main class="tracker-main">
+
+    <!-- Guest banner -->
+    <div id="tracker-guest-banner" class="tracker-guest-banner hidden">
+        <span>Log in to see your full study history and stats.</span>
+        <a href="/" class="apply-btn">Log in on Main Page</a>
+    </div>
+
+    <!-- Tab bar -->
+    <div class="tracker-tab-bar">
+        <button class="tracker-tab active" data-tab="summary" onclick="switchTab('summary')">Summary</button>
+        <button class="tracker-tab"        data-tab="detail"  onclick="switchTab('detail')">Detail</button>
+        <button class="tracker-tab"        data-tab="ranking" onclick="switchTab('ranking')">Ranking</button>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════
+         SUMMARY TAB
+         ══════════════════════════════════════════════════ -->
+    <div id="tab-summary" class="tracker-panel">
+
+        <!-- Stat cards -->
+        <div class="tracker-stat-section">
+            <div class="tracker-stat-cards">
+                <div class="tracker-stat-card">
+                    <div class="stat-label">Hours Focused</div>
+                    <div class="stat-value" id="stat-hours-val">—</div>
+                    <div class="stat-sub"   id="stat-hours-sub"></div>
+                </div>
+                <div class="tracker-stat-card">
+                    <div class="stat-label">Days Accessed</div>
+                    <div class="stat-value" id="stat-days-val">—</div>
+                    <div class="stat-sub">this period</div>
+                </div>
+                <div class="tracker-stat-card">
+                    <div class="stat-label">Day Streak</div>
+                    <div class="stat-value" id="stat-streak-val">—</div>
+                    <div class="stat-sub">days in a row</div>
+                </div>
+            </div>
+            <!-- Guest overlay covers all three stat cards -->
+            <div id="guest-stat-overlay" class="guest-stat-overlay hidden">
+                <p>This report is available when you are logged in.</p>
+            </div>
+        </div>
+
+        <!-- Focus chart card -->
+        <div class="tracker-card">
+            <div class="tracker-card-header">
+                <div class="range-toggle">
+                    <button class="range-btn active" data-range="week"  onclick="setRange('week')">Week</button>
+                    <button class="range-btn"        data-range="month" onclick="setRange('month')">Month</button>
+                    <button class="range-btn"        data-range="year"  onclick="setRange('year')">Year</button>
+                </div>
+                <div class="period-nav">
+                    <button class="period-nav-btn" onclick="navigatePeriod(-1)">&#8249;</button>
+                    <span   class="period-label"   id="period-label">This Week</span>
+                    <button class="period-nav-btn" onclick="navigatePeriod(1)" id="btn-next-period">&#8250;</button>
+                </div>
+            </div>
+
+            <!-- Locked state (guests) -->
+            <div id="chart-guest-lock" class="tracker-lock hidden">
+                <div class="tracker-lock-icon">&#128274;</div>
+                <p>Focus charts are available when you are logged in.</p>
+                <a href="/" class="apply-btn">Log in</a>
+            </div>
+
+            <!-- Chart area (logged-in users) -->
+            <div id="chart-area">
+                <div id="chart-total" class="chart-total-label"></div>
+                <div class="chart-canvas-wrap">
+                    <canvas id="focus-chart" height="220"></canvas>
+                </div>
+                <div id="chart-empty" class="tracker-empty hidden">
+                    No study sessions recorded for this period.
+                </div>
+            </div>
+        </div>
+
+        <!-- Material / project breakdown -->
+        <div class="tracker-card" id="material-card">
+            <h3 class="tracker-section-title">Time by Material</h3>
+            <div id="material-list">
+                <p class="tracker-empty">No data for this period.</p>
+            </div>
+        </div>
+
+    </div><!-- /tab-summary -->
+
+    <!-- ══════════════════════════════════════════════════
+         DETAIL TAB
+         ══════════════════════════════════════════════════ -->
+    <div id="tab-detail" class="tracker-panel hidden">
+        <div class="tracker-card">
+            <div class="tracker-card-header">
+                <h3 class="tracker-section-title" style="margin:0">Session Log</h3>
+                <div class="period-nav">
+                    <button class="period-nav-btn" onclick="navigatePeriod(-1)">&#8249;</button>
+                    <span   class="period-label"   id="detail-period-label">This Week</span>
+                    <button class="period-nav-btn" onclick="navigatePeriod(1)">&#8250;</button>
+                </div>
+            </div>
+
+            <!-- Locked state (guests) -->
+            <div id="detail-guest-lock" class="tracker-lock hidden">
+                <div class="tracker-lock-icon">&#128274;</div>
+                <p>Session history is available when you are logged in.</p>
+                <a href="/" class="apply-btn">Log in</a>
+            </div>
+
+            <!-- Session table (logged-in users) -->
+            <div id="session-list-area">
+                <p id="sessions-empty" class="tracker-empty">No study sessions recorded yet.</p>
+                <div class="table-wrap">
+                    <table id="sessions-table" class="results-table hidden">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Material</th>
+                                <th>Duration</th>
+                                <th>Mode</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sessions-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div><!-- /tab-detail -->
+
+    <!-- ══════════════════════════════════════════════════
+         RANKING TAB
+         ══════════════════════════════════════════════════ -->
+    <div id="tab-ranking" class="tracker-panel hidden">
+        <div class="tracker-card tracker-ranking-placeholder">
+            <div class="tracker-lock-icon">&#127942;</div>
+            <h3>Ranking Coming Soon</h3>
+            <p>In a future update you'll be able to compare your streaks, personal bests, and weekly focus time with the community.</p>
+            <p class="tracker-muted-hint">For now, keep building your streak — every session counts.</p>
+        </div>
+    </div><!-- /tab-ranking -->
+
+</main>
+
+<script th:src="@{/js/tracker.js}"></script>
+</body>
+</html>

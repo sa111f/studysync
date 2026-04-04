@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Dev Admin — StudySyncer</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, sans-serif; background: #f4f4f5; color: #1a1a1a; }
+
+        /* ── Warning banner ── */
+        .dev-banner {
+            background: #dc2626; color: #fff;
+            padding: 10px 20px; font-weight: 700; font-size: 13px;
+            letter-spacing: .05em; text-transform: uppercase; text-align: center;
+        }
+
+        /* ── Layout ── */
+        .page { max-width: 860px; margin: 32px auto; padding: 0 16px; }
+        h1 { font-size: 22px; margin-bottom: 4px; }
+        .subtitle { color: #555; font-size: 13px; margin-bottom: 24px; }
+
+        /* ── Messages ── */
+        .msg { background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46;
+               border-radius: 6px; padding: 10px 14px; margin-bottom: 16px; font-size: 14px; }
+        .err { background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b;
+               border-radius: 6px; padding: 10px 14px; margin-bottom: 16px; font-size: 14px; }
+
+        /* ── Cards ── */
+        .card { background: #fff; border: 1px solid #e4e4e7; border-radius: 10px;
+                padding: 20px 24px; margin-bottom: 20px; }
+        .card h2 { font-size: 15px; margin-bottom: 14px; color: #333; }
+
+        /* ── Users table ── */
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { text-align: left; padding: 8px 10px; background: #f9f9fb;
+             border-bottom: 1px solid #e4e4e7; color: #555; font-weight: 600; }
+        td { padding: 8px 10px; border-bottom: 1px solid #f0f0f2; }
+        tr:last-child td { border-bottom: none; }
+        .empty-row td { color: #888; font-style: italic; text-align: center; padding: 20px; }
+
+        /* ── Buttons ── */
+        .btn { display: inline-block; padding: 6px 14px; border-radius: 6px; font-size: 13px;
+               font-weight: 600; border: none; cursor: pointer; text-decoration: none; }
+        .btn-red   { background: #dc2626; color: #fff; }
+        .btn-red:hover { background: #b91c1c; }
+        .btn-gray  { background: #e4e4e7; color: #333; }
+        .btn-gray:hover { background: #d4d4d8; }
+        .btn-sm    { padding: 4px 10px; font-size: 12px; }
+
+        /* ── Delete form inline ── */
+        .action-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+        .action-row label { font-size: 13px; font-weight: 600; }
+        .action-row input[type=text] {
+            padding: 6px 10px; border: 1px solid #d4d4d8; border-radius: 6px;
+            font-size: 13px; width: 200px; }
+
+        /* ── Reset section ── */
+        .reset-section { border-top: 1px solid #fee2e2; margin-top: 16px; padding-top: 16px; }
+        .reset-section p { font-size: 13px; color: #666; margin-bottom: 10px; }
+
+        /* ── Reset-on-start badge ── */
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 99px;
+                 font-size: 11px; font-weight: 700; }
+        .badge-on  { background: #fef9c3; color: #854d0e; }
+        .badge-off { background: #f1f5f9; color: #64748b; }
+    </style>
+</head>
+<body>
+
+<div class="dev-banner">
+    ⚠ DEV-ONLY ADMIN — Not visible in production (profile: dev)
+</div>
+
+<div class="page">
+    <h1>Dev Admin</h1>
+    <p class="subtitle">
+        Inspect and reset test accounts in local PostgreSQL.
+        Reset-on-start:
+        <span th:if="${resetOnStart}"  class="badge badge-on">ON</span>
+        <span th:unless="${resetOnStart}" class="badge badge-off">off</span>
+        &nbsp;·&nbsp;
+        <a href="/dev/admin" class="btn btn-gray btn-sm">Refresh</a>
+        &nbsp;·&nbsp;
+        <a href="/"          class="btn btn-gray btn-sm">Back to app</a>
+    </p>
+
+    <!-- Flash messages -->
+    <div th:if="${msg}" class="msg" th:text="${msg}"></div>
+    <div th:if="${err}" class="err" th:text="${err}"></div>
+
+    <!-- ── Users table ── -->
+    <div class="card">
+        <h2>All Users (<span th:text="${userCount}">0</span>)</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Created</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="u : ${users}">
+                    <td th:text="${u.id}"></td>
+                    <td><strong th:text="${u.username}"></strong></td>
+                    <td th:text="${u.email != null ? u.email : '—'}"></td>
+                    <td th:text="${u.createdAt != null ? #temporals.format(u.createdAt, 'yyyy-MM-dd HH:mm') : '—'}"></td>
+                    <td>
+                        <form th:action="@{/dev/users/{un}/delete(un=${u.username})}"
+                              method="post"
+                              onsubmit="return confirm('Delete user: ' + this.dataset.name + '?')"
+                              th:attr="data-name=${u.username}">
+                            <button type="submit" class="btn btn-red btn-sm">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                <tr th:if="${userCount == 0}" class="empty-row">
+                    <td colspan="5">No users in the database.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ── Delete by username ── -->
+    <div class="card">
+        <h2>Delete user by username</h2>
+        <form action="/dev/users/delete-by-name" method="post"
+              onsubmit="return confirm('Delete user ' + this.username.value + '?')">
+            <div class="action-row">
+                <div>
+                    <label for="del-username">Username</label><br/>
+                    <input type="text" id="del-username" name="username"
+                           placeholder="e.g. saif" autocomplete="off" />
+                </div>
+                <button type="submit" class="btn btn-red">Delete</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ── Reset all ── -->
+    <div class="card">
+        <h2>Reset all users</h2>
+        <div class="reset-section">
+            <p>Deletes every user and all their study sessions, plans, and timer data.
+               This cannot be undone.</p>
+            <form action="/dev/users/reset" method="post"
+                  onsubmit="return confirm('Wipe ALL users? This cannot be undone.')">
+                <button type="submit" class="btn btn-red">Reset all users</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ── Quick curl reference ── -->
+    <div class="card">
+        <h2>JSON API (curl / Postman)</h2>
+        <pre style="font-size:12px;color:#555;line-height:1.7">
+GET    /dev/users                     — list all users
+DELETE /dev/users/{username}          — delete one user
+POST   /dev/users/reset               — wipe all users</pre>
+    </div>
+</div>
+
+</body>
+</html>
