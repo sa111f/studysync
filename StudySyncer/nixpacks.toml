@@ -1,0 +1,6 @@
+# Explicitly pin JDK 21 for Railway/Nixpacks.
+# Without this, Nixpacks defaults to an older JDK which cannot compile
+# --release 21 targets, causing "release version 21 not supported".
+
+[phases.setup]
+nixPkgs = ["jdk21", "maven"]
