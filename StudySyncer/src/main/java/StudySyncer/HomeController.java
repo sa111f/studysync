@@ -16,6 +16,11 @@ public class HomeController {
         return "index";
     }
 
+    @GetMapping("/focus")
+    public String focus() {
+        return "focus";
+    }
+
     /**
      * Lightweight healthcheck endpoint for Railway (and any other platform probe).
      * No Thymeleaf rendering, no DB calls — returns as fast as possible so the

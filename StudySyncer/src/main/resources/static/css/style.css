@@ -3010,3 +3010,120 @@ main {
         padding: 18px 16px;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   FULL-SCREEN AUTH REDESIGN
+   Overlay becomes a dark page; card is a large standalone hero.
+   ═══════════════════════════════════════════════════════════ */
+
+/* Overlay: nearly opaque dark page */
+.auth-modal {
+    background: rgba(8, 9, 16, 0.97) !important;
+    backdrop-filter: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 24px 16px !important;
+    overflow-y: auto !important;
+}
+.auth-modal.hidden { display: none !important; }
+
+/* Neutralise the border wrapper (now removed from HTML, belt-and-suspenders) */
+.auth-modal-border { display: contents !important; }
+
+/* The card itself */
+.auth-modal-box {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 420px !important;
+    padding: 52px 48px 44px !important;
+    border-radius: 22px !important;
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.65) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+}
+
+/* Brand logo — centered, gradient */
+.auth-modal-logo {
+    text-align: center !important;
+    font-size: 1.25rem !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.02em !important;
+    background: linear-gradient(135deg, var(--accent), #a78bfa) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    margin-bottom: 6px !important;
+}
+
+/* Tagline below logo */
+.auth-tagline {
+    text-align: center;
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin: 0 0 28px;
+    letter-spacing: 0.01em;
+}
+
+/* Heading (Log in / Sign up) */
+.auth-modal-box > h3 {
+    font-size: 1.55rem !important;
+    font-weight: 700 !important;
+    text-align: center !important;
+    color: var(--text) !important;
+    margin-bottom: 28px !important;
+}
+
+/* Close button — circular, top-right */
+.auth-modal-close {
+    position: absolute !important;
+    top: 18px !important;
+    right: 18px !important;
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 50% !important;
+    background: var(--surface2) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--muted) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    font-size: 1rem !important;
+    cursor: pointer !important;
+    transition: background 0.15s, color 0.15s !important;
+}
+.auth-modal-close:hover {
+    background: var(--surface3) !important;
+    color: var(--text) !important;
+}
+
+/* Fade-in overlay + card slide-up */
+@keyframes authOverlayIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes authCardSlideUp {
+    from { opacity: 0; transform: translateY(24px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)   scale(1);    }
+}
+
+.auth-modal:not(.hidden) {
+    animation: authOverlayIn 0.2s ease both;
+}
+.auth-modal:not(.hidden) .auth-modal-box {
+    animation: authCardSlideUp 0.28s cubic-bezier(0.34, 1.1, 0.64, 1) both !important;
+}
+
+/* Mobile — bottom-sheet */
+@media (max-width: 520px) {
+    .auth-modal {
+        align-items: flex-end !important;
+        padding: 0 !important;
+    }
+    .auth-modal-box {
+        max-width: 100% !important;
+        border-radius: 22px 22px 0 0 !important;
+        padding: 44px 28px 36px !important;
+    }
+}

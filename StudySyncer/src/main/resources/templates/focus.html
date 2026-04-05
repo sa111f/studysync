@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Focus Mode — StudySync</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" th:href="@{/css/focus.css}" />
+</head>
+<body>
+
+<!-- ── Minimal top bar ─────────────────────────────────────── -->
+<div class="focus-topbar">
+    <a href="/" class="focus-back-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        Dashboard
+    </a>
+    <span class="focus-page-title">Focus Mode</span>
+    <span class="focus-spacer" aria-hidden="true"></span>
+</div>
+
+<!-- ── Main focus area ─────────────────────────────────────── -->
+<main class="focus-main">
+
+    <!-- Phase tabs -->
+    <div class="focus-phase-tabs" role="tablist" aria-label="Timer phase">
+        <button class="focus-tab active" id="ftab-pomodoro"
+                role="tab" aria-selected="true"
+                onclick="setPhase('pomodoro')">Pomodoro</button>
+        <button class="focus-tab" id="ftab-shortbreak"
+                role="tab" aria-selected="false"
+                onclick="setPhase('shortbreak')">Short Break</button>
+        <button class="focus-tab" id="ftab-longbreak"
+                role="tab" aria-selected="false"
+                onclick="setPhase('longbreak')">Long Break</button>
+    </div>
+
+    <!-- ── Orb ──────────────────────────────────────────────── -->
+    <div class="orb-scene" id="orb-scene">
+
+        <!-- Ambient glow ring (behind the orb, dims with time) -->
+        <div class="orb-halo"></div>
+
+        <!-- Orb body — overflow:hidden clips fill to the circle -->
+        <div class="orb" id="orb">
+
+            <!-- Liquid fill — height = remaining % -->
+            <div class="orb-fill" id="orb-fill">
+                <!-- Two counter-rotating wave layers at the fill surface -->
+                <div class="orb-wave orb-wave-a"></div>
+                <div class="orb-wave orb-wave-b"></div>
+            </div>
+
+            <!-- Gloss highlight (static, top-left of orb) -->
+            <div class="orb-highlight"></div>
+
+        </div><!-- /orb -->
+
+        <!-- Timer text sits above the orb, never clipped -->
+        <div class="orb-text-layer" aria-live="polite" aria-atomic="true">
+            <div class="orb-time" id="orb-time">25:00</div>
+        </div>
+
+    </div><!-- /orb-scene -->
+
+    <!-- Progress bar -->
+    <div class="focus-bar-track" role="progressbar" aria-label="Session progress">
+        <div class="focus-bar-fill" id="focus-bar-fill"></div>
+    </div>
+
+    <!-- Phase / session label -->
+    <p class="focus-session-label" id="focus-session-label">Session 1 of 4</p>
+
+    <!-- Controls -->
+    <div class="focus-controls">
+        <button class="focus-btn focus-btn-secondary" onclick="skipPhase()" title="Skip this phase">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polygon points="5 4 15 12 5 20 5 4"/>
+                <line x1="19" y1="5" x2="19" y2="19"/>
+            </svg>
+            Skip
+        </button>
+        <button class="focus-btn focus-btn-primary" id="focus-toggle-btn" onclick="toggleTimer()">
+            Start
+        </button>
+    </div>
+
+    <!-- Keyboard hint -->
+    <p class="focus-keyboard-hint">
+        Press <kbd>Space</kbd> to pause&nbsp;/&nbsp;resume
+    </p>
+
+</main>
+
+<script th:src="@{/js/focus.js}"></script>
+</body>
+</html>

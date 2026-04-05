@@ -1,0 +1,515 @@
+/* ═══════════════════════════════════════════════════════════
+   focus.css — dedicated Focus Mode page styles
+   Loaded only on /focus — does not affect the main dashboard.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Reset & base ────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --accent:        #7C5CFC;
+    --accent-light:  #a78bfa;
+    --accent-mid:    #8f72fd;
+    --accent-dark:   #5b3fd4;
+    --accent-deep:   #3a1fa8;
+    --bg:            #0c0d14;
+    --surface:       #13111e;
+    --surface2:      #1c1a2e;
+    --surface3:      #252240;
+    --border:        #2e3250;
+    --text:          #e8eaf0;
+    --muted:         #8b8fa8;
+    --radius:        12px;
+}
+
+html, body {
+    height: 100%;
+}
+
+body {
+    background: var(--bg);
+    background-image:
+        radial-gradient(ellipse at 50% -10%, rgba(124,92,252,0.09) 0%, transparent 55%);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── Top bar ─────────────────────────────────────────────────── */
+.focus-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    height: 54px;
+    border-bottom: 1px solid rgba(255,255,255,0.045);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+}
+
+.focus-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    flex: 1;
+    transition: color 0.15s;
+}
+.focus-back-btn:hover { color: var(--text); }
+.focus-back-btn svg { flex-shrink: 0; }
+
+.focus-page-title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: rgba(139,143,168,0.6);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.focus-spacer {
+    flex: 1;
+}
+
+/* ── Main layout ─────────────────────────────────────────────── */
+.focus-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 20px 52px;
+}
+
+/* ── Phase tabs ──────────────────────────────────────────────── */
+.focus-phase-tabs {
+    display: flex;
+    gap: 3px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    padding: 5px;
+    margin-bottom: 56px;
+}
+
+.focus-tab {
+    padding: 8px 20px;
+    border-radius: 9px;
+    font-size: 0.815rem;
+    font-weight: 500;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    letter-spacing: 0.01em;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+.focus-tab:hover:not(.active) {
+    color: var(--text);
+    background: rgba(255,255,255,0.04);
+}
+.focus-tab.active {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 2px 12px rgba(124,92,252,0.35);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ORB
+   Structure:
+     .orb-scene          — positioning context + CSS var anchor
+       .orb-halo         — ambient glow disc behind orb
+       .orb              — the visible circle (overflow:hidden clips fill)
+         .orb-fill       — liquid fill, height = progress %
+           .orb-wave-a/b — rotating wave arcs at fill surface
+         .orb-highlight  — static gloss
+       .orb-text-layer   — absolute overlay for timer text
+   ══════════════════════════════════════════════════════════════ */
+
+.orb-scene {
+    position: relative;
+    width: 300px;
+    height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 40px;
+
+    /* JS writes --glow-opacity here; children inherit it */
+    --glow-opacity: 1;
+}
+
+/* ── Ambient halo ────────────────────────────────────────────── */
+.orb-halo {
+    position: absolute;
+    /* Slightly larger than the orb so glow bleeds outward */
+    inset: -55px;
+    border-radius: 50%;
+    background: radial-gradient(
+        circle,
+        rgba(124,92,252,0.22) 0%,
+        rgba(124,92,252,0.08) 45%,
+        transparent 70%
+    );
+    opacity: var(--glow-opacity);
+    transition: opacity 0.95s linear;
+    pointer-events: none;
+}
+
+/* Second, softer halo ring */
+.orb-halo::after {
+    content: '';
+    position: absolute;
+    inset: -50px;
+    border-radius: 50%;
+    background: radial-gradient(
+        circle,
+        rgba(167,139,250,0.06) 0%,
+        transparent 65%
+    );
+    opacity: inherit;
+}
+
+/* ── Orb body ────────────────────────────────────────────────── */
+.orb {
+    position: absolute;
+    width: 268px;
+    height: 268px;
+    border-radius: 50%;
+    overflow: hidden;                           /* clips fill + waves to circle */
+    background: #100e1c;
+    border: 1.5px solid rgba(124,92,252,0.32);
+    box-shadow:
+        /* outer glow layers */
+        0 0 0   1px rgba(124,92,252,0.10),
+        0 0 32px    rgba(124,92,252,0.38),
+        0 0 72px    rgba(124,92,252,0.18),
+        0 0 130px   rgba(124,92,252,0.08),
+        /* inner depth shadow */
+        inset 0 -20px 50px rgba(0,0,0,0.55),
+        inset 0  20px 30px rgba(0,0,0,0.35);
+}
+
+/* ── Liquid fill ─────────────────────────────────────────────── */
+.orb-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 100%;           /* JS overrides this each tick */
+    background: linear-gradient(
+        to top,
+        var(--accent-deep)  0%,
+        var(--accent-dark)  28%,
+        var(--accent)       62%,
+        var(--accent-light) 100%
+    );
+    transition: height 0.95s linear;
+}
+
+/* Subtle inner glow inside the fill */
+.orb-fill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        to bottom,
+        rgba(167,139,250,0.18) 0%,
+        transparent 50%
+    );
+    pointer-events: none;
+}
+
+/* ── Wave arcs at the fill's top edge ────────────────────────── */
+/*
+   Each wave is a wide, short ellipse positioned at the very top
+   of the fill div. By rotating around its center (left:-50% + width:200%
+   makes the center align with the fill's center) it creates a convincing
+   liquid surface wobble. The two layers spin at different speeds and
+   opposite directions for a natural, non-repetitive look.
+*/
+.orb-wave {
+    position: absolute;
+    top: -15px;
+    left: -50%;
+    width: 200%;
+    height: 30px;
+    border-radius: 44%;
+    transform-origin: 50% 50%;
+}
+
+.orb-wave-a {
+    background: rgba(124,92,252,0.55);
+    animation: wave-spin 5.8s linear infinite;
+}
+
+.orb-wave-b {
+    top: -20px;
+    background: rgba(167,139,250,0.38);
+    animation: wave-spin 7.4s linear infinite reverse;
+}
+
+@keyframes wave-spin {
+    from { transform: rotate(0deg);   }
+    to   { transform: rotate(360deg); }
+}
+
+/* ── Orb gloss highlight ─────────────────────────────────────── */
+.orb-highlight {
+    position: absolute;
+    top: 18px;
+    left: 30px;
+    width: 68px;
+    height: 46px;
+    background: radial-gradient(
+        ellipse at center,
+        rgba(255,255,255,0.13) 0%,
+        transparent 70%
+    );
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 3;
+}
+
+/* ── Timer text layer ────────────────────────────────────────── */
+/*
+   Sits outside the orb div (so it is NOT clipped by overflow:hidden)
+   but positioned absolutely inside .orb-scene at the same coordinates.
+   pointer-events: none so clicks pass through to controls.
+*/
+.orb-text-layer {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    z-index: 20;
+}
+
+.orb-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 3.85rem;
+    font-weight: 700;
+    line-height: 1;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+    text-shadow:
+        0 0 28px rgba(167,139,250,0.95),
+        0 0  8px rgba(124,92,252,0.6),
+        0  2px 16px rgba(0,0,0,0.7);
+    transform: translateY(-1px); /* optical center for JetBrains Mono */
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BODY STATE CLASSES  (added/removed by focus.js)
+   .is-running  — timer counting down
+   .is-paused   — user paused
+   .is-done     — phase just completed
+   ══════════════════════════════════════════════════════════════ */
+
+/* Running: halo pulses outward, waves already animate */
+.is-running .orb-halo {
+    animation: halo-pulse 2.8s ease-in-out infinite;
+}
+
+@keyframes halo-pulse {
+    0%, 100% { transform: scale(1);    }
+    50%       { transform: scale(1.11); }
+}
+
+/* Paused: orb subtly breathes */
+.is-paused .orb {
+    animation: orb-breathe 3.6s ease-in-out infinite;
+}
+
+@keyframes orb-breathe {
+    0%, 100% { filter: brightness(1);    }
+    50%       { filter: brightness(1.2); }
+}
+
+/* Done: brief bright flash */
+.is-done .orb {
+    animation: orb-done-flash 0.55s ease-out 2;
+}
+
+@keyframes orb-done-flash {
+    0%   { filter: brightness(1);   }
+    45%  { filter: brightness(1.7); }
+    100% { filter: brightness(1);   }
+}
+
+/* ── Progress bar ────────────────────────────────────────────── */
+.focus-bar-track {
+    width: 100%;
+    max-width: 330px;
+    height: 5px;
+    background: var(--surface3);
+    border-radius: 99px;
+    overflow: hidden;
+    margin-bottom: 18px;
+}
+
+.focus-bar-fill {
+    height: 100%;
+    width: 100%;            /* JS overrides each tick */
+    background: linear-gradient(
+        90deg,
+        var(--accent-deep),
+        var(--accent),
+        var(--accent-light)
+    );
+    border-radius: 99px;
+    transition: width 0.95s linear;
+    box-shadow: 0 0 8px rgba(124,92,252,0.45);
+}
+
+/* ── Session / phase label ───────────────────────────────────── */
+.focus-session-label {
+    font-size: 0.815rem;
+    color: var(--muted);
+    letter-spacing: 0.025em;
+    margin-bottom: 44px;
+    text-align: center;
+    min-height: 1.2em;      /* prevents layout shift during phase changes */
+}
+
+/* ── Controls ────────────────────────────────────────────────── */
+.focus-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 36px;
+}
+
+.focus-btn {
+    border: none;
+    border-radius: var(--radius);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.focus-btn:active { transform: scale(0.95); }
+
+/* Primary — Start/Pause */
+.focus-btn-primary {
+    background: var(--accent);
+    color: #fff;
+    font-size: 1rem;
+    padding: 15px 52px;
+    box-shadow: 0 4px 28px rgba(124,92,252,0.42);
+    letter-spacing: 0.025em;
+    min-width: 140px;
+}
+.focus-btn-primary:hover {
+    background: var(--accent-mid);
+    box-shadow: 0 6px 36px rgba(124,92,252,0.58);
+}
+
+/* Secondary — Skip */
+.focus-btn-secondary {
+    background: var(--surface2);
+    color: var(--muted);
+    font-size: 0.875rem;
+    padding: 15px 22px;
+    border: 1px solid var(--border);
+}
+.focus-btn-secondary:hover {
+    background: var(--surface3);
+    color: var(--text);
+    border-color: rgba(124,92,252,0.3);
+}
+
+/* ── Keyboard hint ───────────────────────────────────────────── */
+.focus-keyboard-hint {
+    font-size: 0.775rem;
+    color: rgba(139,143,168,0.45);
+    letter-spacing: 0.025em;
+    text-align: center;
+}
+
+.focus-keyboard-hint kbd {
+    display: inline-block;
+    padding: 1px 6px 2px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    vertical-align: baseline;
+    letter-spacing: 0;
+}
+
+/* ── Responsive — small phones ───────────────────────────────── */
+@media (max-width: 480px) {
+    .focus-topbar {
+        padding: 0 18px;
+    }
+
+    .focus-phase-tabs {
+        margin-bottom: 40px;
+    }
+    .focus-tab {
+        padding: 7px 13px;
+        font-size: 0.77rem;
+    }
+
+    .orb-scene {
+        width: 252px;
+        height: 252px;
+        margin-bottom: 32px;
+    }
+    .orb {
+        width: 228px;
+        height: 228px;
+    }
+    .orb-time {
+        font-size: 3.15rem;
+    }
+
+    .focus-bar-track {
+        max-width: 280px;
+    }
+
+    .focus-btn-primary {
+        padding: 14px 38px;
+        min-width: 120px;
+    }
+}
+
+/* ── Responsive — short viewports (landscape phone, small laptop) */
+@media (max-height: 680px) {
+    .focus-main {
+        justify-content: flex-start;
+        padding-top: 24px;
+    }
+    .focus-phase-tabs {
+        margin-bottom: 28px;
+    }
+    .orb-scene {
+        margin-bottom: 24px;
+    }
+    .focus-session-label {
+        margin-bottom: 22px;
+    }
+    .focus-controls {
+        margin-bottom: 20px;
+    }
+}
