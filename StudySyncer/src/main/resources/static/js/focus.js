@@ -146,6 +146,7 @@ function _onCoreEvent(event, state) {
 
     // Session logging — only when focus page is the active page / master
     if (event === 'sessionEnd') {
+        // Natural completion: log the full phase duration.
         if (window.currentUser) {
             const mins = Math.round(state.totalSeconds / 60);
             const mode = _phaseLabel(state.phase);
@@ -159,6 +160,30 @@ function _onCoreEvent(event, state) {
                     completed:       true,
                 }),
             }).catch(() => {});
+        }
+    } else if (event === 'skip') {
+        // Skip: state is the pre-skip snapshot (captured in TimerCore before any
+        // mutation, so state.remaining is the actual remaining at the moment of skip).
+        //
+        // elapsed = totalSeconds − remaining  →  time already spent in this phase
+        //
+        // Only count study phases (pomodoro / countdown).
+        // Break phases (shortbreak / longbreak) do not contribute to study totals.
+        if (state.phase === 'pomodoro' || state.phase === 'countdown') {
+            const elapsed = state.totalSeconds - state.remaining;          // seconds
+            const mins    = Math.round(Math.max(0, elapsed) / 60);        // full minutes
+            if (mins > 0 && window.currentUser) {
+                fetch('/api/tracker/sessions', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        materialName:    'Focus Session',
+                        durationMinutes: mins,
+                        timerMode:       _phaseLabel(state.phase),
+                        completed:       false,   // skipped, not fully completed
+                    }),
+                }).catch(() => {});
+            }
         }
     }
 }
