@@ -809,8 +809,12 @@ function startNewMaterial() {
 // Reset stored PDF page count if user manually edits the notes textarea,
 // so pasted text is not treated as if it came from the last uploaded PDF.
 (function () {
-    const ta = document.getElementById('doc-notes-input');
+    const ta    = document.getElementById('doc-notes-input');
+    const count = document.getElementById('doc-notes-count');
     if (ta) {
-        ta.addEventListener('input', () => { _pdfPageCount = 0; });
+        ta.addEventListener('input', () => {
+            _pdfPageCount = 0;
+            if (count) count.textContent = ta.value.length + ' / 5000';
+        });
     }
 })();

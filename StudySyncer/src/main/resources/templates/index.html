@@ -4,32 +4,38 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>StudySync</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" th:href="@{/css/style.css}" />
 </head>
 <body>
 
 <header>
-    <h1>StudySync</h1>
-    <p class="tagline">Stay focused. Study smarter.</p>
+    <div class="nav-inner">
+        <a href="/" class="nav-logo-link">StudySync</a>
 
-    <nav class="header-nav">
-        <a href="/tracker" class="header-nav-link">Study Tracker</a>
-    </nav>
+        <nav class="nav-links">
+            <a href="/tracker" class="header-nav-link">Study Tracker</a>
+        </nav>
 
-    <!-- Auth bar — guest sees login/signup, logged-in sees name + logout.
-         auth-guest is the default visible state; initAuth() swaps to auth-user
-         if the session check succeeds, avoiding a flash of empty nav. -->
-    <div id="auth-bar" class="auth-bar">
-        <div id="auth-guest" class="auth-guest">
-            <button class="auth-link-btn" onclick="openModal('login')">Log in</button>
-            <button class="auth-link-btn accent" onclick="openModal('register')">Sign up</button>
-        </div>
-        <div id="auth-user" class="auth-user hidden">
-            <span id="auth-username" class="auth-username"></span>
-            <button class="auth-link-btn" onclick="logout()">Log out</button>
+        <!-- Auth bar — guest sees login/signup, logged-in sees name + logout.
+             auth-guest is the default visible state; initAuth() swaps to auth-user
+             if the session check succeeds, avoiding a flash of empty nav. -->
+        <div id="auth-bar" class="auth-bar">
+            <div id="auth-guest" class="auth-guest">
+                <button class="auth-link-btn" onclick="openModal('login')">Log in</button>
+                <button class="auth-link-btn accent" onclick="openModal('register')">Sign up</button>
+            </div>
+            <div id="auth-user" class="auth-user hidden">
+                <span id="auth-username" class="auth-username"></span>
+                <button class="auth-link-btn" onclick="logout()">Log out</button>
+            </div>
         </div>
     </div>
 </header>
+
+<div class="hero-tagline">Stay focused. Study smarter.</div>
 
 <!-- Post-auth notification banner (email verified, OAuth errors, etc.) -->
 <div id="auth-banner" class="auth-banner hidden">
@@ -41,15 +47,17 @@
      Auth modal — Login + Register panels in one overlay
      ══════════════════════════════════════════════════════════ -->
 <div id="auth-modal" class="auth-modal hidden">
+    <div class="auth-modal-border">
     <div class="auth-modal-box" id="auth-modal-box">
         <button class="auth-modal-close" onclick="closeModal()" aria-label="Close">&times;</button>
+        <div class="auth-modal-logo">StudySync</div>
         <h3 id="auth-modal-title">Log in</h3>
 
         <!-- ── LOGIN PANEL ── -->
         <div id="login-panel">
 
             <!-- Google OAuth2 -->
-            <a href="/oauth2/authorization/google" class="google-btn">
+            <a href="/auth/google-start" class="google-btn">
                 <svg class="google-icon" viewBox="0 0 48 48">
                     <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                     <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -96,7 +104,7 @@
         <div id="register-panel" class="hidden">
 
             <!-- Google OAuth2 -->
-            <a href="/oauth2/authorization/google" class="google-btn">
+            <a href="/auth/google-start" class="google-btn">
                 <svg class="google-icon" viewBox="0 0 48 48">
                     <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                     <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -172,6 +180,7 @@
         </div><!-- /register-panel -->
 
     </div><!-- /auth-modal-box -->
+    </div><!-- /auth-modal-border -->
 </div><!-- /auth-modal -->
 
 <main>
@@ -236,6 +245,7 @@
                     <label class="doc-label">Paste notes or syllabus text</label>
                     <textarea id="doc-notes-input" class="field-input doc-notes-textarea"
                               placeholder="Paste your lecture notes, topics, or syllabus here..."></textarea>
+                    <div class="char-count" id="doc-notes-count">0 / 5000</div>
                 </div>
 
                 <div class="doc-section">

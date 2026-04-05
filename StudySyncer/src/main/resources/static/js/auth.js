@@ -29,7 +29,11 @@ async function initAuth() {
 
 // ── URL param handling ─────────────────────────────────
 function handleUrlParams() {
-    // Reserved for future redirect-based flows (OAuth2, email verification, etc.)
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error') === 'oauth') {
+        showBanner('error', 'Google sign-in is not available right now. Please use email login.');
+        cleanUrl();
+    }
 }
 
 function cleanUrl() {

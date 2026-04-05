@@ -22,11 +22,18 @@ public class User {
     private String email;
 
     /**
-     * BCrypt hash. Null only for OAuth-only accounts (not implemented yet).
+     * BCrypt hash. Null only for OAuth-only accounts.
      * No length cap needed — BCrypt output is always 60 chars.
      */
     @Column(name = "password_hash")
     private String passwordHash;
+
+    /**
+     * OAuth2 provider used to create this account, e.g. "google".
+     * Null for local (email/password) accounts.
+     */
+    @Column(name = "oauth_provider", length = 32)
+    private String oauthProvider;
 
     /**
      * Whether the email address has been verified.
@@ -60,18 +67,20 @@ public class User {
 
     // ── Getters ───────────────────────────────────────────
 
-    public Long          getId()            { return id; }
-    public String        getUsername()      { return username; }
-    public String        getEmail()         { return email; }
-    public String        getPasswordHash()  { return passwordHash; }
-    public boolean       isEmailVerified()  { return emailVerified; }
-    public LocalDateTime getCreatedAt()     { return createdAt; }
-    public LocalDateTime getUpdatedAt()     { return updatedAt; }
+    public Long          getId()             { return id; }
+    public String        getUsername()       { return username; }
+    public String        getEmail()          { return email; }
+    public String        getPasswordHash()   { return passwordHash; }
+    public String        getOauthProvider()  { return oauthProvider; }
+    public boolean       isEmailVerified()   { return emailVerified; }
+    public LocalDateTime getCreatedAt()      { return createdAt; }
+    public LocalDateTime getUpdatedAt()      { return updatedAt; }
 
     // ── Setters ───────────────────────────────────────────
 
-    public void setUsername(String username)         { this.username = username; }
-    public void setEmail(String email)               { this.email = email; }
-    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
-    public void setEmailVerified(boolean verified)   { this.emailVerified = verified; }
+    public void setUsername(String username)             { this.username = username; }
+    public void setEmail(String email)                   { this.email = email; }
+    public void setPasswordHash(String passwordHash)     { this.passwordHash = passwordHash; }
+    public void setOauthProvider(String oauthProvider)   { this.oauthProvider = oauthProvider; }
+    public void setEmailVerified(boolean verified)       { this.emailVerified = verified; }
 }

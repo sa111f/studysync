@@ -63,6 +63,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             user.setEmail(email);
             user.setUsername(deriveUsername(name, email));
             user.setEmailVerified(true);
+            user.setOauthProvider("google");
             // passwordHash intentionally null — OAuth-only account
             user = userRepository.save(user);
             log.info("[OAUTH2] New user created via Google — id={} username='{}'",
