@@ -68,7 +68,7 @@ public class UserService {
     public User register(String username, String email, String password) {
         log.info("[SIGNUP] Request — username='{}' email='{}'", username, email);
 
-        username = username == null ? null : username.trim();
+        username = username == null ? null : username.trim().toLowerCase();
         email    = email    == null ? null : email.trim().toLowerCase();
 
         // ── Input validation ─────────────────────────────
@@ -95,7 +95,7 @@ public class UserService {
                   username, email);
 
         // ── Uniqueness checks ────────────────────────────
-        if (userRepository.existsByUsername(username)) {
+        if (userRepository.existsByUsernameIgnoreCase(username)) {
             log.info("[SIGNUP] Rejected — username '{}' already taken", username);
             throw new DuplicateFieldException("username", "Username already taken.");
         }
@@ -133,12 +133,12 @@ public class UserService {
     public AuthResult authenticate(String identifier, String password) {
         if (identifier == null || password == null) return AuthResult.invalidCreds();
 
-        identifier = identifier.trim();
+        identifier = identifier.trim().toLowerCase();
         log.debug("[LOGIN] Attempt — identifier='{}'", identifier);
 
         Optional<User> found = identifier.contains("@")
             ? userRepository.findByEmailIgnoreCase(identifier)
-            : userRepository.findByUsername(identifier);
+            : userRepository.findByUsernameIgnoreCase(identifier);
 
         if (found.isEmpty()) {
             log.debug("[LOGIN] No account found for identifier='{}'", identifier);
