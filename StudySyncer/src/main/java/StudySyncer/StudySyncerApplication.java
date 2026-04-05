@@ -6,6 +6,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -18,6 +19,21 @@ public class StudySyncerApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(StudySyncerApplication.class, args);
+    }
+
+    /**
+     * Logs the active port and Spring profiles immediately after the context is
+     * ready — gives a clear "app is up" marker in Railway's deploy logs.
+     */
+    @Bean
+    public CommandLineRunner onStartup(Environment env) {
+        return args -> {
+            String port     = env.getProperty("server.port", "8080");
+            String profiles = String.join(", ", env.getActiveProfiles());
+            System.out.println("=== StudySync started on port " + port
+                               + " | profiles: " + (profiles.isEmpty() ? "default" : profiles)
+                               + " ===");
+        };
     }
 
     /**
