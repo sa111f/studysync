@@ -32,6 +32,17 @@ function fmt(secs) {
 function setDisplay(secs, state) {
     display.textContent = fmt(secs);
     display.className = 'timer-display ' + (state || '');
+    // Update circular progress ring (element lives in index.html)
+    const ring = document.getElementById('timer-ring-progress');
+    if (ring) {
+        const circumference = 2 * Math.PI * 88;
+        const progress = totalSeconds > 0 ? remainingSeconds / totalSeconds : 0;
+        ring.style.strokeDasharray  = circumference;
+        ring.style.strokeDashoffset = circumference * (1 - progress);
+    }
+    // Pulse wrapper class for CSS animation
+    const wrap = document.getElementById('timer-ring-wrap');
+    if (wrap) wrap.classList.toggle('timer-running', state === 'running');
 }
 
 function updatePomodoroInfo() {
@@ -317,19 +328,25 @@ function renderResults() {
     resultsBody.innerHTML = sessions.map((s, i) => `
         <tr>
             <td>${i + 1}</td>
-            <td>${escape(s.subject)}</td>
-            <td>${s.mode}</td>
-            <td>${s.duration}</td>
-            <td>${s.time}</td>
+            <td>${htmlEsc(s.subject)}</td>
+            <td>${htmlEsc(s.mode)}</td>
+            <td>${htmlEsc(s.duration)}</td>
+            <td>${htmlEsc(s.time)}</td>
             <td class="${s.completed ? 'tracker-status-done' : 'tracker-status-partial'}">
-                ${s.completed ? 'Completed' : 'Skipped'}
+                ${s.completed ? '&#10003; Completed' : '&#9679; Skipped'}
             </td>
         </tr>
     `).join('');
 }
 
-function escape(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+/** Safe HTML escaping — named htmlEsc to avoid shadowing the deprecated window.escape. */
+function htmlEsc(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 }
 
 function clearResults() {
@@ -361,6 +378,16 @@ function resetTimerForNewMaterial() {
     setDisplay(remainingSeconds, '');
     updatePomodoroInfo();
 }
+
+// ── Keyboard shortcut — Space to start / pause ─────────
+document.addEventListener('keydown', e => {
+    // Only fire when no input/textarea is focused
+    if (e.key === ' ' && e.target === document.body) {
+        e.preventDefault();
+        if (isRunning) pauseTimer();
+        else startTimer();
+    }
+});
 
 // ── Init ───────────────────────────────────────────────
 setDisplay(remainingSeconds, '');

@@ -40,13 +40,26 @@
 <!-- ══════════════════════════════════════════════════════════
      Auth modal — Login + Register panels in one overlay
      ══════════════════════════════════════════════════════════ -->
-<div id="auth-modal" class="auth-modal hidden" onclick="closeModalOnOverlay(event)">
+<div id="auth-modal" class="auth-modal hidden">
     <div class="auth-modal-box" id="auth-modal-box">
         <button class="auth-modal-close" onclick="closeModal()" aria-label="Close">&times;</button>
         <h3 id="auth-modal-title">Log in</h3>
 
         <!-- ── LOGIN PANEL ── -->
         <div id="login-panel">
+
+            <!-- Google OAuth2 -->
+            <a href="/oauth2/authorization/google" class="google-btn">
+                <svg class="google-icon" viewBox="0 0 48 48">
+                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                </svg>
+                Continue with Google
+            </a>
+
+            <div class="auth-divider">or</div>
 
             <div class="auth-field">
                 <label class="auth-label" for="login-identifier">Username or Email</label>
@@ -81,6 +94,19 @@
 
         <!-- ── REGISTER PANEL ── -->
         <div id="register-panel" class="hidden">
+
+            <!-- Google OAuth2 -->
+            <a href="/oauth2/authorization/google" class="google-btn">
+                <svg class="google-icon" viewBox="0 0 48 48">
+                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                </svg>
+                Sign up with Google
+            </a>
+
+            <div class="auth-divider">or</div>
 
             <div class="auth-field">
                 <label class="auth-label" for="reg-username">Username</label>
@@ -163,7 +189,16 @@
             </div>
             <p class="card-hint">Completed work sessions are logged automatically in Session Results below</p>
 
-            <div class="timer-display" id="timer-display">25:00</div>
+            <!-- Circular progress ring wraps the timer display -->
+            <div class="timer-ring-wrap" id="timer-ring-wrap">
+                <svg class="timer-ring" viewBox="0 0 200 200" aria-hidden="true">
+                    <circle class="timer-ring-track"    cx="100" cy="100" r="88"/>
+                    <circle class="timer-ring-progress" cx="100" cy="100" r="88"
+                            id="timer-ring-progress"
+                            style="stroke-dasharray:553;stroke-dashoffset:0"/>
+                </svg>
+                <div class="timer-display" id="timer-display">25:00</div>
+            </div>
 
             <div class="duration-input">
                 <label for="duration">Duration (min)</label>
@@ -205,7 +240,10 @@
 
                 <div class="doc-section">
                     <label class="doc-label">Or upload a PDF <span class="doc-limit-note">(max 10 MB)</span></label>
-                    <div class="doc-upload-row">
+                    <div class="drop-zone doc-upload-row" id="pdf-drop-zone"
+                         ondragover="handlePdfDragOver(event)"
+                         ondragleave="handlePdfDragLeave(event)"
+                         ondrop="handlePdfDrop(event)">
                         <input type="file" id="doc-pdf-input" accept=".pdf" class="doc-file-input" />
                         <button id="btn-extract-pdf" class="apply-btn" onclick="extractPdfText()">Extract Text from PDF</button>
                     </div>
@@ -283,8 +321,43 @@
     </section>
 </main>
 
+<footer class="site-footer">
+    Made with &#10084;&#65039; by StudySync &nbsp;&middot;&nbsp; <span style="opacity:0.5">v1.0</span>
+</footer>
+
 <script th:src="@{/js/subjects.js}"></script>
 <script th:src="@{/js/timer.js}"></script>
 <script th:src="@{/js/auth.js}"></script>
+<script>
+/* ── Drag-and-drop PDF handler ── */
+function handlePdfDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    document.getElementById('pdf-drop-zone').classList.add('drag-over');
+}
+
+function handlePdfDragLeave(e) {
+    document.getElementById('pdf-drop-zone').classList.remove('drag-over');
+}
+
+function handlePdfDrop(e) {
+    e.preventDefault();
+    document.getElementById('pdf-drop-zone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+        const errEl = document.getElementById('doc-file-error');
+        if (errEl) { errEl.textContent = 'Only PDF files are supported.'; errEl.classList.remove('hidden'); }
+        return;
+    }
+    // Assign the dropped file to the hidden file input via DataTransfer
+    const dt   = new DataTransfer();
+    dt.items.add(file);
+    const inp = document.getElementById('doc-pdf-input');
+    inp.files = dt.files;
+    // Trigger extraction immediately
+    if (typeof extractPdfText === 'function') extractPdfText();
+}
+</script>
 </body>
 </html>

@@ -76,8 +76,35 @@ function closeModal() {
     clearAllErrors();
 }
 
+/**
+ * BUG FIX: Text-selection drag across the overlay used to trigger closeModal()
+ * because the mouseup landed on the overlay (making e.target the overlay).
+ *
+ * Fix: only close if *both* the mousedown AND the click/mouseup originated on
+ * the overlay — not when the user just dragged text that happened to end there.
+ */
+let _overlayMousedownTarget = null;
+
+function _initOverlayClose() {
+    const overlay = document.getElementById('auth-modal');
+    if (!overlay) return;
+
+    overlay.addEventListener('mousedown', e => {
+        _overlayMousedownTarget = e.target;
+    });
+
+    overlay.addEventListener('click', e => {
+        // Close only when both mousedown AND click landed directly on the overlay
+        if (e.target === overlay && _overlayMousedownTarget === overlay) {
+            closeModal();
+        }
+        _overlayMousedownTarget = null;
+    });
+}
+
+// Legacy handler kept for any inline onclick still present in HTML
 function closeModalOnOverlay(e) {
-    if (e.target === document.getElementById('auth-modal')) closeModal();
+    // Intentional no-op — overlay close is now handled by _initOverlayClose()
 }
 
 function switchModal() {
@@ -104,6 +131,8 @@ function attachKeyboardListeners() {
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') closeModal();
     });
+
+    _initOverlayClose();
 }
 
 // ── Password show/hide toggle ──────────────────────────
@@ -333,4 +362,9 @@ async function loadSavedTimer() {
 }
 
 // ── Boot ───────────────────────────────────────────────
-initAuth();
+// Guard against rare cases where the script executes before DOM is fully parsed
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAuth);
+} else {
+    initAuth();
+}
