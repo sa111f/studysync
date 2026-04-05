@@ -1,123 +1,205 @@
 'use strict';
 
-// ── State ──────────────────────────────────────────────
-let totalSeconds   = 25 * 60;
-let remainingSeconds = totalSeconds;
-let timerInterval  = null;
-let isRunning      = false;
-let currentMode    = 'pomodoro';   // 'pomodoro' | 'countdown'
-let sessionCount   = 1;
-let isBreak        = false;
-let sessions       = [];           // completed session log
+// ── Editable durations (user-configurable) ─────────────
+let pomodoroMins   = 25;
+let shortBreakMins = 5;
+let longBreakMins  = 15;
 
-const POMODORO_WORK  = 25;
-const POMODORO_BREAK =  5;
+// ── Timer state ────────────────────────────────────────
+let totalSeconds     = pomodoroMins * 60;
+let remainingSeconds = totalSeconds;
+let timerInterval    = null;
+let isRunning        = false;
+
+// currentPhase: which tab/phase is active
+// 'pomodoro' | 'shortbreak' | 'longbreak' | 'countdown'
+let currentPhase = 'pomodoro';
+
+// currentMode: kept for session logging and backend save/restore compat
+// 'pomodoro' | 'countdown'
+let currentMode = 'pomodoro';
+
+let sessionCount = 1;
+let sessions     = [];
 
 // ── DOM refs ───────────────────────────────────────────
-const display       = document.getElementById('timer-display');
-const pomodoroInfo  = document.getElementById('pomodoro-info');
-const sessionSpan   = document.getElementById('session-count');
-const durationInput = document.getElementById('duration');
-const resultsEmpty  = document.getElementById('results-empty');
-const resultsTable  = document.getElementById('results-table');
-const resultsBody   = document.getElementById('results-body');
+const display      = document.getElementById('timer-display');
+const pomodoroInfo = document.getElementById('pomodoro-info');
+const resultsEmpty = document.getElementById('results-empty');
+const resultsTable = document.getElementById('results-table');
+const resultsBody  = document.getElementById('results-body');
 
-// ── Helpers ────────────────────────────────────────────
+// ── Formatting ─────────────────────────────────────────
 function fmt(secs) {
     const m = String(Math.floor(secs / 60)).padStart(2, '0');
     const s = String(secs % 60).padStart(2, '0');
     return `${m}:${s}`;
 }
 
+// ── Display + ring update ──────────────────────────────
 function setDisplay(secs, state) {
     display.textContent = fmt(secs);
-    display.className = 'timer-display ' + (state || '');
-    // Update circular progress ring (element lives in index.html)
+    display.className   = 'timer-display' + (state ? ' ' + state : '');
+
+    // Progress ring
     const ring = document.getElementById('timer-ring-progress');
     if (ring) {
-        const circumference = 2 * Math.PI * 88;
+        const circ     = 2 * Math.PI * 88;  // r=88 matches SVG
         const progress = totalSeconds > 0 ? remainingSeconds / totalSeconds : 0;
-        ring.style.strokeDasharray  = circumference;
-        ring.style.strokeDashoffset = circumference * (1 - progress);
+        ring.style.strokeDasharray  = circ;
+        ring.style.strokeDashoffset = circ * (1 - progress);
     }
-    // Pulse wrapper class for CSS animation
+
+    // Pulse animation class on wrapper
     const wrap = document.getElementById('timer-ring-wrap');
     if (wrap) wrap.classList.toggle('timer-running', state === 'running');
 }
 
+// ── Pomodoro info text ─────────────────────────────────
 function updatePomodoroInfo() {
-    if (currentMode === 'countdown') {
-        pomodoroInfo.textContent = '';
-        return;
-    }
-    if (isBreak) {
-        pomodoroInfo.textContent = `Break time! (${POMODORO_BREAK} min) — session ${sessionCount - 1} done.`;
-    } else {
-        sessionSpan.textContent = sessionCount;
-        pomodoroInfo.innerHTML =
-            `Session <span id="session-count">${sessionCount}</span> of 4 — work for ${POMODORO_WORK} min, then take a ${POMODORO_BREAK} min break.`;
+    if (!pomodoroInfo) return;
+    switch (currentPhase) {
+        case 'shortbreak':
+            pomodoroInfo.textContent =
+                `Short break \u2014 ${shortBreakMins} min. Session ${sessionCount - 1} done.`;
+            break;
+        case 'longbreak':
+            pomodoroInfo.textContent =
+                `Long break \u2014 ${longBreakMins} min. Great work!`;
+            break;
+        case 'countdown':
+            pomodoroInfo.textContent =
+                `Countdown from Study Estimator \u2014 ${Math.round(totalSeconds / 60)} min`;
+            break;
+        default: // pomodoro work
+            pomodoroInfo.innerHTML =
+                `Session <span id="session-count">${sessionCount}</span> of 4 \u2014 work ${pomodoroMins} min, short break ${shortBreakMins} min.`;
     }
 }
 
-// ── Mode ───────────────────────────────────────────────
-function setMode(mode) {
+// ── Phase switching ────────────────────────────────────
+/**
+ * Switch the active timer phase. Pauses any running timer,
+ * updates tab visuals, sets duration, resets remaining time.
+ *
+ * @param {'pomodoro'|'shortbreak'|'longbreak'|'countdown'} phase
+ */
+function setTimerPhase(phase) {
     if (isRunning) pauseTimer();
-    currentMode = mode;
-    isBreak = false;
+    currentPhase = phase;
 
-    document.getElementById('btn-pomodoro').classList.toggle('active', mode === 'pomodoro');
-    document.getElementById('btn-countdown').classList.toggle('active', mode === 'countdown');
+    // Tab visual state (only the 3 named tabs exist)
+    ['pomodoro', 'shortbreak', 'longbreak'].forEach(p => {
+        const tab = document.getElementById('tab-' + p);
+        if (tab) tab.classList.toggle('active', p === phase);
+    });
 
-    if (mode === 'pomodoro') {
-        totalSeconds = POMODORO_WORK * 60;
-        durationInput.value = POMODORO_WORK;
-        pomodoroInfo.style.display = '';
-    } else {
-        totalSeconds = parseInt(durationInput.value, 10) * 60 || 25 * 60;
-        pomodoroInfo.style.display = 'none';
+    // Map phase → duration
+    switch (phase) {
+        case 'shortbreak':
+            currentMode  = 'pomodoro';   // part of the pomodoro cycle
+            totalSeconds = shortBreakMins * 60;
+            break;
+        case 'longbreak':
+            currentMode  = 'pomodoro';
+            totalSeconds = longBreakMins * 60;
+            break;
+        case 'countdown':
+            currentMode  = 'countdown';
+            // totalSeconds already set by applyTimerDuration before calling here
+            break;
+        default: // 'pomodoro'
+            currentMode  = 'pomodoro';
+            totalSeconds = pomodoroMins * 60;
     }
 
     remainingSeconds = totalSeconds;
     setDisplay(remainingSeconds, '');
     updatePomodoroInfo();
+}
+
+// Backward-compat shim — subjects.js calls applyTimerDuration, not setMode.
+// This is kept so any direct call to setMode('pomodoro') still works.
+function setMode(mode) {
+    if (mode === 'pomodoro') setTimerPhase('pomodoro');
+}
+
+// ── Duration settings panel ────────────────────────────
+function toggleTimerSettings() {
+    const panel  = document.getElementById('timer-settings-panel');
+    const toggle = document.getElementById('timer-settings-toggle');
+    if (!panel) return;
+    const nowHidden = panel.classList.toggle('hidden');
+    if (toggle) toggle.classList.toggle('open', !nowHidden);
 }
 
 /**
- * STUD-74: Apply a study time directly to the countdown timer.
- * Called by subjects.js when a recommended or custom study-time option is selected.
- * Sets state directly — does NOT read back from the duration input, avoiding
- * any browser constraint-validation coercion on the max="180" attribute.
+ * Read the three duration inputs, update the live variables,
+ * then refresh the current phase display.
+ */
+function applyTimerSettings() {
+    const pd = parseInt(document.getElementById('dur-pomodoro').value,   10);
+    const sd = parseInt(document.getElementById('dur-shortbreak').value, 10);
+    const ld = parseInt(document.getElementById('dur-longbreak').value,  10);
+
+    if (pd >= 1 && pd <= 999) pomodoroMins   = pd;
+    if (sd >= 1 && sd <= 999) shortBreakMins = sd;
+    if (ld >= 1 && ld <= 999) longBreakMins  = ld;
+
+    // Refresh whichever phase is currently active
+    const refreshPhase = (currentPhase === 'countdown') ? 'pomodoro' : currentPhase;
+    setTimerPhase(refreshPhase);
+
+    // Collapse the panel
+    const panel  = document.getElementById('timer-settings-panel');
+    const toggle = document.getElementById('timer-settings-toggle');
+    if (panel)  panel.classList.add('hidden');
+    if (toggle) toggle.classList.remove('open');
+}
+
+// ── Apply duration from Study Estimator (subjects.js API) ──
+/**
+ * Called by subjects.js when a study-time recommendation is selected.
+ * Switches to a special "countdown" phase with the given duration.
+ *
+ * @param {number} mins - Duration in minutes.
  */
 function applyTimerDuration(mins) {
-    console.log('[StudySyncer] applyTimerDuration:', mins, 'min →', mins * 60, 'sec');
+    console.log('[StudySyncer] applyTimerDuration:', mins, 'min');
     if (isRunning) pauseTimer();
-    currentMode = 'countdown';
-    isBreak     = false;
-
-    document.getElementById('btn-pomodoro').classList.remove('active');
-    document.getElementById('btn-countdown').classList.add('active');
 
     totalSeconds     = mins * 60;
     remainingSeconds = totalSeconds;
-    durationInput.value = mins;          // keep input in sync (display only)
-    pomodoroInfo.style.display = 'none';
+
+    // Keep the hidden input in sync (used by restoreTimerState)
+    const inp = document.getElementById('duration');
+    if (inp) inp.value = mins;
+
+    // Switch to countdown phase (no tab active)
+    currentPhase = 'countdown';
+    currentMode  = 'countdown';
+
+    ['pomodoro', 'shortbreak', 'longbreak'].forEach(p => {
+        const tab = document.getElementById('tab-' + p);
+        if (tab) tab.classList.remove('active');
+    });
 
     setDisplay(remainingSeconds, '');
     updatePomodoroInfo();
 }
 
-// ── Duration ───────────────────────────────────────────
+// Legacy shim — preserved in case anything still calls applyDuration()
 function applyDuration() {
+    const inp  = document.getElementById('duration');
+    const mins = inp ? Math.max(1, parseInt(inp.value, 10) || pomodoroMins) : pomodoroMins;
+    if (inp) inp.value = mins;
     if (isRunning) pauseTimer();
-    const mins = Math.max(1, parseInt(durationInput.value, 10) || 25);
-    durationInput.value = mins;
-    totalSeconds = mins * 60;
+    totalSeconds     = mins * 60;
     remainingSeconds = totalSeconds;
     setDisplay(remainingSeconds, '');
-    updatePomodoroInfo();
 }
 
-// ── Timer core ─────────────────────────────────────────
+// ── Core timer ─────────────────────────────────────────
 function startTimer() {
     if (isRunning) return;
     isRunning = true;
@@ -144,56 +226,39 @@ function pauseTimer() {
 }
 
 /**
- * Skip the current session.
+ * Skip the current phase.
  *
- * Elapsed time  = totalSeconds − remainingSeconds.
- * Rounding rule = Math.round(elapsed / 60) — consistent with how
- *                 handleSessionEnd rounds countdown durations.
- * A skip is only recorded when at least one full rounded minute elapsed;
- * anything under 30 s rounds to 0 and is treated as a false start.
- *
- * Pomodoro work  → record partial minutes, then auto-start the break
- *                  (mirrors natural session completion).
- * Pomodoro break → end break early, return to work — nothing to record.
- * Countdown      → record partial minutes, reset to full duration.
+ * - Pomodoro work  → log partial minutes (if ≥1), auto-advance to break.
+ * - Short/Long break → skip rest, return to pomodoro work.
+ * - Countdown      → log partial minutes, reset to full duration.
  */
 function skipTimer() {
-    const elapsedSeconds = totalSeconds - remainingSeconds;
-
+    const elapsed = totalSeconds - remainingSeconds;
     clearInterval(timerInterval);
     isRunning = false;
 
-    if (currentMode === 'pomodoro') {
-        if (isBreak) {
-            // Skip rest of break — no study time to record, just return to work
-            isBreak      = false;
-            totalSeconds = POMODORO_WORK * 60;
-            remainingSeconds = totalSeconds;
-            setDisplay(remainingSeconds, '');
-            updatePomodoroInfo();
-        } else {
-            // Skip a work block — save partial time, then run the break
-            const elapsedMins = Math.round(elapsedSeconds / 60);
-            if (elapsedMins > 0) {
-                const subject = (typeof getActiveSubjectName === 'function')
-                    ? getActiveSubjectName() : 'General';
-                logSession(subject, 'Pomodoro (work)', elapsedMins, false);
-            }
-            isBreak      = true;
-            sessionCount++;
-            totalSeconds = POMODORO_BREAK * 60;
-            remainingSeconds = totalSeconds;
-            setDisplay(remainingSeconds, '');
-            updatePomodoroInfo();
-            setTimeout(startTimer, 1000);   // auto-start break, same as natural end
+    if (currentPhase === 'pomodoro') {
+        const mins = Math.round(elapsed / 60);
+        if (mins > 0) {
+            const subj = _activeSubject();
+            logSession(subj, 'Pomodoro (work)', mins, false);
         }
+        // Decide next break type: long every 4th session
+        const nextBreak = (sessionCount % 4 === 0) ? 'longbreak' : 'shortbreak';
+        sessionCount++;
+        setTimerPhase(nextBreak);
+        setTimeout(startTimer, 800);  // auto-start break
+
+    } else if (currentPhase === 'shortbreak' || currentPhase === 'longbreak') {
+        // Skip break → back to work
+        setTimerPhase('pomodoro');
+
     } else {
-        // Countdown — save partial time, reset to full duration
-        const elapsedMins = Math.round(elapsedSeconds / 60);
-        if (elapsedMins > 0) {
-            const subject = (typeof getActiveSubjectName === 'function')
-                ? getActiveSubjectName() : 'General';
-            logSession(subject, 'Countdown', elapsedMins, false);
+        // Countdown — log partial, reset
+        const mins = Math.round(elapsed / 60);
+        if (mins > 0) {
+            const subj = _activeSubject();
+            logSession(subj, 'Countdown', mins, false);
         }
         remainingSeconds = totalSeconds;
         setDisplay(remainingSeconds, '');
@@ -202,51 +267,39 @@ function skipTimer() {
     saveTimerState();
 }
 
-// ── Session end logic ──────────────────────────────────
+// ── Session end (natural completion) ──────────────────
 function handleSessionEnd() {
-    const subject = (typeof getActiveSubjectName === 'function') ? getActiveSubjectName() : 'General';
+    const subj = _activeSubject();
 
-    if (currentMode === 'pomodoro') {
-        if (!isBreak) {
-            // Work session just ended — log it
-            logSession(subject, 'Pomodoro (work)', POMODORO_WORK);
-            isBreak = true;
-            sessionCount++;
-            totalSeconds = POMODORO_BREAK * 60;
-            remainingSeconds = totalSeconds;
-            setDisplay(remainingSeconds, '');
-            updatePomodoroInfo();
-            // Auto-start break
-            setTimeout(startTimer, 1000);
-        } else {
-            // Break just ended
-            isBreak = false;
-            totalSeconds = POMODORO_WORK * 60;
-            remainingSeconds = totalSeconds;
-            if (sessionCount > 4) sessionCount = 1;
-            setDisplay(remainingSeconds, '');
-            updatePomodoroInfo();
-        }
+    if (currentPhase === 'pomodoro') {
+        logSession(subj, 'Pomodoro (work)', pomodoroMins);
+        const nextBreak = (sessionCount % 4 === 0) ? 'longbreak' : 'shortbreak';
+        sessionCount++;
+        setTimerPhase(nextBreak);
+        setTimeout(startTimer, 1000);  // auto-start break
+
+    } else if (currentPhase === 'shortbreak' || currentPhase === 'longbreak') {
+        // Break done → reset count if needed, go back to work
+        if (sessionCount > 4) sessionCount = 1;
+        setTimerPhase('pomodoro');
+
     } else {
+        // Countdown complete
         const mins = Math.round(totalSeconds / 60);
-        logSession(subject, 'Countdown', mins);
+        logSession(subj, 'Countdown', mins);
     }
 
-    // STUD-34: persist session count after each session
     saveTimerState();
 }
 
-// ── Timer persistence (STUD-34 / STUD-35) ─────────────
-
-// Saves mode + duration config + session count for the logged-in user.
-// Silent no-op for guests (window.currentUser is null until auth.js runs).
+// ── Persistence (STUD-34/35) ───────────────────────────
 async function saveTimerState() {
     if (!window.currentUser) return;
     try {
         await fetch('/api/timer/save', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({
+            body: JSON.stringify({
                 mode:         currentMode,
                 totalSeconds: totalSeconds,
                 sessionCount: sessionCount,
@@ -255,64 +308,52 @@ async function saveTimerState() {
     } catch (_) { /* silent */ }
 }
 
-// Called by auth.js after login/page-load when saved state exists (STUD-35).
 function restoreTimerState(state) {
-    currentMode   = state.mode         || 'pomodoro';
-    totalSeconds  = state.totalSeconds || (25 * 60);
-    sessionCount  = state.sessionCount || 1;
+    currentMode  = state.mode         || 'pomodoro';
+    totalSeconds = state.totalSeconds || (pomodoroMins * 60);
+    sessionCount = state.sessionCount || 1;
     remainingSeconds = totalSeconds;
-    isBreak  = false;
     isRunning = false;
 
-    // Sync mode toggle buttons
-    document.getElementById('btn-pomodoro').classList.toggle('active', currentMode === 'pomodoro');
-    document.getElementById('btn-countdown').classList.toggle('active', currentMode === 'countdown');
-    document.getElementById('duration').value = Math.round(totalSeconds / 60);
+    // Map saved mode → phase
+    currentPhase = (currentMode === 'countdown') ? 'countdown' : 'pomodoro';
 
-    const pomInfo = document.getElementById('pomodoro-info');
-    pomInfo.style.display = (currentMode === 'pomodoro') ? '' : 'none';
+    // Sync tab UI
+    ['pomodoro', 'shortbreak', 'longbreak'].forEach(p => {
+        const tab = document.getElementById('tab-' + p);
+        if (tab) tab.classList.toggle('active', p === currentPhase);
+    });
+
+    // Keep hidden input in sync
+    const inp = document.getElementById('duration');
+    if (inp) inp.value = Math.round(totalSeconds / 60);
 
     setDisplay(remainingSeconds, '');
     updatePomodoroInfo();
 }
 
 // ── Results log ────────────────────────────────────────
-
-/**
- * Record a study session in the local in-page log and (for logged-in users)
- * persist it to the backend.
- *
- * @param {string}  subject   - Subject / material name shown in the results table.
- * @param {string}  mode      - Timer mode label ("Pomodoro (work)" | "Countdown").
- * @param {number}  mins      - Rounded elapsed minutes.
- * @param {boolean} completed - true = ran to natural end; false = skipped early.
- */
 function logSession(subject, mode, mins, completed = true) {
     const now  = new Date();
     const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const date = now.toISOString().split('T')[0];   // STUD-38/39: yyyy-mm-dd for daily/weekly sums
+    const date = now.toISOString().split('T')[0];
     sessions.push({ subject, mode, duration: mins + ' min', durationMins: mins, time, date, completed });
     renderResults();
-    // STUD-36/37/38/39: notify progress tracker (defined in subjects.js)
     if (typeof onSessionCompleted === 'function') onSessionCompleted(subject, mins, date);
 
-    // Persist to tracker backend for logged-in users
     if (window.currentUser) {
-        // Prefer the doc-subject-name field (Study Material flow) over the session label
-        const docSubjectEl = document.getElementById('doc-subject-name');
-        const materialName = (docSubjectEl && docSubjectEl.value.trim())
-            ? docSubjectEl.value.trim()
-            : subject;
+        const docEl = document.getElementById('doc-subject-name');
+        const name  = (docEl && docEl.value.trim()) ? docEl.value.trim() : subject;
         fetch('/api/tracker/sessions', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({
-                materialName:    materialName,
+            body: JSON.stringify({
+                materialName:    name,
                 durationMinutes: mins,
                 timerMode:       mode,
-                completed:       completed,
+                completed,
             }),
-        }).catch(() => { /* silent — never break the timer flow */ });
+        }).catch(() => {});
     }
 }
 
@@ -339,14 +380,13 @@ function renderResults() {
     `).join('');
 }
 
-/** Safe HTML escaping — named htmlEsc to avoid shadowing the deprecated window.escape. */
 function htmlEsc(str) {
     if (str == null) return '';
     return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+        .replace(/&/g,  '&amp;')
+        .replace(/</g,  '&lt;')
+        .replace(/>/g,  '&gt;')
+        .replace(/"/g,  '&quot;');
 }
 
 function clearResults() {
@@ -355,37 +395,27 @@ function clearResults() {
     if (typeof onSessionsCleared === 'function') onSessionsCleared();
 }
 
-// ── Reset for new material (called by subjects.js startNewMaterial) ────────
+// ── Reset for new material (called by subjects.js) ─────
 function resetTimerForNewMaterial() {
-    // Stop any running timer
     isRunning = false;
     clearInterval(timerInterval);
     timerInterval = null;
-
-    // Reset to Pomodoro defaults
-    currentMode      = 'pomodoro';
-    isBreak          = false;
-    sessionCount     = 1;
-    totalSeconds     = POMODORO_WORK * 60;
-    remainingSeconds = totalSeconds;
-
-    // Sync UI
-    document.getElementById('btn-pomodoro').classList.add('active');
-    document.getElementById('btn-countdown').classList.remove('active');
-    durationInput.value        = POMODORO_WORK;
-    pomodoroInfo.style.display = '';
-
-    setDisplay(remainingSeconds, '');
-    updatePomodoroInfo();
+    sessionCount  = 1;
+    setTimerPhase('pomodoro');
 }
 
-// ── Keyboard shortcut — Space to start / pause ─────────
+// ── Internal helpers ───────────────────────────────────
+function _activeSubject() {
+    return (typeof getActiveSubjectName === 'function')
+        ? getActiveSubjectName()
+        : 'General';
+}
+
+// ── Space-bar shortcut ─────────────────────────────────
 document.addEventListener('keydown', e => {
-    // Only fire when no input/textarea is focused
     if (e.key === ' ' && e.target === document.body) {
         e.preventDefault();
-        if (isRunning) pauseTimer();
-        else startTimer();
+        if (isRunning) pauseTimer(); else startTimer();
     }
 });
 
