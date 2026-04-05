@@ -29,7 +29,8 @@ html, body {
 body {
     background: var(--bg);
     background-image:
-        radial-gradient(ellipse at 50% -10%, rgba(124,92,252,0.09) 0%, transparent 55%);
+        radial-gradient(ellipse at 50% -10%,
+            rgba(124,92,252,0.08) 0%, transparent 55%);
     color: var(--text);
     font-family: 'Inter', system-ui, sans-serif;
     min-height: 100vh;
@@ -48,8 +49,6 @@ body {
     height: 54px;
     border-bottom: 1px solid rgba(255,255,255,0.045);
     flex-shrink: 0;
-    position: relative;
-    z-index: 10;
 }
 
 .focus-back-btn {
@@ -64,20 +63,18 @@ body {
     transition: color 0.15s;
 }
 .focus-back-btn:hover { color: var(--text); }
-.focus-back-btn svg { flex-shrink: 0; }
+.focus-back-btn svg   { flex-shrink: 0; }
 
 .focus-page-title {
     font-size: 0.78rem;
     font-weight: 600;
-    color: rgba(139,143,168,0.6);
+    color: rgba(139,143,168,0.55);
     letter-spacing: 0.1em;
     text-transform: uppercase;
     flex-shrink: 0;
 }
 
-.focus-spacer {
-    flex: 1;
-}
+.focus-spacer { flex: 1; }
 
 /* ── Main layout ─────────────────────────────────────────────── */
 .focus-main {
@@ -97,11 +94,11 @@ body {
     border: 1px solid var(--border);
     border-radius: 13px;
     padding: 5px;
-    margin-bottom: 56px;
+    margin-bottom: 48px;
 }
 
 .focus-tab {
-    padding: 8px 20px;
+    padding: 8px 18px;
     border-radius: 9px;
     font-size: 0.815rem;
     font-weight: 500;
@@ -125,233 +122,120 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   ORB
-   Structure:
-     .orb-scene          — positioning context + CSS var anchor
-       .orb-halo         — ambient glow disc behind orb
-       .orb              — the visible circle (overflow:hidden clips fill)
-         .orb-fill       — liquid fill, height = progress %
-           .orb-wave-a/b — rotating wave arcs at fill surface
-         .orb-highlight  — static gloss
-       .orb-text-layer   — absolute overlay for timer text
+   FLASK SCENE
    ══════════════════════════════════════════════════════════════ */
 
-.orb-scene {
+.flask-scene {
     position: relative;
-    width: 300px;
-    height: 300px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 40px;
-
-    /* JS writes --glow-opacity here; children inherit it */
-    --glow-opacity: 1;
+    /* Extra space around the SVG for the glow halo */
+    padding: 40px 50px;
+    margin-bottom: 32px;
+    /* JS writes --flask-glow (0.25 → 1.0); halo reads it */
+    --flask-glow: 1;
 }
 
-/* ── Ambient halo ────────────────────────────────────────────── */
-.orb-halo {
+/* Ambient radial glow behind the flask */
+.flask-glow-halo {
     position: absolute;
-    /* Slightly larger than the orb so glow bleeds outward */
-    inset: -55px;
+    inset: 0;
     border-radius: 50%;
     background: radial-gradient(
-        circle,
+        ellipse at 50% 60%,
         rgba(124,92,252,0.22) 0%,
-        rgba(124,92,252,0.08) 45%,
+        rgba(124,92,252,0.07) 45%,
         transparent 70%
     );
-    opacity: var(--glow-opacity);
+    opacity: var(--flask-glow);
     transition: opacity 0.95s linear;
     pointer-events: none;
 }
 
-/* Second, softer halo ring */
-.orb-halo::after {
-    content: '';
-    position: absolute;
-    inset: -50px;
-    border-radius: 50%;
-    background: radial-gradient(
-        circle,
-        rgba(167,139,250,0.06) 0%,
-        transparent 65%
-    );
-    opacity: inherit;
+/* The SVG itself */
+#flask-svg {
+    position: relative;
+    z-index: 1;
+    /* Overall drop-shadow around the whole SVG (includes outline glow) */
+    filter:
+        drop-shadow(0 0 18px rgba(124,92,252,0.45))
+        drop-shadow(0 0 50px rgba(124,92,252,0.18));
+    transition: filter 0.95s linear;
+    overflow: visible; /* allow glow to escape viewBox */
+    display: block;
 }
 
-/* ── Orb body ────────────────────────────────────────────────── */
-.orb {
-    position: absolute;
-    width: 268px;
-    height: 268px;
-    border-radius: 50%;
-    overflow: hidden;                           /* clips fill + waves to circle */
-    background: #100e1c;
-    border: 1.5px solid rgba(124,92,252,0.32);
-    box-shadow:
-        /* outer glow layers */
-        0 0 0   1px rgba(124,92,252,0.10),
-        0 0 32px    rgba(124,92,252,0.38),
-        0 0 72px    rgba(124,92,252,0.18),
-        0 0 130px   rgba(124,92,252,0.08),
-        /* inner depth shadow */
-        inset 0 -20px 50px rgba(0,0,0,0.55),
-        inset 0  20px 30px rgba(0,0,0,0.35);
-}
-
-/* ── Liquid fill ─────────────────────────────────────────────── */
-.orb-fill {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 100%;           /* JS overrides this each tick */
-    background: linear-gradient(
-        to top,
-        var(--accent-deep)  0%,
-        var(--accent-dark)  28%,
-        var(--accent)       62%,
-        var(--accent-light) 100%
-    );
-    transition: height 0.95s linear;
-}
-
-/* Subtle inner glow inside the fill */
-.orb-fill::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-        to bottom,
-        rgba(167,139,250,0.18) 0%,
-        transparent 50%
-    );
-    pointer-events: none;
-}
-
-/* ── Wave arcs at the fill's top edge ────────────────────────── */
+/* ── Pixel shimmer animation ─────────────────────────────────── */
 /*
-   Each wave is a wide, short ellipse positioned at the very top
-   of the fill div. By rotating around its center (left:-50% + width:200%
-   makes the center align with the fill's center) it creates a convincing
-   liquid surface wobble. The two layers spin at different speeds and
-   opposite directions for a natural, non-repetitive look.
+   The pixel group subtly pulses while idle.
+   When running, it pulses faster.
+   Combined with the SVG glow filter, this creates a living feel.
 */
-.orb-wave {
-    position: absolute;
-    top: -15px;
-    left: -50%;
-    width: 200%;
-    height: 30px;
-    border-radius: 44%;
-    transform-origin: 50% 50%;
+#flask-pixels {
+    animation: px-shimmer 4.5s ease-in-out infinite;
 }
 
-.orb-wave-a {
-    background: rgba(124,92,252,0.55);
-    animation: wave-spin 5.8s linear infinite;
+@keyframes px-shimmer {
+    0%, 100% { opacity: 0.88; }
+    50%       { opacity: 1.0;  }
 }
 
-.orb-wave-b {
-    top: -20px;
-    background: rgba(167,139,250,0.38);
-    animation: wave-spin 7.4s linear infinite reverse;
-}
+/* ── Body state classes ──────────────────────────────────────── */
 
-@keyframes wave-spin {
-    from { transform: rotate(0deg);   }
-    to   { transform: rotate(360deg); }
-}
-
-/* ── Orb gloss highlight ─────────────────────────────────────── */
-.orb-highlight {
-    position: absolute;
-    top: 18px;
-    left: 30px;
-    width: 68px;
-    height: 46px;
-    background: radial-gradient(
-        ellipse at center,
-        rgba(255,255,255,0.13) 0%,
-        transparent 70%
-    );
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 3;
-}
-
-/* ── Timer text layer ────────────────────────────────────────── */
-/*
-   Sits outside the orb div (so it is NOT clipped by overflow:hidden)
-   but positioned absolutely inside .orb-scene at the same coordinates.
-   pointer-events: none so clicks pass through to controls.
-*/
-.orb-text-layer {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    pointer-events: none;
-    z-index: 20;
-}
-
-.orb-time {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 3.85rem;
-    font-weight: 700;
-    line-height: 1;
-    color: #ffffff;
-    letter-spacing: -0.02em;
-    text-shadow:
-        0 0 28px rgba(167,139,250,0.95),
-        0 0  8px rgba(124,92,252,0.6),
-        0  2px 16px rgba(0,0,0,0.7);
-    transform: translateY(-1px); /* optical center for JetBrains Mono */
-}
-
-/* ══════════════════════════════════════════════════════════════
-   BODY STATE CLASSES  (added/removed by focus.js)
-   .is-running  — timer counting down
-   .is-paused   — user paused
-   .is-done     — phase just completed
-   ══════════════════════════════════════════════════════════════ */
-
-/* Running: halo pulses outward, waves already animate */
-.is-running .orb-halo {
+/* Running: halo pulses + pixels shimmer faster */
+.is-running .flask-glow-halo {
     animation: halo-pulse 2.8s ease-in-out infinite;
+}
+.is-running #flask-pixels {
+    animation: px-shimmer-fast 2.2s ease-in-out infinite;
 }
 
 @keyframes halo-pulse {
     0%, 100% { transform: scale(1);    }
-    50%       { transform: scale(1.11); }
+    50%       { transform: scale(1.12); }
 }
 
-/* Paused: orb subtly breathes */
-.is-paused .orb {
-    animation: orb-breathe 3.6s ease-in-out infinite;
+@keyframes px-shimmer-fast {
+    0%, 100% { opacity: 0.80; }
+    50%       { opacity: 1.0;  }
 }
 
-@keyframes orb-breathe {
-    0%, 100% { filter: brightness(1);    }
-    50%       { filter: brightness(1.2); }
+/* Paused: flask breathes gently */
+.is-paused #flask-svg {
+    animation: flask-breathe 3.5s ease-in-out infinite;
+}
+
+@keyframes flask-breathe {
+    0%, 100% { filter:
+        drop-shadow(0 0 18px rgba(124,92,252,0.45))
+        drop-shadow(0 0 50px rgba(124,92,252,0.18)); }
+    50%       { filter:
+        drop-shadow(0 0 28px rgba(124,92,252,0.65))
+        drop-shadow(0 0 70px rgba(124,92,252,0.28)); }
 }
 
 /* Done: brief bright flash */
-.is-done .orb {
-    animation: orb-done-flash 0.55s ease-out 2;
+.is-done #flask-svg {
+    animation: flask-done-flash 0.55s ease-out 2;
 }
 
-@keyframes orb-done-flash {
-    0%   { filter: brightness(1);   }
-    45%  { filter: brightness(1.7); }
-    100% { filter: brightness(1);   }
+@keyframes flask-done-flash {
+    0%   { filter:
+        drop-shadow(0 0 18px rgba(124,92,252,0.45))
+        drop-shadow(0 0 50px rgba(124,92,252,0.18)); }
+    45%  { filter:
+        drop-shadow(0 0 50px rgba(167,139,250,0.9))
+        drop-shadow(0 0 100px rgba(124,92,252,0.5)); }
+    100% { filter:
+        drop-shadow(0 0 18px rgba(124,92,252,0.45))
+        drop-shadow(0 0 50px rgba(124,92,252,0.18)); }
 }
 
 /* ── Progress bar ────────────────────────────────────────────── */
 .focus-bar-track {
     width: 100%;
-    max-width: 330px;
+    max-width: 320px;
     height: 5px;
     background: var(--surface3);
     border-radius: 99px;
@@ -361,7 +245,7 @@ body {
 
 .focus-bar-fill {
     height: 100%;
-    width: 100%;            /* JS overrides each tick */
+    width: 100%;       /* focus.js sets this on each tick */
     background: linear-gradient(
         90deg,
         var(--accent-deep),
@@ -378,9 +262,9 @@ body {
     font-size: 0.815rem;
     color: var(--muted);
     letter-spacing: 0.025em;
-    margin-bottom: 44px;
+    margin-bottom: 40px;
     text-align: center;
-    min-height: 1.2em;      /* prevents layout shift during phase changes */
+    min-height: 1.2em;
 }
 
 /* ── Controls ────────────────────────────────────────────────── */
@@ -388,7 +272,7 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 36px;
+    margin-bottom: 32px;
 }
 
 .focus-btn {
@@ -407,19 +291,19 @@ body {
 }
 .focus-btn:active { transform: scale(0.95); }
 
-/* Primary — Start/Pause */
+/* Primary — Start / Pause */
 .focus-btn-primary {
     background: var(--accent);
     color: #fff;
     font-size: 1rem;
     padding: 15px 52px;
-    box-shadow: 0 4px 28px rgba(124,92,252,0.42);
+    box-shadow: 0 4px 28px rgba(124,92,252,0.40);
     letter-spacing: 0.025em;
     min-width: 140px;
 }
 .focus-btn-primary:hover {
     background: var(--accent-mid);
-    box-shadow: 0 6px 36px rgba(124,92,252,0.58);
+    box-shadow: 0 6px 36px rgba(124,92,252,0.56);
 }
 
 /* Secondary — Skip */
@@ -439,7 +323,7 @@ body {
 /* ── Keyboard hint ───────────────────────────────────────────── */
 .focus-keyboard-hint {
     font-size: 0.775rem;
-    color: rgba(139,143,168,0.45);
+    color: rgba(139,143,168,0.42);
     letter-spacing: 0.025em;
     text-align: center;
 }
@@ -459,57 +343,30 @@ body {
 
 /* ── Responsive — small phones ───────────────────────────────── */
 @media (max-width: 480px) {
-    .focus-topbar {
-        padding: 0 18px;
+    .focus-topbar    { padding: 0 18px; }
+    .focus-phase-tabs { margin-bottom: 32px; }
+    .focus-tab       { padding: 7px 12px; font-size: 0.77rem; }
+
+    .flask-scene     { padding: 28px 36px; margin-bottom: 20px; }
+
+    /* Scale the SVG down on small phones */
+    #flask-svg {
+        width: 160px !important;
+        height: auto !important;
     }
 
-    .focus-phase-tabs {
-        margin-bottom: 40px;
-    }
-    .focus-tab {
-        padding: 7px 13px;
-        font-size: 0.77rem;
-    }
-
-    .orb-scene {
-        width: 252px;
-        height: 252px;
-        margin-bottom: 32px;
-    }
-    .orb {
-        width: 228px;
-        height: 228px;
-    }
-    .orb-time {
-        font-size: 3.15rem;
-    }
-
-    .focus-bar-track {
-        max-width: 280px;
-    }
-
+    .focus-bar-track { max-width: 260px; }
     .focus-btn-primary {
-        padding: 14px 38px;
+        padding: 14px 36px;
         min-width: 120px;
     }
 }
 
-/* ── Responsive — short viewports (landscape phone, small laptop) */
+/* ── Responsive — short viewports (landscape / small laptops) ── */
 @media (max-height: 680px) {
-    .focus-main {
-        justify-content: flex-start;
-        padding-top: 24px;
-    }
-    .focus-phase-tabs {
-        margin-bottom: 28px;
-    }
-    .orb-scene {
-        margin-bottom: 24px;
-    }
-    .focus-session-label {
-        margin-bottom: 22px;
-    }
-    .focus-controls {
-        margin-bottom: 20px;
-    }
+    .focus-main        { justify-content: flex-start; padding-top: 20px; }
+    .focus-phase-tabs  { margin-bottom: 24px; }
+    .flask-scene       { padding: 24px 40px; margin-bottom: 16px; }
+    .focus-session-label { margin-bottom: 18px; }
+    .focus-controls    { margin-bottom: 18px; }
 }
