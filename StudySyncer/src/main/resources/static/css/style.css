@@ -2415,3 +2415,228 @@ header {
     padding: 6px 14px;
     flex-shrink: 0;
 }
+
+/* ════════════════════════════════════════════════════════
+   UI/UX REFINEMENT — Layout, Spacing, Typography, Modal
+   ════════════════════════════════════════════════════════ */
+
+/* ── Hero tagline: breathing room below ── */
+.hero-tagline {
+    padding: 14px 20px 28px;
+}
+
+/* ── Top panel: overflow-safe columns, wider gap ── */
+.top-panel {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 28px;
+    margin-bottom: 28px;
+    align-items: start;
+}
+
+/* ── Cards: extra horizontal padding for readability ── */
+.timer-card,
+.syllabus-card,
+.results-card,
+.estimation-card,
+.study-plan-card {
+    padding: 28px 32px;
+}
+
+/* ── Unified card headings ── */
+.timer-card h2,
+.syllabus-card h2,
+.results-card h2,
+.estimation-card h2,
+.study-plan-card h2 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    color: var(--text);
+}
+
+.timer-card h2   { margin-bottom: 14px; }
+.results-card h2 { margin-bottom: 18px; }
+
+/* ── Timer card: compact mode-toggle gap ── */
+.timer-card .mode-toggle {
+    margin-bottom: 10px;
+}
+
+/* ── Card hint: clean positive margin (remove negative hack) ── */
+.card-hint {
+    margin: 0 0 14px;
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+/* ── Auth bar: right-aligned inside horizontal nav ── */
+.auth-bar {
+    margin-top: 0;
+    justify-content: flex-end;
+}
+
+/* ── Inputs: taller touch targets ── */
+.field-input {
+    padding: 10px 14px;
+    border-radius: 10px;
+}
+
+.password-wrap .field-input {
+    padding-right: 44px;
+}
+
+/* Re-centre toggle icon for taller input */
+.toggle-pw {
+    right: 12px;
+}
+
+/* ── Consistent 10px border-radius on all interactive elements ── */
+.apply-btn,
+.clear-btn,
+.mode-btn,
+.ctrl-btn,
+.save-btn,
+.auth-link-btn,
+.google-btn,
+.add-subject-btn {
+    border-radius: 10px;
+}
+
+.duration-input input[type="number"] {
+    border-radius: 10px;
+}
+
+/* ── Start button: soft accent glow ── */
+.ctrl-btn.start {
+    box-shadow: 0 2px 18px rgba(124, 92, 252, 0.28);
+    letter-spacing: 0.2px;
+}
+
+.ctrl-btn.start:hover:not(:disabled) {
+    box-shadow: 0 4px 24px rgba(124, 92, 252, 0.42);
+}
+
+/* ── Clear results button: space from table ── */
+.results-card .clear-btn {
+    margin-top: 16px;
+}
+
+/* ── Mobile: restore compact card padding ── */
+@media (max-width: 480px) {
+    .timer-card,
+    .syllabus-card,
+    .estimation-card,
+    .study-plan-card,
+    .results-card {
+        padding: 18px 16px;
+    }
+}
+
+/* ══════════════════════════════════════════════════════
+   AUTH MODAL — Width, Padding, Form Spacing Hierarchy
+   ══════════════════════════════════════════════════════ */
+
+/* Wider gradient border wrapper */
+.auth-modal-border {
+    max-width: 424px;
+}
+
+/* Modal box: wider, better padded, remove uniform gap */
+.auth-modal-box {
+    max-width: 100%;
+    padding: 40px 36px 32px;
+    gap: 0;
+}
+
+/* Modal logo: tighter */
+.auth-modal-logo {
+    font-size: 1rem;
+    margin-bottom: 8px;
+    letter-spacing: -0.2px;
+}
+
+/* Modal title: larger, more weight, bottom gap to panel */
+.auth-modal-box > h3 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    margin-bottom: 22px;
+}
+
+/* Close button: match new padding */
+.auth-modal-close {
+    top: 16px;
+    right: 18px;
+    font-size: 1.4rem;
+    border-radius: 8px;
+}
+
+/* ── Panels: flex column so margins work predictably ── */
+#login-panel,
+#register-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Google button: bottom gap + slightly taller */
+.google-btn {
+    margin-bottom: 16px;
+    padding: 11px 16px;
+    border-radius: 10px;
+    font-size: 0.875rem;
+}
+
+/* Divider: space below only */
+.auth-divider {
+    margin: 0 0 16px;
+}
+
+/* All auth fields: consistent vertical rhythm */
+.auth-field {
+    margin-bottom: 14px;
+}
+
+/* Labels: slightly bolder for hierarchy */
+.auth-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    margin-bottom: 7px;
+}
+
+/* Auth field inputs: match global radius */
+.auth-field .field-input {
+    border-radius: 10px;
+}
+
+/* Password strength: breathe above, flush below */
+.password-strength {
+    margin-top: 10px;
+    margin-bottom: 0;
+}
+
+/* Confirm password field: extra top clearance after strength bar */
+.auth-field:has(#reg-confirm) {
+    margin-top: 6px;
+}
+
+/* Auth error block: space below */
+.auth-error {
+    margin-bottom: 14px;
+    border-radius: 10px;
+    font-size: 0.83rem;
+}
+
+/* Submit button: clear separation from fields above */
+.auth-submit-btn {
+    margin-top: 20px;
+    padding: 12px;
+    font-size: 0.95rem;
+    letter-spacing: 0.2px;
+    border-radius: 10px;
+}
+
+/* Switch link: breathing room below submit */
+.auth-switch {
+    margin-top: 16px;
+}
