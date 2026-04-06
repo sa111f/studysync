@@ -279,7 +279,7 @@ async function doLogin() {
         showLoginError(data.error || 'Login failed.');
     } finally {
         btn.disabled = false;
-        btn.textContent = 'Log in';
+        btn.textContent = 'Log in with Email';
     }
 }
 
@@ -325,7 +325,7 @@ async function doRegister() {
         }
     } finally {
         btn.disabled    = false;
-        btn.textContent = 'Sign up';
+        btn.textContent = 'Sign up with Email';
     }
 }
 

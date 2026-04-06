@@ -49,11 +49,6 @@
      ══════════════════════════════════════════════════════════ -->
 <div id="auth-modal" class="auth-modal hidden">
     <div class="auth-modal-box" id="auth-modal-box">
-        <button class="auth-modal-close" onclick="closeModal()" aria-label="Close">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-        </button>
         <div class="auth-modal-logo">StudySync</div>
         <p class="auth-tagline">Stay focused. Study smarter.</p>
         <h3 id="auth-modal-title">Log in</h3>
@@ -62,7 +57,7 @@
         <div id="login-panel">
 
             <!-- Google OAuth2 -->
-            <a href="/auth/google-start" class="google-btn">
+            <a href="/oauth2/authorization/google" class="google-btn">
                 <svg class="google-icon" viewBox="0 0 48 48">
                     <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                     <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -98,7 +93,7 @@
 
             <div id="login-error" class="auth-error hidden"></div>
 
-            <button id="login-submit-btn" class="save-btn auth-submit-btn" onclick="doLogin()">Log in</button>
+            <button id="login-submit-btn" class="save-btn auth-submit-btn" onclick="doLogin()">Log in with Email</button>
 
             <p class="auth-switch">
                 No account? <button class="auth-link-btn" onclick="switchModal()">Sign up</button>
@@ -109,7 +104,7 @@
         <div id="register-panel" class="hidden">
 
             <!-- Google OAuth2 -->
-            <a href="/auth/google-start" class="google-btn">
+            <a href="/oauth2/authorization/google" class="google-btn">
                 <svg class="google-icon" viewBox="0 0 48 48">
                     <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                     <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -177,7 +172,7 @@
 
             <div id="register-error" class="auth-error hidden"></div>
 
-            <button id="register-submit-btn" class="save-btn auth-submit-btn" onclick="doRegister()">Sign up</button>
+            <button id="register-submit-btn" class="save-btn auth-submit-btn" onclick="doRegister()">Sign up with Email</button>
 
             <p class="auth-switch">
                 Have an account? <button class="auth-link-btn" onclick="switchModal()">Log in</button>

@@ -3127,3 +3127,63 @@ main {
         padding: 44px 28px 36px !important;
     }
 }
+
+/* ══════════════════════════════════════════════════════════
+   AUTH PANEL HIDDEN FIX
+   ID selectors (#login-panel, #register-panel) have specificity
+   (1,0,0) which beats .hidden (0,1,0). Compound rule (1,1,0)
+   wins both so the panel correctly disappears.
+   ══════════════════════════════════════════════════════════ */
+#login-panel.hidden,
+#register-panel.hidden { display: none !important; }
+
+/* ══════════════════════════════════════════════════════════
+   POMOFOCUS-STYLE AUTH REDESIGN
+   ══════════════════════════════════════════════════════════ */
+
+/* Hide X close button — overlay click (and Escape) already close the modal */
+.auth-modal-close { display: none !important; }
+
+/* Google button — outlined, transparent fill */
+.google-btn {
+    background: transparent !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text) !important;
+    box-shadow: none !important;
+    font-weight: 500 !important;
+}
+.google-btn:hover {
+    background: rgba(255,255,255,0.04) !important;
+    border-color: rgba(124,92,252,0.4) !important;
+    color: var(--text) !important;
+    box-shadow: none !important;
+}
+
+/* Field labels — small, uppercase, letter-spaced */
+.auth-label {
+    font-size: 0.695rem !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+    color: var(--muted) !important;
+    margin-bottom: 6px !important;
+}
+
+/* Submit button — solid dark (distinct from the Google outlined style) */
+.auth-submit-btn {
+    background: var(--surface3) !important;
+    color: var(--text) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    box-shadow: none !important;
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.02em !important;
+}
+.auth-submit-btn:hover:not(:disabled) {
+    background: var(--surface2) !important;
+    border-color: rgba(124,92,252,0.35) !important;
+    opacity: 1 !important;
+}
+.auth-submit-btn:disabled {
+    opacity: 0.5 !important;
+}
