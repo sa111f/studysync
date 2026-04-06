@@ -6,29 +6,29 @@
  * in TimerCore (timer-core.js, loaded before this file).
  *
  * Responsibilities:
- *   - Subscribe to TimerCore and drive the flask SVG visuals
+ *   - Subscribe to TimerCore and drive the finjan (Arabic coffee-cup) SVG
  *   - Update phase tabs, progress bar, session label, toggle button
  *   - POST completed sessions to /api/tracker/sessions
- *   - Silent auth check so session saving works for logged-in users
+ *   - Handle fullscreen toggle on finjan click
  *
- * Flask fill mechanism
- *   The SVG contains a dark cover rect (#flask-cover) anchored at
- *   y=FLASK_TOP with height=0. As progress decreases from 1→0,
- *   the cover height grows from 0→FLASK_FILL_HEIGHT, hiding pixels
- *   row by row from the TOP. The clipping by #c-flask keeps
- *   everything inside the flask shape.
+ * Finjan fill mechanism
+ *   The SVG contains a dark cover rect (#finjan-cover) anchored at
+ *   y=FINJAN_TOP with height=0. As progress decreases from 1→0,
+ *   the cover height grows from 0→FINJAN_FILL_HEIGHT, revealing the
+ *   dark interior from the top (coffee appears to drain). The clipPath
+ *   #fj-clip keeps everything inside the cup interior shape.
  */
 
-// ── Flask geometry (must match the SVG viewBox in focus.html) ─
-const FLASK_TOP         = 16;   // y where neck opening starts
-const FLASK_FILL_HEIGHT = 244;  // y=16 to y=260 (body base)
+// ── Finjan geometry (must match the SVG viewBox in focus.html) ─
+const FINJAN_TOP         = 65;  // y where cup interior starts
+const FINJAN_FILL_HEIGHT = 172; // y=65 to y=237 (interior base)
 
 // ── DOM refs ──────────────────────────────────────────────────
-const _barFill    = document.getElementById('focus-bar-fill');
-const _sessionLbl = document.getElementById('focus-session-label');
-const _toggleBtn  = document.getElementById('focus-toggle-btn');
-const _flaskCover = document.getElementById('flask-cover');
-const _flaskScene = document.getElementById('flask-scene');
+const _barFill     = document.getElementById('focus-bar-fill');
+const _sessionLbl  = document.getElementById('focus-session-label');
+const _toggleBtn   = document.getElementById('focus-toggle-btn');
+const _finjanCover = document.getElementById('finjan-cover');
+const _finjanScene = document.getElementById('finjan-scene');
 
 // ── Time formatter ────────────────────────────────────────────
 function _fmt(secs) {
@@ -37,58 +37,25 @@ function _fmt(secs) {
     return `${m}:${s}`;
 }
 
-// ── Generate the pixel grid inside the flask SVG ──────────────
-//
-//   Pixels are small squares laid out on a dense grid.
-//   The SVG clipPath #c-flask clips them to the flask shape.
-//   The cover rect (#flask-cover) then hides the top portion
-//   as time decreases. Pixel color varies slightly for a richer look.
-function _generatePixels() {
-    const g = document.getElementById('flask-pixels');
-    if (!g) return;
-
-    const PX   = 6;   // pixel size (SVG user units)
-    const GAP  = 3;   // gap between pixels
-    const STEP = PX + GAP;
-
-    // Color palette — varying shades of purple
-    const COLORS = ['#7c5cfc', '#8b5cf6', '#9061f9', '#a078fb', '#6748e8', '#b39dfa'];
-
-    let html = '';
-    const colCount = Math.ceil(200  / STEP) + 1;
-    const rowCount = Math.ceil(285  / STEP) + 1;
-
-    for (let r = 0; r < rowCount; r++) {
-        for (let c = 0; c < colCount; c++) {
-            const x = c * STEP + 1;
-            const y = r * STEP + FLASK_TOP;
-            // Non-trivial index so adjacent pixels differ
-            const color = COLORS[(r * 5 + c * 3 + (r ^ c)) % COLORS.length];
-            html += `<rect x="${x}" y="${y}" width="${PX}" height="${PX}" rx="1" fill="${color}"/>`;
-        }
-    }
-    g.innerHTML = html;
-}
-
-// ── Update all flask visuals from a state snapshot ────────────
-function _updateFlask(state, visState) {
+// ── Update all finjan visuals from a state snapshot ──────────
+function _updateFinjan(state, visState) {
     const progress = state.totalSeconds > 0 ? state.remaining / state.totalSeconds : 0;
 
     // 1. Timer text (SVG <text> element)
-    const timeEl = document.getElementById('flask-time');
+    const timeEl = document.getElementById('finjan-time');
     if (timeEl) timeEl.textContent = _fmt(state.remaining);
 
-    // 2. Cover rect height = (1 − progress) × FLASK_FILL_HEIGHT
-    //    Grows from top → hides pixels row by row as time drains.
-    if (_flaskCover) {
-        const coverH = Math.round((1 - progress) * FLASK_FILL_HEIGHT);
-        _flaskCover.setAttribute('height', String(Math.max(0, coverH)));
+    // 2. Cover rect height = (1 − progress) × FINJAN_FILL_HEIGHT
+    //    Grows from top → coffee drains from top as time passes.
+    if (_finjanCover) {
+        const coverH = Math.round((1 - progress) * FINJAN_FILL_HEIGHT);
+        _finjanCover.setAttribute('height', String(Math.max(0, coverH)));
     }
 
     // 3. Ambient glow: dims from 1.0 (full) → 0.25 (empty)
-    if (_flaskScene) {
+    if (_finjanScene) {
         const glow = (0.25 + progress * 0.75).toFixed(3);
-        _flaskScene.style.setProperty('--flask-glow', glow);
+        _finjanScene.style.setProperty('--flask-glow', glow);
     }
 
     // 4. Progress bar (HTML element, CSS-transitioned for smooth fill)
@@ -138,7 +105,7 @@ function _onCoreEvent(event, state) {
 
     // Update flask visuals for all events except logging-only
     if (event !== 'sessionEnd' && event !== 'skip') {
-        _updateFlask(state, visState);
+        _updateFinjan(state, visState);
         _updateTabs(state);
         _updateSessionLabel(state);
         if (_toggleBtn) _toggleBtn.textContent = state.isRunning ? 'Pause' : 'Start';
@@ -202,6 +169,15 @@ function setPhase(phase)  { TimerCore.setPhase(phase);  }
 function toggleTimer()    { TimerCore.toggle();          }
 function skipPhase()      { TimerCore.skip();            }
 
+// ── Fullscreen toggle (wired to finjan click) ─────────────────
+function _toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+        document.exitFullscreen().catch(() => {});
+    }
+}
+
 // ── Silent auth check ─────────────────────────────────────────
 window.currentUser = null;
 
@@ -224,14 +200,21 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Init ──────────────────────────────────────────────────────
-_generatePixels();
-
 (function () {
     const state = TimerCore.getState();
-    _updateFlask(state, state.isRunning ? 'running' : '');
+    _updateFinjan(state, state.isRunning ? 'running' : '');
     _updateTabs(state);
     _updateSessionLabel(state);
     if (_toggleBtn) _toggleBtn.textContent = state.isRunning ? 'Pause' : 'Start';
+
+    // Wire finjan click → fullscreen toggle
+    const finjanSvg = document.getElementById('finjan-svg');
+    if (finjanSvg) {
+        finjanSvg.addEventListener('click', _toggleFullscreen);
+        finjanSvg.addEventListener('keydown', e => {
+            if (e.key === 'Enter') _toggleFullscreen();
+        });
+    }
 })();
 
 _initAuth();
