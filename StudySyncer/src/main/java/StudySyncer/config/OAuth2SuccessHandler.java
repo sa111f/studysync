@@ -76,7 +76,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         HttpSession session = request.getSession(true);
         session.setAttribute("userId", user.getId());
 
-        response.sendRedirect("/");
+        response.sendRedirect("https://www.studysyncer.com/");
     }
 
     // ── Username derivation ───────────────────────────────────
