@@ -36,6 +36,12 @@ body {
 /* ── Header ── */
 header {
     padding: 0 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(15, 17, 23, 0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
 }
 
 /* ── Nav inner ── */
@@ -2646,25 +2652,34 @@ header {
    — overrides old timer/layout rules above —
    ════════════════════════════════════════════════════════ */
 
-/* ── Page layout: focused single-column ── */
+/* ── Page layout: two-column dashboard ── */
 main {
-    max-width: 680px;
+    max-width: 1100px;
     padding-top: 0;
     padding-bottom: 60px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 24px;
 }
 
-/* Suppress old top-panel grid (no longer used) */
-.top-panel { display: contents; }
+/* Two-column top panel: timer (left) + study material (right) */
+.top-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+}
 
-/* ── Timer card: centered hero ── */
+@media (max-width: 820px) {
+    .top-panel { grid-template-columns: 1fr; }
+}
+
+/* ── Timer card: visual hero ── */
 .timer-card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 36px 40px 32px;
+    border-radius: 16px;
+    padding: 40px 40px 32px;
     box-shadow: var(--shadow);
     display: flex;
     flex-direction: column;
@@ -2710,11 +2725,11 @@ main {
     color: var(--text);
 }
 
-/* ── Timer ring wrap: grid centering (fixes off-center bug) ── */
+/* ── Timer ring wrap ── */
 .timer-ring-wrap {
     position: relative;
-    width: 260px;
-    height: 260px;
+    width: 280px;
+    height: 280px;
     display: grid;
     place-items: center;
     margin: 0 auto 28px;
@@ -2727,50 +2742,60 @@ main {
     height: 100%;
     transform: rotate(-90deg);
     pointer-events: none;
+    filter: drop-shadow(0 0 16px rgba(124,92,252,0.25));
+    transition: filter 0.3s;
 }
 
 .timer-ring-track {
     fill: none;
     stroke: rgba(124, 92, 252, 0.12);
-    stroke-width: 8;
+    stroke-width: 5;
 }
 
 .timer-ring-progress {
     fill: none;
     stroke: var(--accent);
-    stroke-width: 8;
+    stroke-width: 5;
     stroke-linecap: round;
     transition: stroke-dashoffset 0.9s linear, stroke 0.3s;
 }
 
-/* Timer display — perfectly centered, no invisible font space */
+/* Timer display — perfectly centered */
 .timer-display {
     position: relative;
     z-index: 1;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 4.4rem;
-    font-weight: 600;
+    font-size: 4.5rem;
+    font-weight: 700;
     letter-spacing: 3px;
     color: var(--text);
     font-variant-numeric: tabular-nums;
-    line-height: 1;      /* collapses invisible descender space */
+    line-height: 1;
     margin: 0;
     transition: color 0.3s;
-    /* Nudge up slightly to optically center within the ring's stroke weight */
     transform: translateY(-1px);
 }
 
-.timer-display.running { color: #7effa0; }
-.timer-display.paused  { color: #ffd27e; }
-.timer-display.done    { color: var(--accent2); }
+.timer-display.running { color: #4ADE80; }
+.timer-display.paused  { color: #FBBF24; }
+.timer-display.done    { color: #FF6B6B; }
 
-/* Ring pulse when running */
+/* Glow pulse on the SVG when running */
 @keyframes ringPulse {
-    0%, 100% { filter: drop-shadow(0 0 6px  rgba(124,92,255,0.4)); }
-    50%       { filter: drop-shadow(0 0 20px rgba(124,92,255,0.8)); }
+    0%, 100% { filter: drop-shadow(0 0 10px rgba(124,92,252,0.25)); }
+    50%       { filter: drop-shadow(0 0 28px rgba(124,92,252,0.65)); }
 }
-.timer-running .timer-ring-progress {
+.timer-running .timer-ring {
     animation: ringPulse 2s ease-in-out infinite;
+}
+
+/* Done state — brief celebration pulse */
+@keyframes donePulse {
+    0%, 100% { filter: drop-shadow(0 0 10px rgba(255,107,107,0.2)); }
+    50%       { filter: drop-shadow(0 0 28px rgba(255,107,107,0.6)); }
+}
+.timer-ring-wrap:has(.timer-display.done) .timer-ring {
+    animation: donePulse 1s ease-in-out 3;
 }
 
 /* ── Timer controls ── */
@@ -2800,20 +2825,22 @@ main {
 .ctrl-btn.start {
     background: var(--accent);
     color: #fff;
-    flex: 1.4;    /* Start is the primary action — slightly wider */
+    flex: 2;
     box-shadow: 0 2px 20px rgba(124, 92, 252, 0.30);
+    min-width: 120px;
 }
 
-.ctrl-btn.pause {
-    background: var(--surface2);
-    color: var(--text);
-    border: 1px solid var(--border);
+.ctrl-btn.start.is-pausing {
+    background: #FBBF24;
+    color: #1a1d27;
+    box-shadow: 0 2px 16px rgba(251,191,36,0.3);
 }
 
 .ctrl-btn.skip {
-    background: rgba(255, 210, 126, 0.10);
-    color: #ffd27e;
-    border: 1px solid rgba(255, 210, 126, 0.28);
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    flex: 1;
 }
 
 .ctrl-btn:hover:not(:disabled) {
@@ -2837,8 +2864,41 @@ main {
     color: var(--muted);
     text-align: center;
     min-height: 1.2em;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
     line-height: 1.5;
+}
+
+/* ── Session progress dots ── */
+.session-dots {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 8px;
+}
+
+.session-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    transition: background 0.3s, border-color 0.3s, transform 0.2s;
+}
+
+.session-dot.filled {
+    background: var(--accent);
+    border-color: var(--accent);
+    transform: scale(1.15);
+}
+
+/* ── Space hint ── */
+.space-hint {
+    font-size: 0.72rem;
+    color: var(--muted);
+    opacity: 0.6;
+    text-align: center;
+    margin-bottom: 20px;
+    letter-spacing: 0.2px;
 }
 
 /* ── Settings trigger button ── */
@@ -2949,7 +3009,7 @@ main {
 /* ── Syllabus card: secondary treatment ── */
 .syllabus-card {
     border-radius: 16px;
-    padding: 24px 28px;
+    padding: 28px;
 }
 
 .syllabus-card h2 {
@@ -2970,6 +3030,11 @@ main {
     margin-bottom: 18px;
 }
 
+/* ── Zebra striping for session results ── */
+.results-table tbody tr:nth-child(even) td {
+    background: rgba(34, 38, 58, 0.5);
+}
+
 /* ── Estimation + study-plan cards match ── */
 .estimation-card,
 .study-plan-card {
@@ -2980,16 +3045,15 @@ main {
 @media (max-width: 600px) {
     .timer-card {
         padding: 28px 20px 24px;
-        border-radius: 16px;
     }
 
     .timer-ring-wrap {
-        width: 220px;
-        height: 220px;
+        width: 230px;
+        height: 230px;
     }
 
     .timer-display {
-        font-size: 3.6rem;
+        font-size: 3.8rem;
     }
 
     .timer-phase-tabs {

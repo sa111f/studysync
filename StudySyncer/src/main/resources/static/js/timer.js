@@ -63,6 +63,26 @@ function _refreshDisplay(state, visState) {
     // Pulse class on ring wrapper
     const wrap = document.getElementById('timer-ring-wrap');
     if (wrap) wrap.classList.toggle('timer-running', visState === 'running');
+
+    // Start/Pause toggle button
+    const startBtn = document.getElementById('btn-start-pause');
+    if (startBtn) {
+        const running = visState === 'running';
+        startBtn.textContent = running ? 'Pause' : 'Start';
+        startBtn.classList.toggle('is-pausing', running);
+    }
+
+    // Session progress dots
+    _updateSessionDots(state);
+}
+
+// ── Update session progress dots ─────────────────────────────
+function _updateSessionDots(state) {
+    const completed = (state.sessionCount - 1) % 4;
+    for (let i = 1; i <= 4; i++) {
+        const dot = document.getElementById('dot-' + i);
+        if (dot) dot.classList.toggle('filled', i <= completed);
+    }
 }
 
 // ── Update phase tabs ─────────────────────────────────────────
@@ -218,6 +238,9 @@ function startTimer()  { TimerCore.start();  }
 
 /** Called directly from HTML: <button onclick="pauseTimer()"> */
 function pauseTimer()  { TimerCore.pause();  }
+
+/** Called from Start/Pause toggle button */
+function toggleTimer() { TimerCore.toggle(); }
 
 /** Called directly from HTML: <button onclick="skipTimer()"> */
 function skipTimer()   { TimerCore.skip();   }

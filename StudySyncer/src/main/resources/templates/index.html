@@ -183,6 +183,8 @@
 
 <main>
 
+<div class="top-panel">
+
     <!-- ── Timer hero ── -->
     <section class="timer-card">
 
@@ -204,10 +206,9 @@
             <div class="timer-display" id="timer-display">25:00</div>
         </div>
 
-        <!-- Controls: Pause · Start · Skip -->
+        <!-- Controls: Start/Pause toggle · Skip -->
         <div class="timer-controls">
-            <button class="ctrl-btn pause" onclick="pauseTimer()">Pause</button>
-            <button class="ctrl-btn start" onclick="startTimer()">Start</button>
+            <button class="ctrl-btn start" id="btn-start-pause" onclick="toggleTimer()">Start</button>
             <button class="ctrl-btn skip"  onclick="skipTimer()">Skip</button>
         </div>
 
@@ -215,6 +216,16 @@
         <p class="pomodoro-info" id="pomodoro-info">
             Session <span id="session-count">1</span> of 4 &mdash; work 25 min, break 5 min.
         </p>
+
+        <!-- Session progress dots -->
+        <div class="session-dots" id="session-dots">
+            <span class="session-dot" id="dot-1"></span>
+            <span class="session-dot" id="dot-2"></span>
+            <span class="session-dot" id="dot-3"></span>
+            <span class="session-dot" id="dot-4"></span>
+        </div>
+
+        <p class="space-hint">Press Space to pause / resume</p>
 
         <!-- Duration settings (collapsed by default) -->
         <div class="timer-settings">
@@ -257,7 +268,7 @@
 
         <!-- Hidden duration input — keeps applyTimerDuration() in sync -->
         <input type="number" id="duration" value="25" style="display:none" aria-hidden="true" />
-    </section>
+    </section><!-- /timer-card -->
 
     <!-- ── Study Material ── -->
     <section class="syllabus-card">
@@ -300,7 +311,9 @@
                 <span id="doc-save-status" class="save-status"></span>
             </div>
         </div>
-    </section>
+    </section><!-- /syllabus-card -->
+
+</div><!-- /top-panel -->
 
     <!-- Study time estimation options -->
     <section id="estimation-card" class="estimation-card hidden">
