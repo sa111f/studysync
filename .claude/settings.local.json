@@ -13,7 +13,10 @@
       "Bash(n/* test:*)",
       "Bash(powershell -Command \"Add-Content -Path 'C:\\\\Users\\\\Saif0\\\\OneDrive\\\\Desktop\\\\StudySyncer\\\\StudySyncer\\\\src\\\\main\\\\resources\\\\static\\\\css\\\\style.css' -Value \\\\\"`n/* test CSS append worked */\\\\n\\\\\"\" && echo \"done\")",
       "Bash(powershell -File \"C:/Users/Saif0/OneDrive/Desktop/StudySyncer/append_css.py\")",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(mvn compile:*)",
+      "Bash(cmd //c \"mvnw.cmd compile\")",
+      "Bash(bash mvnw:*)"
     ]
   }
 }

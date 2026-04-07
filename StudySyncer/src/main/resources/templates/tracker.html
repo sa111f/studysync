@@ -102,38 +102,12 @@
             </div>
         </div>
 
-        <!-- ── Today's Goal ─────────────────────────────────── -->
-        <div class="today-goal-card" id="today-goal-card">
-            <div class="today-goal-row">
-                <div class="today-goal-left">
-                    <span class="today-goal-label">Today's Goal</span>
-                    <span class="today-goal-badge">optional</span>
-                </div>
-                <div class="today-goal-right">
-                    <div class="today-goal-input-group">
-                        <input type="number" id="today-goal-input" class="today-goal-input"
-                               placeholder="—" min="1" max="720"
-                               onkeydown="if(event.key==='Enter')applyGoal()" />
-                        <span class="today-goal-unit">min</span>
-                    </div>
-                    <button class="today-goal-btn" onclick="applyGoal()">Set</button>
-                    <button class="today-goal-clear hidden" id="today-goal-clear" onclick="clearGoal()">Clear</button>
-                </div>
-            </div>
-            <!-- Progress bar — visible only when goal is active on the current period -->
-            <div class="today-goal-progress hidden" id="today-goal-progress">
-                <div class="today-goal-bar-track">
-                    <div class="today-goal-bar-fill" id="today-goal-bar-fill" style="width:0%"></div>
-                </div>
-                <span class="today-goal-status-text" id="today-goal-status-text"></span>
-            </div>
-        </div>
-
         <!-- Focus chart card -->
         <div class="tracker-card">
             <div class="tracker-card-header">
                 <div class="tracker-card-header-left">
                     <div class="range-toggle">
+                        <button class="range-btn"        data-range="today" onclick="setRange('today')">Today</button>
                         <button class="range-btn active" data-range="week"  onclick="setRange('week')">Week</button>
                         <button class="range-btn"        data-range="month" onclick="setRange('month')">Month</button>
                         <!-- Year is locked — coming soon -->

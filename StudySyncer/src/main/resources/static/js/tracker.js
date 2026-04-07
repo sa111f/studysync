@@ -155,9 +155,13 @@ async function loadChart() {
             : -1;
 
         if (!isEmpty) {
-            todayActualMins = (todayIdx >= 0 && data.values[todayIdx] != null)
-                ? data.values[todayIdx]
-                : 0;
+            // For the "today" range the full chart represents one day,
+            // so today's total = sum of all hourly bars.
+            todayActualMins = (currentRange === 'today' && currentOffset === 0)
+                ? (data.totalMinutes || 0)
+                : (todayIdx >= 0 && data.values[todayIdx] != null)
+                    ? data.values[todayIdx]
+                    : 0;
 
             emptyEl.classList.add('hidden');
             canvas.style.display = '';
@@ -372,13 +376,22 @@ function updateGoalUI() {
 }
 
 /**
- * Finds the index of today's bar in the chart labels array.
- * Supports week ranges (3-letter day abbrs like "Mon") and
- * month ranges (day numbers like "6" or "15").
- * Returns -1 if today cannot be identified.
+ * Finds the index of "now" in the chart labels array.
+ *
+ * - today range:  highlights the current-hour bar (e.g. label "14h")
+ * - week range:   matches 3-letter day abbreviation (e.g. "Mon")
+ * - month range:  matches numeric day-of-month (e.g. "6")
+ * Returns -1 when viewing a past period or no match is found.
  */
 function getTodayBarIndex(labels) {
-    const now      = new Date();
+    const now = new Date();
+
+    if (currentRange === 'today') {
+        // Only highlight when viewing the actual current day
+        if (currentOffset !== 0) return -1;
+        return labels.findIndex(l => l === now.getHours() + 'h');
+    }
+
     const dayAbbrs = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const abbr     = dayAbbrs[now.getDay()];   // e.g. "Mon"
     const dayNum   = String(now.getDate());     // e.g. "6"

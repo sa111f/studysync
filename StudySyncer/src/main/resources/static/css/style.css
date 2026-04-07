@@ -140,6 +140,14 @@ main {
     .top-panel { grid-template-columns: 1fr; }
 }
 
+/* Timer + Today's Goal stacked in the left column */
+.timer-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+
 /* ── Shared card style ── */
 .timer-card,
 .syllabus-card,
@@ -2399,9 +2407,10 @@ header {
     to   { opacity: 1; transform: translateY(0); }
 }
 
-.timer-card    { animation: cardSlideUp 0.4s ease both; animation-delay: 0.05s; }
-.syllabus-card { animation: cardSlideUp 0.4s ease both; animation-delay: 0.15s; }
-.results-card  { animation: cardSlideUp 0.4s ease both; animation-delay: 0.25s; }
+.timer-card      { animation: cardSlideUp 0.4s ease both; animation-delay: 0.05s; }
+.goal-card-main  { animation: cardSlideUp 0.4s ease both; animation-delay: 0.12s; }
+.syllabus-card   { animation: cardSlideUp 0.4s ease both; animation-delay: 0.15s; }
+.results-card    { animation: cardSlideUp 0.4s ease both; animation-delay: 0.25s; }
 
 /* ── Tracker back button ── */
 .tracker-back-btn {
@@ -2434,6 +2443,10 @@ header {
 .estimation-card,
 .study-plan-card {
     padding: 28px 32px;
+}
+
+.goal-card-main {
+    padding: 22px 28px;
 }
 
 /* ── Unified card headings ── */
@@ -3465,6 +3478,212 @@ main {
     .today-goal-row         { flex-direction: column; align-items: flex-start; }
     .today-goal-right       { width: 100%; }
     .today-goal-status-text { min-width: 0; text-align: left; }
+}
+
+/* ══════════════════════════════════════════════════════════
+   TODAY'S GOAL — Main-page card (index.html)
+   ══════════════════════════════════════════════════════════ */
+
+.goal-card-main {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.goal-card-hd {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.goal-card-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+    letter-spacing: -0.1px;
+}
+
+.goal-card-hint {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.goal-set-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.goal-current-label {
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin: 0;
+    font-weight: 500;
+}
+
+.goal-save-status {
+    font-size: 0.78rem;
+    font-weight: 500;
+    margin: 0;
+}
+
+/* ══════════════════════════════════════════════════════════
+   ACCOUNTABILITY SMS — Phase 4 styles
+   ══════════════════════════════════════════════════════════ */
+
+.accountability-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.accountability-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 2px 0 6px;
+}
+
+.accountability-toggle-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.accountability-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 0.83rem;
+    font-weight: 600;
+    color: var(--text);
+    user-select: none;
+}
+
+.accountability-toggle-text {
+    line-height: 1.2;
+}
+
+.accountability-hint {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin: 0;
+    line-height: 1.4;
+    padding-left: 24px; /* indent under checkbox */
+}
+
+.accountability-checkbox {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.accountability-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-left: 24px; /* align with label text */
+}
+
+.accountability-field-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.accountability-phone-group,
+.accountability-name-group {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+    min-width: 140px;
+}
+
+.accountability-label {
+    font-size: 0.73rem;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.01em;
+}
+
+.optional-tag {
+    font-weight: 400;
+    color: var(--muted);
+    opacity: 0.7;
+}
+
+.accountability-phone-input,
+.accountability-name-input {
+    font-size: 0.82rem;
+    padding: 6px 9px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.18s, box-shadow 0.18s;
+    width: 100%;
+}
+
+.accountability-phone-input:focus,
+.accountability-name-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,92,252,0.12);
+}
+
+.accountability-consent-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.4;
+    user-select: none;
+}
+
+.accountability-consent-label input {
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+/* Status badges */
+.accountability-status-row {
+    padding-left: 24px;
+}
+
+.accountability-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.73rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.01em;
+}
+
+.badge-pending {
+    background: rgba(124,92,252,0.15);
+    color: var(--accent);
+    border: 1px solid rgba(124,92,252,0.3);
+}
+
+.badge-sent {
+    background: rgba(52,211,153,0.12);
+    color: var(--success);
+    border: 1px solid rgba(52,211,153,0.3);
 }
 
 /* ══════════════════════════════════════════════════════════

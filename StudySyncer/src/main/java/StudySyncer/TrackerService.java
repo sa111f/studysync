@@ -16,9 +16,11 @@ import java.util.stream.Collectors;
 public class TrackerService {
 
     private final StudySessionRepository sessionRepo;
+    private final DailyGoalService       dailyGoalService;
 
-    public TrackerService(StudySessionRepository sessionRepo) {
-        this.sessionRepo = sessionRepo;
+    public TrackerService(StudySessionRepository sessionRepo, DailyGoalService dailyGoalService) {
+        this.sessionRepo      = sessionRepo;
+        this.dailyGoalService = dailyGoalService;
     }
 
     // ── Save ──────────────────────────────────────────────
@@ -37,6 +39,11 @@ public class TrackerService {
         s.setStartedAt(now.minusMinutes(durationMinutes));
         s.setStudyDate(now.toLocalDate());
         sessionRepo.save(s);
+
+        // Phase 3: accumulate completed minutes toward today's daily goal
+        if (completed && durationMinutes > 0) {
+            dailyGoalService.addCompletedMinutes(user, durationMinutes);
+        }
     }
 
     // ── Date range ────────────────────────────────────────
@@ -46,6 +53,12 @@ public class TrackerService {
         LocalDate today = LocalDate.now();
         LocalDate from, to;
         switch (range) {
+            case "today": {
+                LocalDate d = today.plusDays(offset);
+                from = d;
+                to   = d;
+                break;
+            }
             case "month": {
                 LocalDate base = today.withDayOfMonth(1).plusMonths(offset);
                 from = base;
@@ -75,6 +88,11 @@ public class TrackerService {
         LocalDate[] r = getDateRange(range, offset);
         LocalDate from = r[0];
         switch (range) {
+            case "today":
+                if (offset == 0)  return "Today";
+                if (offset == -1) return "Yesterday";
+                return from.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
+                        + " " + from.getDayOfMonth();
             case "week":
                 if (offset == 0)  return "This Week";
                 if (offset == -1) return "Last Week";
@@ -151,7 +169,17 @@ public class TrackerService {
         List<String>  labels = new ArrayList<>();
         List<Integer> values = new ArrayList<>();
 
-        if ("week".equals(range)) {
+        if ("today".equals(range)) {
+            // Aggregate minutes by hour of day (0–23) using session completion time
+            int[] byHour = new int[24];
+            for (StudySession s : sessions) {
+                byHour[s.getCompletedAt().getHour()] += s.getDurationMinutes();
+            }
+            for (int h = 0; h < 24; h++) {
+                labels.add(h + "h");
+                values.add(byHour[h]);
+            }
+        } else if ("week".equals(range)) {
             for (int i = 0; i < 7; i++) {
                 LocalDate d = r[0].plusDays(i);
                 labels.add(d.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.ENGLISH));
