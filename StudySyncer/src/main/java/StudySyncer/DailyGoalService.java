@@ -4,6 +4,7 @@ import StudySyncer.dto.GoalSaveRequest;
 import StudySyncer.entity.DailyGoal;
 import StudySyncer.entity.User;
 import StudySyncer.repository.DailyGoalRepository;
+import StudySyncer.repository.StudySessionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -26,12 +27,26 @@ public class DailyGoalService {
      */
     private static final Pattern PHONE_CHARS = Pattern.compile("^[+\\d\\s().\\-]{7,20}$");
 
-    private final DailyGoalRepository repo;
-    private final SmsService          smsService;
+    private final DailyGoalRepository    repo;
+    private final SmsService             smsService;
+    private final StudySessionRepository sessionRepo;
 
-    public DailyGoalService(DailyGoalRepository repo, SmsService smsService) {
-        this.repo       = repo;
-        this.smsService = smsService;
+    public DailyGoalService(DailyGoalRepository repo, SmsService smsService,
+                            StudySessionRepository sessionRepo) {
+        this.repo        = repo;
+        this.smsService  = smsService;
+        this.sessionRepo = sessionRepo;
+    }
+
+    // ── Session-based progress (single source of truth) ────
+
+    /**
+     * Returns the total study minutes for today, summed directly from StudySession
+     * records — exactly the same figure the Study Tracker's Today view shows.
+     * ALL sessions are counted regardless of their {@code completed} flag.
+     */
+    public int computeTodayActualMinutes(User user) {
+        return (int) sessionRepo.sumDurationByUserAndDate(user, LocalDate.now());
     }
 
     // ── Phase 2: Goal-minutes ──────────────────────────────
@@ -51,20 +66,29 @@ public class DailyGoalService {
     // ── Phase 3: Completed-minutes ─────────────────────────
 
     /**
-     * Add completed study minutes to today's record.
-     * Creates a bare record (goalMinutes=0) if none exists yet.
-     * Only called for truly completed sessions (completed=true).
+     * Syncs today's {@code completedMinutes} with the real session total and checks
+     * whether the daily goal was just crossed (triggering an immediate success SMS if so).
      *
-     * After incrementing, checks whether the daily goal threshold has just been
-     * crossed and — if accountability SMS is configured and not yet sent — fires
-     * the success SMS immediately (without waiting for the end-of-day scheduler).
+     * <p>Called after every session save — regardless of the session's {@code completed}
+     * flag — so that the goal progress always matches the Study Tracker's Today view.
+     * Uses {@link #computeTodayActualMinutes} as the single source of truth: a direct
+     * DB sum over today's {@code StudySession} records, identical to what the tracker
+     * query returns.</p>
+     *
+     * @param user    the user whose goal should be synced
+     * @param minutes the session duration that was just saved (used only as a guard;
+     *                the actual counter is recomputed from session records, not incremented)
      */
     @Transactional
     public void addCompletedMinutes(User user, int minutes) {
         if (minutes <= 0) return;
         LocalDate today = LocalDate.now();
         DailyGoal goal = findOrCreate(user, today);
-        goal.setCompletedMinutes(goal.getCompletedMinutes() + minutes);
+
+        // Recompute from ALL sessions for today — same query the tracker uses —
+        // instead of blindly incrementing a counter that can drift out of sync.
+        int actualTotal = computeTodayActualMinutes(user);
+        goal.setCompletedMinutes(actualTotal);
         goal = repo.save(goal);
 
         // Immediate success trigger: fire as soon as the goal threshold is crossed.

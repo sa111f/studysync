@@ -66,14 +66,21 @@ public class DailyGoalController {
 
     /**
      * Converts a DailyGoal (or null) to the JSON shape the frontend expects.
-     * Phase 4 adds notificationEnabled, notificationSent, notificationStatus.
-     * username is included for the client-side SMS preview feature.
+     *
+     * <p>completedMinutes is always derived from the live session total via
+     * {@link DailyGoalService#computeTodayActualMinutes}, NOT from the stored
+     * {@code goal.completedMinutes} counter.  This guarantees the goal card and the
+     * Study Tracker's Today view always display the same number, regardless of how or
+     * when sessions were saved.</p>
      */
     private Map<String, Object> toMap(DailyGoal g, User user) {
+        // Always compute from session records — same source as the Study Tracker.
+        int actualMinutes = (user != null) ? dailyGoalService.computeTodayActualMinutes(user) : 0;
+
         Map<String, Object> m = new HashMap<>();
         if (g == null) {
             m.put("goalMinutes",          0);
-            m.put("completedMinutes",     0);
+            m.put("completedMinutes",     actualMinutes);
             m.put("status",               "none");
             m.put("notificationEnabled",  false);
             m.put("notificationSent",     false);
@@ -87,14 +94,14 @@ public class DailyGoalController {
         }
 
         int    goal   = g.getGoalMinutes();
-        int    done   = g.getCompletedMinutes();
-        String status = (goal == 0) ? "none" : (done >= goal ? "achieved" : "in_progress");
+        // Use the live actual minutes for both the progress value and the achieved check.
+        String status = (goal == 0) ? "none" : (actualMinutes >= goal ? "achieved" : "in_progress");
 
         // notificationStatus values consumed by the frontend badge:
         //   "disabled"      — SMS not enabled
-        //   "pending"       — enabled, not yet sent (goal not yet reached, end-of-day not here)
-        //   "success_sent"  — success SMS already fired immediately (goal was reached)
-        //   "failure_sent"  — failure SMS sent by end-of-day scheduler (goal was missed)
+        //   "pending"       — enabled, not yet sent
+        //   "success_sent"  — success SMS fired immediately when goal was reached
+        //   "failure_sent"  — failure SMS sent by end-of-day scheduler
         String notifStatus;
         if (!g.isNotificationEnabled()) {
             notifStatus = "disabled";
@@ -105,7 +112,7 @@ public class DailyGoalController {
         }
 
         m.put("goalMinutes",          goal);
-        m.put("completedMinutes",     done);
+        m.put("completedMinutes",     actualMinutes);
         m.put("status",               status);
         m.put("notificationEnabled",  g.isNotificationEnabled());
         m.put("notificationSent",     g.isNotificationSent());

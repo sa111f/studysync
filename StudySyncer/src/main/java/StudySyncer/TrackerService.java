@@ -40,10 +40,9 @@ public class TrackerService {
         s.setStudyDate(now.toLocalDate());
         sessionRepo.save(s);
 
-        // Phase 3: accumulate completed minutes toward today's daily goal
-        if (completed && durationMinutes > 0) {
-            dailyGoalService.addCompletedMinutes(user, durationMinutes);
-        }
+        // Sync today's goal progress after every session save — completed or not —
+        // so the goal card always matches the Study Tracker's Today total.
+        dailyGoalService.addCompletedMinutes(user, durationMinutes);
     }
 
     // ── Date range ────────────────────────────────────────
