@@ -60,6 +60,14 @@ public class DailyGoal {
     @Column(name = "notification_message", length = 300)
     private String notificationMessage;
 
+    /**
+     * Which kind of notification was sent: "SUCCESS" (goal reached, sent immediately)
+     * or "FAILURE" (goal missed, sent by end-of-day scheduler).
+     * Null until a notification is actually dispatched.
+     */
+    @Column(name = "notification_type", length = 10)
+    private String notificationType;
+
     // ── Audit ─────────────────────────────────────────────────────────────────
 
     @Column(name = "created_at", updatable = false)
@@ -94,6 +102,7 @@ public class DailyGoal {
     public boolean       isNotificationSent()     { return notificationSent; }
     public LocalDateTime getNotificationSentAt()  { return notificationSentAt; }
     public String        getNotificationMessage() { return notificationMessage; }
+    public String        getNotificationType()    { return notificationType; }
     public LocalDateTime getCreatedAt()           { return createdAt; }
     public LocalDateTime getUpdatedAt()           { return updatedAt; }
 
@@ -110,4 +119,5 @@ public class DailyGoal {
     public void setNotificationSent(boolean sent)            { this.notificationSent = sent; }
     public void setNotificationSentAt(LocalDateTime sentAt)  { this.notificationSentAt = sentAt; }
     public void setNotificationMessage(String message)       { this.notificationMessage = message; }
+    public void setNotificationType(String type)             { this.notificationType = type; }
 }

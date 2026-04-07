@@ -310,7 +310,7 @@
                            onchange="onSmsToggle()" />
                     <span class="accountability-toggle-text">Enable accountability SMS</span>
                 </label>
-                <p class="accountability-hint">Send an end-of-day StudySyncer update to an accountability contact.</p>
+                <p class="accountability-hint">Goal reached? They get a success message instantly. Goal missed? They get a message at end of day.</p>
             </div>
 
             <div class="accountability-fields" id="accountability-fields" style="display:none">
@@ -334,6 +334,16 @@
                     <input type="checkbox" id="sms-consent-checkbox" class="accountability-checkbox" />
                     <span>I confirm this contact agreed to receive StudySyncer accountability messages.</span>
                 </label>
+
+                <!-- Preview SMS -->
+                <div class="sms-preview-row">
+                    <button class="sms-preview-btn" onclick="previewSms()">Preview SMS</button>
+                    <div class="sms-preview-box" id="sms-preview-box" style="display:none">
+                        <span class="sms-preview-label">SMS Preview</span>
+                        <span class="sms-preview-message" id="sms-preview-message"></span>
+                        <span class="sms-preview-note">Preview only — no SMS sent</span>
+                    </div>
+                </div>
             </div>
 
             <!-- Notification status badge (populated by JS after load) -->
@@ -508,11 +518,15 @@ function handlePdfDrop(e) {
 (function () {
     function el(id) { return document.getElementById(id); }
 
+    // Cached API response — used by previewSms()
+    let lastGoalData = null;
+
     // ════════════════════════════════════════════════════
     // Render: goal progress
     // ════════════════════════════════════════════════════
 
     function renderGoal(data) {
+        lastGoalData = data;
         const label       = el('goal-current-label');
         const progressRow = el('goal-progress-row');
         const barFill     = el('goal-bar-fill');
@@ -603,15 +617,25 @@ function handlePdfDrop(e) {
             if (notifStat === 'disabled') {
                 statusRow.style.display = 'none';
                 badge.textContent = '';
-                badge.className = 'accountability-status-badge';
+                badge.className   = 'accountability-status-badge';
+            } else if (notifStat === 'success_sent') {
+                statusRow.style.display = '';
+                badge.textContent = 'Success SMS sent.';
+                badge.className   = 'accountability-status-badge badge-sent badge-success';
+            } else if (notifStat === 'failure_sent') {
+                statusRow.style.display = '';
+                badge.textContent = 'Missed-goal SMS sent.';
+                badge.className   = 'accountability-status-badge badge-sent badge-failure';
             } else if (notifStat === 'sent') {
+                // Fallback for legacy records without notificationType
                 statusRow.style.display = '';
-                badge.textContent = 'Notification sent for today';
-                badge.className = 'accountability-status-badge badge-sent';
+                badge.textContent = 'Notification sent for today.';
+                badge.className   = 'accountability-status-badge badge-sent';
             } else {
+                // pending
                 statusRow.style.display = '';
-                badge.textContent = 'Accountability SMS enabled — notification pending end of day';
-                badge.className = 'accountability-status-badge badge-pending';
+                badge.textContent = 'Accountability SMS enabled — failure message will be sent at end of day if goal is missed.';
+                badge.className   = 'accountability-status-badge badge-pending';
             }
         }
     }
@@ -721,6 +745,38 @@ function handlePdfDrop(e) {
         const toggle = el('sms-enabled-toggle');
         const fields = el('accountability-fields');
         if (fields) fields.style.display = (toggle && toggle.checked) ? '' : 'none';
+        // Hide preview when SMS is toggled off
+        if (toggle && !toggle.checked) {
+            const box = el('sms-preview-box');
+            if (box) box.style.display = 'none';
+        }
+    };
+
+    // ════════════════════════════════════════════════════
+    // Public: SMS preview (no real SMS sent)
+    // ════════════════════════════════════════════════════
+
+    window.previewSms = function () {
+        const box     = el('sms-preview-box');
+        const msgEl   = el('sms-preview-message');
+        if (!box || !msgEl) return;
+
+        const data     = lastGoalData;
+        const username = (data && data.username) ? data.username : 'you';
+        const goal     = data ? (data.goalMinutes     || 0) : 0;
+        const done     = data ? (data.completedMinutes || 0) : 0;
+
+        let message;
+        if (goal === 0) {
+            message = 'No goal set for today — set a goal first.';
+        } else if (done >= goal) {
+            message = 'StudySyncer alert: ' + username + ' reached today\u2019s study goal.';
+        } else {
+            message = 'StudySyncer alert: ' + username + ' didn\u2019t reach today\u2019s study goal.';
+        }
+
+        msgEl.textContent = message;
+        box.style.display = '';
     };
 
     // ════════════════════════════════════════════════════
@@ -728,7 +784,7 @@ function handlePdfDrop(e) {
     // ════════════════════════════════════════════════════
 
     window.onSessionCompleted = function (_subject, _mins, _date) {
-        setTimeout(fetchTodayGoal, 600);
+        fetchTodayGoal();
     };
 
     // ════════════════════════════════════════════════════

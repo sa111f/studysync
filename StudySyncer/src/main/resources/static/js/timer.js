@@ -175,21 +175,32 @@ function logSession(subject, mode, mins, completed = true) {
     const date = now.toISOString().split('T')[0];
     sessions.push({ subject, mode, duration: mins + ' min', durationMins: mins, time, date, completed });
     renderResults();
-    if (typeof onSessionCompleted === 'function') onSessionCompleted(subject, mins, date);
 
     if (window.currentUser) {
         const docEl = document.getElementById('doc-subject-name');
         const name  = (docEl && docEl.value.trim()) ? docEl.value.trim() : subject;
         fetch('/api/tracker/sessions', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method:   'POST',
+            headers:  { 'Content-Type': 'application/json' },
+            keepalive: true,
             body: JSON.stringify({
                 materialName:    name,
                 durationMinutes: mins,
                 timerMode:       mode,
                 completed,
             }),
-        }).catch(() => {});
+        })
+        .then(() => {
+            // Session is now saved in DB — safe to refresh the goal display
+            if (typeof onSessionCompleted === 'function') onSessionCompleted(subject, mins, date);
+        })
+        .catch(() => {
+            // Save failed; still fire the hook so the UI at least re-checks
+            if (typeof onSessionCompleted === 'function') onSessionCompleted(subject, mins, date);
+        });
+    } else {
+        // Guest — no server save, but notify UI (localStorage-based goal display)
+        if (typeof onSessionCompleted === 'function') onSessionCompleted(subject, mins, date);
     }
 }
 

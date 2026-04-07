@@ -39,7 +39,7 @@ public class DailyGoalController {
         User user = resolveUser(session);
         if (user == null) return ResponseEntity.status(401).body(Map.of("error", "Not logged in."));
         Optional<DailyGoal> opt = dailyGoalService.getTodayGoal(user);
-        return ResponseEntity.ok(toMap(opt.orElse(null)));
+        return ResponseEntity.ok(toMap(opt.orElse(null), user));
     }
 
     // ── POST /api/daily-goal ───────────────────────────────
@@ -56,7 +56,7 @@ public class DailyGoalController {
             DailyGoal goal = dailyGoalService.saveGoalAndSettings(user, req);
             log.info("[GOAL] Saved — userId={} goalMinutes={} smsEnabled={}",
                     user.getId(), goal.getGoalMinutes(), goal.isNotificationEnabled());
-            return ResponseEntity.ok(toMap(goal));
+            return ResponseEntity.ok(toMap(goal, user));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -67,8 +67,9 @@ public class DailyGoalController {
     /**
      * Converts a DailyGoal (or null) to the JSON shape the frontend expects.
      * Phase 4 adds notificationEnabled, notificationSent, notificationStatus.
+     * username is included for the client-side SMS preview feature.
      */
-    private Map<String, Object> toMap(DailyGoal g) {
+    private Map<String, Object> toMap(DailyGoal g, User user) {
         Map<String, Object> m = new HashMap<>();
         if (g == null) {
             m.put("goalMinutes",          0);
@@ -76,10 +77,12 @@ public class DailyGoalController {
             m.put("status",               "none");
             m.put("notificationEnabled",  false);
             m.put("notificationSent",     false);
+            m.put("notificationType",     "");
             m.put("notificationStatus",   "disabled");
             m.put("accountabilityPhone",  "");
             m.put("contactName",          "");
             m.put("consentConfirmed",     false);
+            m.put("username",             user != null ? user.getUsername() : "");
             return m;
         }
 
@@ -87,20 +90,31 @@ public class DailyGoalController {
         int    done   = g.getCompletedMinutes();
         String status = (goal == 0) ? "none" : (done >= goal ? "achieved" : "in_progress");
 
+        // notificationStatus values consumed by the frontend badge:
+        //   "disabled"      — SMS not enabled
+        //   "pending"       — enabled, not yet sent (goal not yet reached, end-of-day not here)
+        //   "success_sent"  — success SMS already fired immediately (goal was reached)
+        //   "failure_sent"  — failure SMS sent by end-of-day scheduler (goal was missed)
         String notifStatus;
-        if (!g.isNotificationEnabled())  notifStatus = "disabled";
-        else if (g.isNotificationSent()) notifStatus = "sent";
-        else                             notifStatus = "pending";
+        if (!g.isNotificationEnabled()) {
+            notifStatus = "disabled";
+        } else if (g.isNotificationSent()) {
+            notifStatus = "SUCCESS".equals(g.getNotificationType()) ? "success_sent" : "failure_sent";
+        } else {
+            notifStatus = "pending";
+        }
 
         m.put("goalMinutes",          goal);
         m.put("completedMinutes",     done);
         m.put("status",               status);
         m.put("notificationEnabled",  g.isNotificationEnabled());
         m.put("notificationSent",     g.isNotificationSent());
+        m.put("notificationType",     g.getNotificationType() != null ? g.getNotificationType() : "");
         m.put("notificationStatus",   notifStatus);
         m.put("accountabilityPhone",  g.getAccountabilityPhone()  != null ? g.getAccountabilityPhone()  : "");
         m.put("contactName",          g.getContactName()          != null ? g.getContactName()          : "");
         m.put("consentConfirmed",     g.isConsentConfirmed());
+        m.put("username",             g.getUser().getUsername());
         return m;
     }
 

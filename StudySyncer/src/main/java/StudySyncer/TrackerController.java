@@ -16,15 +16,12 @@ public class TrackerController {
 
     private static final Logger log = LoggerFactory.getLogger(TrackerController.class);
 
-    private final TrackerService   trackerService;
-    private final UserService      userService;
-    private final DailyGoalService dailyGoalService;
+    private final TrackerService trackerService;
+    private final UserService   userService;
 
-    public TrackerController(TrackerService trackerService, UserService userService,
-                             DailyGoalService dailyGoalService) {
-        this.trackerService   = trackerService;
-        this.userService      = userService;
-        this.dailyGoalService = dailyGoalService;
+    public TrackerController(TrackerService trackerService, UserService userService) {
+        this.trackerService = trackerService;
+        this.userService    = userService;
     }
 
     // ── Page ──────────────────────────────────────────────
@@ -51,10 +48,7 @@ public class TrackerController {
         trackerService.saveSession(user,
                 dto.getMaterialName(), dto.getDurationMinutes(),
                 dto.getTimerMode(), dto.isCompleted());
-        // Only count truly completed sessions toward the daily goal
-        if (dto.isCompleted()) {
-            dailyGoalService.addCompletedMinutes(user, dto.getDurationMinutes());
-        }
+        // addCompletedMinutes is handled inside trackerService.saveSession — no duplicate call here
         return ResponseEntity.ok(Map.of("message", "Session saved."));
     }
 

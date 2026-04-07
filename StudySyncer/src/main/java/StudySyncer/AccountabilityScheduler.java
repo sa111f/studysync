@@ -37,13 +37,17 @@ public class AccountabilityScheduler {
      * Runs once a day at the time defined by {@code studysyncer.notification.cron}
      * in the zone defined by {@code studysyncer.notification.timezone}.
      *
+     * At this point, any record still pending (notificationSent=false) means the
+     * user did NOT reach their goal — the success SMS would have been sent immediately
+     * by DailyGoalService.addCompletedMinutes() the moment the threshold was crossed.
+     *
+     * Therefore this scheduler ONLY sends the failure message.
+     *
      * For each pending DailyGoal record it:
-     *  1. Decides whether the goal was achieved (completedMinutes >= goalMinutes).
-     *  2. Builds the appropriate SMS message using the user's username.
-     *  3. Sends the SMS via Twilio.
-     *  4. If successful, marks notificationSent=true and stores the timestamp + message.
-     *     If Twilio fails, the record remains unsent — a retry is safe because of the
-     *     notificationSent guard.
+     *  1. Verifies guards (notification enabled, consent, phone, goalMinutes > 0).
+     *  2. Sends the failure SMS via Twilio.
+     *  3. If successful, marks notificationSent=true with type="FAILURE".
+     *     If Twilio fails, the record remains unsent (retry is safe — notificationSent guard).
      */
     @Scheduled(
         cron     = "${studysyncer.notification.cron:0 59 23 * * *}",
@@ -99,8 +103,11 @@ public class AccountabilityScheduler {
                     goal.getId(), goal.isNotificationEnabled(), goal.isConsentConfirmed());
             return;
         }
+        // If success was already sent during the day, this record won't appear in the
+        // pending query (notificationSent=true). Double-check as a safety net.
         if (goal.isNotificationSent()) {
-            log.info("[SCHEDULER] Skipping goalId={} — already sent", goal.getId());
+            log.info("[SCHEDULER] Skipping goalId={} — notification already sent (type={})",
+                    goal.getId(), goal.getNotificationType());
             return;
         }
         if (phone == null || phone.isBlank()) {
@@ -114,17 +121,17 @@ public class AccountabilityScheduler {
             return;
         }
 
-        boolean achieved = doneMin >= goalMin;
-        String message = achieved
-                ? "StudySyncer alert: " + username + " reached today's study goal."
-                : "StudySyncer alert: " + username + " didn't reach today's study goal.";
+        // At end-of-day, notificationSent=false means the goal was never reached
+        // (success fires immediately upon crossing the threshold during the day).
+        // Always send the failure message here.
+        String message = "StudySyncer alert: " + username + " didn't reach today's study goal.";
 
-        log.info("[SCHEDULER] Sending SMS — goalId={} userId={} to={} achieved={} done={}min goal={}min",
-                goal.getId(), goal.getUser().getId(), phone, achieved, doneMin, goalMin);
+        log.info("[SCHEDULER] Sending failure SMS — goalId={} userId={} to={} done={}min goal={}min",
+                goal.getId(), goal.getUser().getId(), phone, doneMin, goalMin);
 
         boolean ok = smsService.send(phone, message);
         if (ok) {
-            dailyGoalService.markNotificationSent(goal, message);
+            dailyGoalService.markNotificationSent(goal, message, "FAILURE");
         } else {
             log.error("[SCHEDULER] SMS failed for goalId={} userId={} — will retry on next scheduler run",
                     goal.getId(), goal.getUser().getId());

@@ -27,9 +27,11 @@ public class DailyGoalService {
     private static final Pattern PHONE_CHARS = Pattern.compile("^[+\\d\\s().\\-]{7,20}$");
 
     private final DailyGoalRepository repo;
+    private final SmsService          smsService;
 
-    public DailyGoalService(DailyGoalRepository repo) {
-        this.repo = repo;
+    public DailyGoalService(DailyGoalRepository repo, SmsService smsService) {
+        this.repo       = repo;
+        this.smsService = smsService;
     }
 
     // ── Phase 2: Goal-minutes ──────────────────────────────
@@ -52,6 +54,10 @@ public class DailyGoalService {
      * Add completed study minutes to today's record.
      * Creates a bare record (goalMinutes=0) if none exists yet.
      * Only called for truly completed sessions (completed=true).
+     *
+     * After incrementing, checks whether the daily goal threshold has just been
+     * crossed and — if accountability SMS is configured and not yet sent — fires
+     * the success SMS immediately (without waiting for the end-of-day scheduler).
      */
     @Transactional
     public void addCompletedMinutes(User user, int minutes) {
@@ -59,7 +65,53 @@ public class DailyGoalService {
         LocalDate today = LocalDate.now();
         DailyGoal goal = findOrCreate(user, today);
         goal.setCompletedMinutes(goal.getCompletedMinutes() + minutes);
-        repo.save(goal);
+        goal = repo.save(goal);
+
+        // Immediate success trigger: fire as soon as the goal threshold is crossed.
+        // The notificationSent guard ensures this runs at most once per day.
+        checkAndSendSuccessNotification(goal);
+    }
+
+    /**
+     * Checks whether the user just reached their daily goal and, if all conditions
+     * are met, sends the success SMS immediately (not waiting for 23:59).
+     *
+     * Conditions (all must be true):
+     *   - goalMinutes > 0 (a real goal exists)
+     *   - completedMinutes >= goalMinutes (threshold just crossed or already past)
+     *   - notificationEnabled = true
+     *   - consentConfirmed = true
+     *   - a valid phone number is stored
+     *   - notificationSent = false (idempotency guard — sends at most once)
+     *
+     * The notificationSent flag is persisted ONLY after Twilio confirms dispatch.
+     * If Twilio fails the record stays unsent; the end-of-day scheduler will then
+     * send the failure message instead (which is accurate — the SMS was never sent).
+     */
+    private void checkAndSendSuccessNotification(DailyGoal goal) {
+        if (goal.getGoalMinutes() <= 0)                    return;
+        if (goal.getCompletedMinutes() < goal.getGoalMinutes()) return;
+        if (!goal.isNotificationEnabled())                 return;
+        if (!goal.isConsentConfirmed())                    return;
+        if (goal.isNotificationSent())                     return;  // already sent today
+        String phone = goal.getAccountabilityPhone();
+        if (phone == null || phone.isBlank())              return;
+
+        String username = goal.getUser().getUsername();
+        String message  = "StudySyncer alert: " + username + " reached today's study goal.";
+
+        log.info("[NOTIF] Immediate success trigger — goalId={} userId={} done={}min goal={}min",
+                goal.getId(), goal.getUser().getId(),
+                goal.getCompletedMinutes(), goal.getGoalMinutes());
+
+        boolean ok = smsService.send(phone, message);
+        if (ok) {
+            markNotificationSent(goal, message, "SUCCESS");
+        } else {
+            log.error("[NOTIF] Immediate success SMS failed for goalId={} userId={} — " +
+                            "end-of-day scheduler will send failure if goal remains unmet",
+                    goal.getId(), goal.getUser().getId());
+        }
     }
 
     // ── Phase 4: Goal + accountability settings in one call ─
@@ -116,15 +168,21 @@ public class DailyGoalService {
     /**
      * Marks a DailyGoal as having had its notification sent.
      * Only call this after the SMS provider confirms dispatch.
+     *
+     * @param goal        the goal record to update
+     * @param messageBody exact SMS body that was sent (stored for audit)
+     * @param type        "SUCCESS" (goal reached, immediate trigger) or
+     *                    "FAILURE" (goal missed, end-of-day scheduler)
      */
     @Transactional
-    public void markNotificationSent(DailyGoal goal, String messageBody) {
+    public void markNotificationSent(DailyGoal goal, String messageBody, String type) {
         goal.setNotificationSent(true);
         goal.setNotificationSentAt(LocalDateTime.now());
         goal.setNotificationMessage(messageBody);
+        goal.setNotificationType(type);
         repo.save(goal);
-        log.info("[NOTIF] Marked notification sent for goalId={} userId={} date={}",
-                goal.getId(), goal.getUser().getId(), goal.getGoalDate());
+        log.info("[NOTIF] Marked notification sent — goalId={} userId={} date={} type={}",
+                goal.getId(), goal.getUser().getId(), goal.getGoalDate(), type);
     }
 
     // ── Queries ────────────────────────────────────────────

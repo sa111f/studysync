@@ -305,15 +305,23 @@ function _onCoreEvent(event, state) {
         if (window.currentUser) {
             const mins = Math.round(state.totalSeconds / 60);
             fetch('/api/tracker/sessions', {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method:    'POST',
+                headers:   { 'Content-Type': 'application/json' },
+                keepalive: true,   // survives page navigation
                 body: JSON.stringify({
                     materialName:    'Focus Session',
                     durationMinutes: mins,
                     timerMode:       _phaseLabel(state.phase),
                     completed:       true,
                 }),
-            }).catch(() => {});
+            })
+            .then(() => {
+                // Session saved — notify the dashboard so it can refresh goal progress
+                if (typeof window.onSessionCompleted === 'function') {
+                    window.onSessionCompleted('Focus Session', mins, new Date().toISOString().split('T')[0]);
+                }
+            })
+            .catch(() => {});
         }
     } else if (event === 'skip') {
         if (state.phase === 'pomodoro' || state.phase === 'countdown') {
@@ -321,8 +329,9 @@ function _onCoreEvent(event, state) {
             const mins    = Math.round(Math.max(0, elapsed) / 60);
             if (mins > 0 && window.currentUser) {
                 fetch('/api/tracker/sessions', {
-                    method:  'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method:    'POST',
+                    headers:   { 'Content-Type': 'application/json' },
+                    keepalive: true,
                     body: JSON.stringify({
                         materialName:    'Focus Session',
                         durationMinutes: mins,
