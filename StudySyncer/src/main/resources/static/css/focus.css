@@ -94,7 +94,7 @@ body {
     border: 1px solid var(--border);
     border-radius: 13px;
     padding: 5px;
-    margin-bottom: 48px;
+    margin-bottom: 40px;
 }
 
 .focus-tab {
@@ -130,94 +130,71 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 32px 50px 24px;
-    margin-bottom: 28px;
-    /* JS writes --flask-glow (0.25 → 1.0); halo reads it */
-    --flask-glow: 1;
+    padding: 20px 40px 16px;
+    margin-bottom: 20px;
 }
 
-/* Ambient radial glow behind the cup */
-.finjan-glow-halo {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    background: radial-gradient(
-        ellipse at 50% 62%,
-        rgba(124,92,252,0.22) 0%,
-        rgba(124,92,252,0.07) 45%,
-        transparent 70%
-    );
-    opacity: var(--flask-glow);
-    transition: opacity 0.95s linear;
-    pointer-events: none;
-}
-
-/* The finjan SVG */
+/* The finjan SVG — no drop shadows, clean */
 #finjan-svg {
     position: relative;
     z-index: 1;
-    /* Large enough to be the visual hero: ~300 px tall */
-    height: 300px;
+    height: 400px;
     width: auto;
     overflow: visible;
     display: block;
     cursor: pointer;
-    filter:
-        drop-shadow(0 0 20px rgba(124,92,252,0.42))
-        drop-shadow(0 0 52px rgba(124,92,252,0.16));
-    transition: filter 0.95s linear;
     outline: none;
+    transition: opacity 0.2s;
 }
 
-/* Hover: subtle glow brightens to hint at clickability */
 #finjan-svg:hover,
 #finjan-svg:focus-visible {
-    filter:
-        drop-shadow(0 0 28px rgba(124,92,252,0.65))
-        drop-shadow(0 0 70px rgba(124,92,252,0.28));
+    opacity: 0.88;
+}
+
+/* ── Timer countdown text ────────────────────────────────────── */
+.finjan-time-display {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 3.2rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.04em;
+    text-align: center;
+    margin-bottom: 20px;
+    line-height: 1;
 }
 
 /* ── Body state classes ──────────────────────────────────────── */
 
-/* Running: halo pulses gently */
-.is-running .finjan-glow-halo {
-    animation: finjan-halo-pulse 2.8s ease-in-out infinite;
+/* Running: time display pulses color */
+.is-running .finjan-time-display {
+    color: #a78bfa;
 }
 
-@keyframes finjan-halo-pulse {
-    0%, 100% { transform: scale(1);    opacity: var(--flask-glow); }
-    50%       { transform: scale(1.14); opacity: 1; }
+/* Paused: dim the time display */
+.is-paused .finjan-time-display {
+    color: var(--muted);
+    animation: finjan-blink 1.8s ease-in-out infinite;
 }
 
-/* Paused: cup breathes slowly */
-.is-paused #finjan-svg {
-    animation: finjan-breathe 3.5s ease-in-out infinite;
+@keyframes finjan-blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.45; }
 }
 
-@keyframes finjan-breathe {
-    0%, 100% { filter:
-        drop-shadow(0 0 20px rgba(124,92,252,0.42))
-        drop-shadow(0 0 52px rgba(124,92,252,0.16)); }
-    50%       { filter:
-        drop-shadow(0 0 32px rgba(124,92,252,0.62))
-        drop-shadow(0 0 76px rgba(124,92,252,0.28)); }
+/* Done: bright celebratory color */
+.is-done .finjan-time-display {
+    color: #4ade80;
 }
 
-/* Done: bright celebratory flash */
-.is-done #finjan-svg {
-    animation: finjan-done-flash 0.55s ease-out 2;
+/* Running: very subtle cup scale pulse */
+.is-running #finjan-svg {
+    animation: finjan-cup-pulse 3s ease-in-out infinite;
 }
 
-@keyframes finjan-done-flash {
-    0%   { filter:
-        drop-shadow(0 0 20px rgba(124,92,252,0.42))
-        drop-shadow(0 0 52px rgba(124,92,252,0.16)); }
-    45%  { filter:
-        drop-shadow(0 0 55px rgba(167,139,250,0.92))
-        drop-shadow(0 0 110px rgba(124,92,252,0.52)); }
-    100% { filter:
-        drop-shadow(0 0 20px rgba(124,92,252,0.42))
-        drop-shadow(0 0 52px rgba(124,92,252,0.16)); }
+@keyframes finjan-cup-pulse {
+    0%, 100% { transform: scale(1);    }
+    50%       { transform: scale(1.02); }
 }
 
 /* ── Progress bar ────────────────────────────────────────────── */
@@ -332,15 +309,14 @@ body {
 /* ── Responsive — small phones ───────────────────────────────── */
 @media (max-width: 480px) {
     .focus-topbar    { padding: 0 18px; }
-    .focus-phase-tabs { margin-bottom: 32px; }
+    .focus-phase-tabs { margin-bottom: 24px; }
     .focus-tab       { padding: 7px 12px; font-size: 0.77rem; }
 
-    .finjan-scene    { padding: 20px 32px 16px; margin-bottom: 18px; }
+    .finjan-scene    { padding: 12px 24px 10px; margin-bottom: 12px; }
 
-    /* Scale the cup down on small phones */
-    #finjan-svg {
-        height: 220px !important;
-    }
+    #finjan-svg { height: 280px; }
+
+    .finjan-time-display { font-size: 2.4rem; }
 
     .focus-bar-track { max-width: 260px; }
     .focus-btn-primary {
@@ -351,10 +327,11 @@ body {
 
 /* ── Responsive — short viewports (landscape / small laptops) ── */
 @media (max-height: 680px) {
-    .focus-main        { justify-content: flex-start; padding-top: 20px; }
-    .focus-phase-tabs  { margin-bottom: 24px; }
-    .finjan-scene      { padding: 16px 40px 12px; margin-bottom: 14px; }
-    #finjan-svg        { height: 240px !important; }
+    .focus-main        { justify-content: flex-start; padding-top: 16px; }
+    .focus-phase-tabs  { margin-bottom: 20px; }
+    .finjan-scene      { padding: 10px 32px 8px; margin-bottom: 10px; }
+    #finjan-svg        { height: 260px; }
+    .finjan-time-display { font-size: 2.6rem; margin-bottom: 14px; }
     .focus-session-label { margin-bottom: 18px; }
     .focus-controls    { margin-bottom: 18px; }
 }

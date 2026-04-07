@@ -7,21 +7,30 @@
  *
  * Responsibilities:
  *   - Subscribe to TimerCore and drive the finjan (Arabic coffee-cup) SVG
+ *   - Generate a pixel grid inside the cup interior; pixels drain as time passes
  *   - Update phase tabs, progress bar, session label, toggle button
  *   - POST completed sessions to /api/tracker/sessions
  *   - Handle fullscreen toggle on finjan click
  *
  * Finjan fill mechanism
- *   The SVG contains a dark cover rect (#finjan-cover) anchored at
- *   y=FINJAN_TOP with height=0. As progress decreases from 1→0,
- *   the cover height grows from 0→FINJAN_FILL_HEIGHT, revealing the
- *   dark interior from the top (coffee appears to drain). The clipPath
- *   #fj-clip keeps everything inside the cup interior shape.
+ *   The SVG contains:
+ *     1. A pixel grid <g id="finjan-pixels"> populated with colored squares,
+ *        all clipped to the cup interior via #fj-clip.
+ *     2. A dark cover rect (#finjan-cover) anchored at y=FINJAN_TOP (44),
+ *        height=0 when full. As progress decreases from 1→0,
+ *        cover height grows from 0→FINJAN_FILL_HEIGHT (170),
+ *        hiding pixels from the top down — coffee drains visually.
  */
 
 // ── Finjan geometry (must match the SVG viewBox in focus.html) ─
-const FINJAN_TOP         = 65;  // y where cup interior starts
-const FINJAN_FILL_HEIGHT = 172; // y=65 to y=237 (interior base)
+const FINJAN_TOP         = 44;   // y where cup interior starts (top of clip)
+const FINJAN_FILL_HEIGHT = 170;  // interior height: y=44 to y=214
+
+// ── Pixel grid constants ──────────────────────────────────────
+const PIXEL_SIZE   = 8;    // px square side
+const PIXEL_GAP    = 2;    // gap between squares
+const PIXEL_STEP   = PIXEL_SIZE + PIXEL_GAP;   // 10
+const PIXEL_COLORS = ['#7c3aed', '#8b5cf6', '#a78bfa', '#6d28d9', '#9061f9'];
 
 // ── DOM refs ──────────────────────────────────────────────────
 const _barFill     = document.getElementById('focus-bar-fill');
@@ -37,31 +46,54 @@ function _fmt(secs) {
     return `${m}:${s}`;
 }
 
+// ── Generate pixel grid inside the cup ───────────────────────
+// Fills #finjan-pixels with a grid of 8x8 SVG rects covering the
+// interior bounding box. The clip-path #fj-clip masks out anything
+// outside the actual cup shape. Colors are assigned pseudo-randomly
+// per position so the grid looks textured rather than uniform.
+function _generatePixels() {
+    const container = document.getElementById('finjan-pixels');
+    if (!container) return;
+
+    // Bounding box of the interior (matches FINJAN_TOP + FINJAN_FILL_HEIGHT)
+    const startX = 44;   // left margin inside clip
+    const endX   = 196;  // right margin
+    const startY = FINJAN_TOP;
+    const endY   = FINJAN_TOP + FINJAN_FILL_HEIGHT; // 214
+
+    const rects = [];
+    for (let y = startY; y < endY; y += PIXEL_STEP) {
+        for (let x = startX; x < endX; x += PIXEL_STEP) {
+            // Deterministic color based on position (avoid uniform look)
+            const ci = ((x * 3) ^ (y * 7)) % PIXEL_COLORS.length;
+            const color = PIXEL_COLORS[Math.abs(ci)];
+            rects.push(
+                `<rect x="${x}" y="${y}" width="${PIXEL_SIZE}" height="${PIXEL_SIZE}" fill="${color}" opacity="0.82"/>`
+            );
+        }
+    }
+    container.innerHTML = rects.join('');
+}
+
 // ── Update all finjan visuals from a state snapshot ──────────
 function _updateFinjan(state, visState) {
     const progress = state.totalSeconds > 0 ? state.remaining / state.totalSeconds : 0;
 
-    // 1. Timer text (SVG <text> element)
+    // 1. Timer text (HTML element below SVG)
     const timeEl = document.getElementById('finjan-time');
     if (timeEl) timeEl.textContent = _fmt(state.remaining);
 
     // 2. Cover rect height = (1 − progress) × FINJAN_FILL_HEIGHT
-    //    Grows from top → coffee drains from top as time passes.
+    //    Grows from top — pixels drain from top as time passes.
     if (_finjanCover) {
         const coverH = Math.round((1 - progress) * FINJAN_FILL_HEIGHT);
         _finjanCover.setAttribute('height', String(Math.max(0, coverH)));
     }
 
-    // 3. Ambient glow: dims from 1.0 (full) → 0.25 (empty)
-    if (_finjanScene) {
-        const glow = (0.25 + progress * 0.75).toFixed(3);
-        _finjanScene.style.setProperty('--flask-glow', glow);
-    }
-
-    // 4. Progress bar (HTML element, CSS-transitioned for smooth fill)
+    // 3. Progress bar (HTML element, CSS-transitioned for smooth fill)
     if (_barFill) _barFill.style.width = (progress * 100) + '%';
 
-    // 5. Body state classes drive CSS animations
+    // 4. Body state classes drive CSS animations
     document.body.classList.toggle('is-running', visState === 'running');
     document.body.classList.toggle('is-paused',  visState === 'paused');
     document.body.classList.toggle('is-done',    visState === 'done');
@@ -103,7 +135,7 @@ function _onCoreEvent(event, state) {
     else if (event === 'pause') visState = 'paused';
     else                        visState = state.isRunning ? 'running' : '';
 
-    // Update flask visuals for all events except logging-only
+    // Update finjan visuals for all events except logging-only
     if (event !== 'sessionEnd' && event !== 'skip') {
         _updateFinjan(state, visState);
         _updateTabs(state);
@@ -113,7 +145,6 @@ function _onCoreEvent(event, state) {
 
     // Session logging — only when focus page is the active page / master
     if (event === 'sessionEnd') {
-        // Natural completion: log the full phase duration.
         if (window.currentUser) {
             const mins = Math.round(state.totalSeconds / 60);
             const mode = _phaseLabel(state.phase);
@@ -129,16 +160,9 @@ function _onCoreEvent(event, state) {
             }).catch(() => {});
         }
     } else if (event === 'skip') {
-        // Skip: state is the pre-skip snapshot (captured in TimerCore before any
-        // mutation, so state.remaining is the actual remaining at the moment of skip).
-        //
-        // elapsed = totalSeconds − remaining  →  time already spent in this phase
-        //
-        // Only count study phases (pomodoro / countdown).
-        // Break phases (shortbreak / longbreak) do not contribute to study totals.
         if (state.phase === 'pomodoro' || state.phase === 'countdown') {
-            const elapsed = state.totalSeconds - state.remaining;          // seconds
-            const mins    = Math.round(Math.max(0, elapsed) / 60);        // full minutes
+            const elapsed = state.totalSeconds - state.remaining;
+            const mins    = Math.round(Math.max(0, elapsed) / 60);
             if (mins > 0 && window.currentUser) {
                 fetch('/api/tracker/sessions', {
                     method:  'POST',
@@ -147,7 +171,7 @@ function _onCoreEvent(event, state) {
                         materialName:    'Focus Session',
                         durationMinutes: mins,
                         timerMode:       _phaseLabel(state.phase),
-                        completed:       false,   // skipped, not fully completed
+                        completed:       false,
                     }),
                 }).catch(() => {});
             }
@@ -201,6 +225,9 @@ document.addEventListener('keydown', e => {
 
 // ── Init ──────────────────────────────────────────────────────
 (function () {
+    // Build pixel grid first (static; doesn't change per tick)
+    _generatePixels();
+
     const state = TimerCore.getState();
     _updateFinjan(state, state.isRunning ? 'running' : '');
     _updateTabs(state);

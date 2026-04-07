@@ -41,265 +41,144 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════
-         FINJAN SCENE
-         Arabic coffee cup (finjan) — the visual centrepiece.
-         Click to toggle fullscreen. Coffee level drains as time runs.
-           .finjan-scene      — positioning context + CSS var --flask-glow
-             .finjan-glow-halo — ambient radial glow
-             #finjan-svg       — Arabic finjan SVG
-               <g clip-path>   — interior (coffee + cover rect)
-               decorations     — gold bands, geometric patterns, green accents
-               #finjan-time    — SVG <text> timer, centered in lower cup body
+         FINJAN SCENE — redrawn Arabic qahwa cup
+         Shape: wide flared rim → dramatic inward curve → narrow waist → rounded base
+         Interior: pixel grid clipped to cup, generated + depleted by focus.js
+         Exterior: thin gold (#d4a847) geometric lines only — no glow filters
+         Timer text is the HTML element #finjan-time BELOW the SVG
+         Click → fullscreen toggle
          ══════════════════════════════════════════════════════ -->
     <div class="finjan-scene" id="finjan-scene">
 
-        <!-- Ambient radial glow behind the cup -->
-        <div class="finjan-glow-halo" aria-hidden="true"></div>
-
         <!--
-            Click → toggle fullscreen.
-            viewBox 0 0 200 290  |  rendered ≈ 207 × 300 px via CSS.
-            FINJAN_TOP = 65, FINJAN_FILL_HEIGHT = 172  (interior y 65–237).
+            ViewBox 0 0 240 280  |  CSS height: 400 px → ~343 px wide
+            FINJAN_TOP = 44        (top of interior clip, y=44)
+            FINJAN_FILL_HEIGHT = 170  (interior y 44 → 214)
         -->
         <svg id="finjan-svg"
-             viewBox="0 0 200 290"
+             viewBox="0 0 240 280"
              xmlns="http://www.w3.org/2000/svg"
              role="button"
              tabindex="0"
              aria-label="Focus timer — click to toggle fullscreen">
             <defs>
-                <!-- Outer body glow -->
-                <filter id="fj-glow" x="-18%" y="-8%" width="136%" height="116%"
-                        color-interpolation-filters="sRGB">
-                    <feGaussianBlur in="SourceGraphic" stdDeviation="3.8" result="b"/>
-                    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-                </filter>
-                <!-- Gold detail glow -->
-                <filter id="fj-gold" x="-12%" y="-30%" width="124%" height="160%"
-                        color-interpolation-filters="sRGB">
-                    <feGaussianBlur in="SourceGraphic" stdDeviation="1.6" result="b"/>
-                    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-                </filter>
-                <!-- Timer text glow -->
-                <filter id="fj-txt" x="-22%" y="-55%" width="144%" height="210%"
-                        color-interpolation-filters="sRGB">
-                    <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b"/>
-                    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-                </filter>
-
-                <!-- Cup interior clip path -->
+                <!--
+                    Interior clip: follows the inner ceramic wall.
+                    Wide at the rim opening, curves inward to a narrow waist,
+                    gently rounds to the base.
+                    Top y=44, bottom y=214.  FINJAN_FILL_HEIGHT = 170.
+                -->
                 <clipPath id="fj-clip">
-                    <path d="M 44,65 C 44,71 47,73 50,76 L 52,237
-                             Q 100,247 148,237 L 150,76
-                             C 153,73 156,71 156,65 Z"/>
+                    <path d="M 52,44 L 188,44
+                             C 188,90 163,128 155,148
+                             C 151,174 151,198 150,214
+                             Q 120,224 90,214
+                             C 89,198 89,174 85,148
+                             C 77,128 52,90 52,44 Z"/>
                 </clipPath>
-
-                <!-- Ceramic body gradient: deep indigo / violet -->
-                <linearGradient id="fj-body" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%"   stop-color="#110a2c"/>
-                    <stop offset="18%"  stop-color="#1c1452"/>
-                    <stop offset="50%"  stop-color="#231a64"/>
-                    <stop offset="82%"  stop-color="#1c1452"/>
-                    <stop offset="100%" stop-color="#110a2c"/>
-                </linearGradient>
-
-                <!-- Rim gradient: slightly lighter indigo -->
-                <linearGradient id="fj-rim" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%"   stop-color="#1a1248"/>
-                    <stop offset="50%"  stop-color="#2b2076"/>
-                    <stop offset="100%" stop-color="#1a1248"/>
-                </linearGradient>
-
-                <!-- Coffee interior: rich warm brown -->
-                <linearGradient id="fj-coffee" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%"   stop-color="#3e2208"/>
-                    <stop offset="45%"  stop-color="#2c1a06"/>
-                    <stop offset="100%" stop-color="#1a0e04"/>
-                </linearGradient>
-
-                <!-- Saucer gradient -->
-                <linearGradient id="fj-saucer" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%"   stop-color="#130d38"/>
-                    <stop offset="50%"  stop-color="#1f186a"/>
-                    <stop offset="100%" stop-color="#130d38"/>
-                </linearGradient>
             </defs>
 
-            <!-- ── Drop shadow under saucer ── -->
-            <ellipse cx="100" cy="274" rx="76" ry="6" fill="rgba(0,0,0,0.5)"/>
+            <!-- ══ Ground shadow — subtle ellipse under the base ══ -->
+            <ellipse cx="120" cy="272" rx="54" ry="5" fill="rgba(0,0,0,0.32)"/>
 
-            <!-- ── Saucer ── -->
-            <ellipse cx="100" cy="268" rx="72" ry="9"
-                     fill="url(#fj-saucer)"
-                     stroke="rgba(124,92,252,0.45)" stroke-width="1.2"/>
-            <ellipse cx="100" cy="265" rx="60" ry="6" fill="none"
-                     stroke="rgba(255,215,0,0.32)" stroke-width="1"/>
-            <!-- Cup ring indent -->
-            <ellipse cx="100" cy="264" rx="33" ry="3" fill="rgba(0,0,0,0.3)"/>
+            <!-- ══ Cup outer ceramic body ══
+                 Wide flared rim (y=18–40, x=38–202).
+                 Curves steeply inward: waist at x≈82–158, y≈148.
+                 Rounds gently to a small base and bottom arc. -->
+            <path d="M 38,18 L 202,18 L 202,40
+                     C 200,88 170,126 162,148
+                     C 158,174 157,200 157,218
+                     Q 120,230 83,218
+                     C 83,200 82,174 78,148
+                     C 70,126 40,88 38,40 Z"
+                  fill="#17103a"
+                  stroke="rgba(140,110,220,0.45)"
+                  stroke-width="1.2"/>
 
-            <!-- ── Cup outer body ── -->
-            <path d="M 28,50 Q 28,42 38,42 L 162,42 Q 172,42 172,50
-                     L 170,65 C 162,69 158,72 156,78 L 150,242
-                     Q 126,252 74,252 Q 50,252 50,242
-                     L 44,78 C 42,72 38,69 30,65 Z"
-                  fill="url(#fj-body)"
-                  stroke="rgba(124,92,252,0.62)"
-                  stroke-width="1.5"
-                  filter="url(#fj-glow)"/>
+            <!-- ══ Rim top edge — thin gold line across the opening ══ -->
+            <line x1="38" y1="18" x2="202" y2="18"
+                  stroke="#d4a847" stroke-width="1.5" stroke-linecap="round" opacity="0.75"/>
 
-            <!-- Rim cap (overhang, lighter fill) -->
-            <path d="M 28,50 Q 28,42 38,42 L 162,42 Q 172,42 172,50
-                     L 170,65 C 162,69 158,72 156,78
-                     L 44,78 C 42,72 38,69 30,65 Z"
-                  fill="url(#fj-rim)"/>
+            <!-- Rim bottom edge — separates the lip from the body -->
+            <line x1="41" y1="40" x2="199" y2="40"
+                  stroke="#d4a847" stroke-width="0.9" stroke-linecap="round" opacity="0.5"/>
 
-            <!-- Gold top rim edges -->
-            <path d="M 38,42 L 162,42 Q 172,42 172,50 L 170,65"
-                  fill="none" stroke="rgba(255,215,0,0.82)" stroke-width="2"
-                  stroke-linecap="round" filter="url(#fj-gold)"/>
-            <path d="M 38,42 Q 28,42 28,50 L 30,65"
-                  fill="none" stroke="rgba(255,215,0,0.82)" stroke-width="2"
-                  stroke-linecap="round" filter="url(#fj-gold)"/>
-            <!-- Rim / body dividing line -->
-            <line x1="44" y1="78" x2="156" y2="78"
-                  stroke="rgba(255,215,0,0.6)" stroke-width="1.3"
-                  filter="url(#fj-gold)"/>
-
-            <!-- ══ Cup interior (coffee + drain cover) ══ -->
+            <!-- ══ Interior pixel region (clipped to cup shape) ══ -->
             <g clip-path="url(#fj-clip)">
-                <!-- Dark ceramic interior base -->
-                <rect x="0" y="0" width="200" height="290" fill="#0c0820"/>
-                <!-- Coffee warm fill -->
-                <rect x="0" y="65" width="200" height="172" fill="url(#fj-coffee)"/>
+                <!-- Dark background fills the cup interior -->
+                <rect x="0" y="0" width="240" height="280" fill="#0c0820"/>
+
+                <!-- Pixel grid — populated by focus.js _generatePixels() -->
+                <g id="finjan-pixels"/>
+
                 <!--
-                    Cover rect — same dark colour as interior; grows from top as time drains.
-                    y is always FINJAN_TOP (65). Only height changes.
-                    focus.js: height = Math.round((1−progress) × 172)
+                    Cover rect — opaque dark; anchored at y=FINJAN_TOP (44).
+                    height=0 when timer is full; grows to 170 as time drains.
+                    focus.js: height = Math.round((1−progress) × 170)
                 -->
-                <rect id="finjan-cover" x="0" y="65" width="200" height="0" fill="#0c0820"/>
+                <rect id="finjan-cover" x="0" y="44" width="240" height="0" fill="#0c0820"/>
             </g>
 
-            <!-- Open cup top — dark coffee surface visible at rim opening -->
-            <ellipse cx="100" cy="67" rx="56" ry="8.5" fill="rgba(38,20,7,0.75)"/>
-            <!-- Subtle coffee sheen -->
-            <ellipse cx="89" cy="63" rx="15" ry="3" fill="rgba(200,140,40,0.07)"/>
+            <!-- ══ Exterior decoration — thin gold geometric lines only ══
 
-            <!-- ══ Upper gold decorative border ══ -->
-            <line x1="46" y1="94" x2="154" y2="94"
-                  stroke="rgba(255,215,0,0.8)" stroke-width="1.4"
-                  filter="url(#fj-gold)"/>
-            <!-- Dot chain on upper border -->
-            <g fill="rgba(255,215,0,0.7)" filter="url(#fj-gold)">
-                <circle cx="55"  cy="94" r="1.8"/>
-                <circle cx="69"  cy="94" r="1.8"/>
-                <circle cx="83"  cy="94" r="1.8"/>
-                <circle cx="100" cy="94" r="2.2"/>
-                <circle cx="117" cy="94" r="1.8"/>
-                <circle cx="131" cy="94" r="1.8"/>
-                <circle cx="145" cy="94" r="1.8"/>
-            </g>
-            <!-- Subtle chevron accent above band -->
-            <path d="M 46,87 L 55,90 L 64,87 L 73,90 L 82,87 L 91,90 L 100,87
-                     L 109,90 L 118,87 L 127,90 L 136,87 L 145,90 L 154,87"
-                  fill="none" stroke="rgba(255,215,0,0.28)" stroke-width="0.9"
-                  stroke-linecap="round" stroke-linejoin="round"/>
+                 Band 1 (upper body, y≈50–100):
+                   Two border lines with a diamond-chain between them.
+                   3 diamonds, centers at x=96,120,144, half-w=12, half-h=24.
 
-            <!-- ══ Geometric pattern band (y ≈ 94–168) ══ -->
+                 Band 2 (mid body, y≈155–175):
+                   Two horizontal lines with small V-chevrons between them.
+            ══ -->
 
-            <!-- Central diamond -->
-            <polygon points="100,106 112,128 100,150 88,128"
-                     fill="none" stroke="rgba(255,215,0,0.74)" stroke-width="1.3"
-                     filter="url(#fj-gold)"/>
-            <!-- 4-petal rosette inside centre diamond -->
-            <ellipse cx="100" cy="121" rx="3.2" ry="5"   fill="rgba(167,139,250,0.52)"/>
-            <ellipse cx="100" cy="135" rx="3.2" ry="5"   fill="rgba(167,139,250,0.52)"/>
-            <ellipse cx="93"  cy="128" rx="5"   ry="3.2" fill="rgba(167,139,250,0.52)"/>
-            <ellipse cx="107" cy="128" rx="5"   ry="3.2" fill="rgba(167,139,250,0.52)"/>
-            <!-- Centre dot -->
-            <circle cx="100" cy="128" r="3.2" fill="rgba(255,215,0,0.84)"
-                    filter="url(#fj-gold)"/>
+            <!-- Band 1: upper border line -->
+            <line x1="44" y1="52" x2="196" y2="52"
+                  stroke="#d4a847" stroke-width="1" opacity="0.6"/>
 
-            <!-- Left diamond -->
-            <polygon points="67,109 77,128 67,147 57,128"
-                     fill="none" stroke="rgba(255,215,0,0.54)" stroke-width="1.1"/>
-            <circle cx="67" cy="128" r="2.3" fill="rgba(255,215,0,0.62)"/>
+            <!-- Band 1: diamond chain
+                 D1 centre x=96:  (84,76)-(96,52)-(108,76)-(96,100)
+                 D2 centre x=120: (108,76)-(120,52)-(132,76)-(120,100)
+                 D3 centre x=144: (132,76)-(144,52)-(156,76)-(144,100)
+                 Diamonds share vertices horizontally. -->
+            <polyline points="84,76 96,52 108,76 120,52 132,76 144,52 156,76"
+                      fill="none" stroke="#d4a847" stroke-width="1.1"
+                      stroke-linecap="round" stroke-linejoin="round" opacity="0.65"/>
+            <polyline points="84,76 96,100 108,76 120,100 132,76 144,100 156,76"
+                      fill="none" stroke="#d4a847" stroke-width="1.1"
+                      stroke-linecap="round" stroke-linejoin="round" opacity="0.65"/>
 
-            <!-- Right diamond -->
-            <polygon points="133,109 143,128 133,147 123,128"
-                     fill="none" stroke="rgba(255,215,0,0.54)" stroke-width="1.1"/>
-            <circle cx="133" cy="128" r="2.3" fill="rgba(255,215,0,0.62)"/>
+            <!-- Band 1: lower border line -->
+            <line x1="76" y1="100" x2="164" y2="100"
+                  stroke="#d4a847" stroke-width="1" opacity="0.6"/>
 
-            <!-- Green accent orbs flanking centre -->
-            <circle cx="85"  cy="128" r="3.2" fill="rgba(74,222,128,0.7)"
-                    filter="url(#fj-gold)"/>
-            <circle cx="115" cy="128" r="3.2" fill="rgba(74,222,128,0.7)"
-                    filter="url(#fj-gold)"/>
-            <!-- Outer green dots -->
-            <circle cx="50"  cy="128" r="2.0" fill="rgba(74,222,128,0.42)"/>
-            <circle cx="150" cy="128" r="2.0" fill="rgba(74,222,128,0.42)"/>
+            <!-- Band 2: upper border line (at the waist/lower body) -->
+            <line x1="83" y1="156" x2="157" y2="156"
+                  stroke="#d4a847" stroke-width="0.9" opacity="0.5"/>
 
-            <!-- 8-point mini-stars between diamonds -->
-            <g stroke="rgba(255,215,0,0.58)" stroke-width="0.9" stroke-linecap="round">
-                <!-- Left edge -->
-                <line x1="50" y1="122" x2="50" y2="118"/>
-                <line x1="48" y1="120" x2="52" y2="120"/>
-                <!-- Left ↔ Centre -->
-                <line x1="85" y1="112" x2="85" y2="116"/>
-                <line x1="83" y1="114" x2="87" y2="114"/>
-                <line x1="83.5" y1="112.5" x2="86.5" y2="115.5"/>
-                <line x1="86.5" y1="112.5" x2="83.5" y2="115.5"/>
-                <!-- Centre ↔ Right -->
-                <line x1="115" y1="112" x2="115" y2="116"/>
-                <line x1="113" y1="114" x2="117" y2="114"/>
-                <line x1="113.5" y1="112.5" x2="116.5" y2="115.5"/>
-                <line x1="116.5" y1="112.5" x2="113.5" y2="115.5"/>
-                <!-- Right edge -->
-                <line x1="150" y1="122" x2="150" y2="118"/>
-                <line x1="148" y1="120" x2="152" y2="120"/>
-            </g>
+            <!-- Band 2: three small V-chevrons -->
+            <polyline points="91,156 99,168 107,156"
+                      fill="none" stroke="#d4a847" stroke-width="1"
+                      stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+            <polyline points="112,156 120,168 128,156"
+                      fill="none" stroke="#d4a847" stroke-width="1"
+                      stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+            <polyline points="133,156 141,168 149,156"
+                      fill="none" stroke="#d4a847" stroke-width="1"
+                      stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
 
-            <!-- ══ Lower gold decorative border ══ -->
-            <line x1="46" y1="168" x2="154" y2="168"
-                  stroke="rgba(255,215,0,0.8)" stroke-width="1.4"
-                  filter="url(#fj-gold)"/>
-            <!-- Dot chain on lower border -->
-            <g fill="rgba(255,215,0,0.7)" filter="url(#fj-gold)">
-                <circle cx="55"  cy="168" r="1.8"/>
-                <circle cx="69"  cy="168" r="1.8"/>
-                <circle cx="83"  cy="168" r="1.8"/>
-                <circle cx="100" cy="168" r="2.2"/>
-                <circle cx="117" cy="168" r="1.8"/>
-                <circle cx="131" cy="168" r="1.8"/>
-                <circle cx="145" cy="168" r="1.8"/>
-            </g>
-            <!-- Chevron accent below lower band -->
-            <path d="M 46,175 L 55,178 L 64,175 L 73,178 L 82,175 L 91,178 L 100,175
-                     L 109,178 L 118,175 L 127,178 L 136,175 L 145,178 L 154,175"
-                  fill="none" stroke="rgba(255,215,0,0.24)" stroke-width="0.9"
-                  stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- Band 2: lower border line -->
+            <line x1="83" y1="174" x2="157" y2="174"
+                  stroke="#d4a847" stroke-width="0.9" opacity="0.5"/>
 
-            <!-- ── Gloss highlight on left cup wall ── -->
-            <path d="M 37,74 Q 37,96 38,120 L 40,185 Q 41,210 43,228"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.055)"
-                  stroke-width="10"
-                  stroke-linecap="round"/>
-
-            <!-- ── Timer text — lower cup body, below decorative band ── -->
-            <ellipse cx="100" cy="210" rx="48" ry="22" fill="rgba(0,0,0,0.38)"/>
-            <text id="finjan-time"
-                  x="100" y="210"
-                  text-anchor="middle"
-                  dominant-baseline="central"
-                  font-family="'JetBrains Mono', monospace"
-                  font-size="28"
-                  font-weight="700"
-                  fill="white"
-                  filter="url(#fj-txt)">25:00</text>
+            <!-- Subtle gloss on the left wall (white, very faint) -->
+            <path d="M 42,44 C 43,76 44,110 46,148 C 47,168 48,192 50,214"
+                  fill="none" stroke="rgba(255,255,255,0.04)"
+                  stroke-width="12" stroke-linecap="round"/>
 
         </svg><!-- /finjan-svg -->
 
     </div><!-- /finjan-scene -->
+
+    <!-- Timer countdown — displayed below the cup, not inside it -->
+    <p class="finjan-time-display" id="finjan-time">25:00</p>
 
     <!-- Progress bar -->
     <div class="focus-bar-track" role="progressbar" aria-label="Session progress">
