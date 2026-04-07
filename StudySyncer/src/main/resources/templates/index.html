@@ -8,12 +8,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" th:href="@{/css/style.css}" />
+    <link rel="stylesheet" th:href="@{/css/ds.css}" />
 </head>
 <body>
 
 <header>
     <div class="nav-inner">
-        <a href="/" class="nav-logo-link">StudySync</a>
+        <a href="/" class="nav-logo-link"><span class="logo-study">Study</span><span class="logo-sync">Sync</span></a>
 
         <nav class="nav-links">
             <a href="/focus"   class="header-nav-link">Focus Mode</a>
@@ -25,7 +26,7 @@
              if the session check succeeds, avoiding a flash of empty nav. -->
         <div id="auth-bar" class="auth-bar">
             <div id="auth-guest" class="auth-guest">
-                <button class="auth-link-btn" onclick="openModal('login')">Log in</button>
+                <button class="auth-link-btn shine-btn" onclick="openModal('login')">Log in</button>
             </div>
             <div id="auth-user" class="auth-user hidden">
                 <span id="auth-username" class="auth-username"></span>
@@ -48,7 +49,7 @@
      ══════════════════════════════════════════════════════════ -->
 <div id="auth-modal" class="auth-modal hidden">
     <div class="auth-modal-box" id="auth-modal-box">
-        <div class="auth-modal-logo">StudySync</div>
+        <div class="auth-modal-logo"><span class="logo-study">Study</span><span class="logo-sync">Sync</span></div>
         <p class="auth-tagline">Stay focused. Study smarter.</p>
         <h3 id="auth-modal-title">Log in</h3>
 
@@ -208,7 +209,7 @@
 
         <!-- Controls: Start/Pause toggle · Skip -->
         <div class="timer-controls">
-            <button class="ctrl-btn start" id="btn-start-pause" onclick="toggleTimer()">Start</button>
+            <button class="ctrl-btn start shine-btn" id="btn-start-pause" onclick="toggleTimer()">Start</button>
             <button class="ctrl-btn skip"  onclick="skipTimer()">Skip</button>
         </div>
 
@@ -306,7 +307,7 @@
             </div>
 
             <div class="syllabus-footer">
-                <button id="btn-estimate" class="save-btn" onclick="estimateStudyTime()"
+                <button id="btn-estimate" class="save-btn shine-btn" onclick="estimateStudyTime()"
                         title="AI estimates how long to study based on your notes">Estimate Study Time</button>
                 <span id="doc-save-status" class="save-status"></span>
             </div>
@@ -314,6 +315,13 @@
     </section><!-- /syllabus-card -->
 
 </div><!-- /top-panel -->
+
+    <!-- ── Study Priority Widget ── -->
+    <section class="priority-widget-section">
+        <div id="priority-widget" class="priority-widget">
+            <!-- Populated by deadlines.js -->
+        </div>
+    </section>
 
     <!-- Study time estimation options -->
     <section id="estimation-card" class="estimation-card hidden">
@@ -375,14 +383,19 @@
     </section>
 </main>
 
-<footer class="site-footer">
-    Made with &#10084;&#65039; by StudySync &nbsp;&middot;&nbsp; <span style="opacity:0.5">v1.0</span>
-</footer>
-
 <script th:src="@{/js/subjects.js}"></script>
 <script th:src="@{/js/timer-core.js}"></script>
 <script th:src="@{/js/timer.js}"></script>
 <script th:src="@{/js/auth.js}"></script>
+<script th:src="@{/js/deadlines.js}"></script>
+<script>
+    // Boot the priority widget after auth is resolved
+    // auth.js calls initAuth() which sets up the session; we run deadlines after.
+    document.addEventListener('DOMContentLoaded', function() {
+        // Small delay so auth.js has time to resolve the session
+        setTimeout(initDeadlines, 400);
+    });
+</script>
 <script>
 /* ── Drag-and-drop PDF handler ── */
 function handlePdfDragOver(e) {

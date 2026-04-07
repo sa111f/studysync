@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" th:href="@{/css/focus.css}" />
+    <link rel="stylesheet" th:href="@{/css/ds.css}" />
 </head>
 <body>
 
@@ -72,15 +73,15 @@
             <defs>
 
                 <!--
-                    Interior clip — inner ceramic wall, ~14 px inside the
-                    outer body.  Purple fill pixels are masked to stay here.
-                    Top y=62 (flat), bottom arc peaks near y=212.
+                    Interior clip — identical to the outer body path so purple
+                    pixels fill right up to the white border pixels with no
+                    dark "ceramic wall" gap in between.
                 -->
                 <clipPath id="fj-clip">
-                    <path d="M 62,62 L 238,62
-                             C 252,88  228,162  166,198
-                             Q 150,212  134,198
-                             C  72,162   48, 88   62, 62 Z"/>
+                    <path d="M 48,48 L 252,48
+                             C 268,70  242,162  176,205
+                             Q 150,220  124,205
+                             C  58,162   32, 70   48, 48 Z"/>
                 </clipPath>
 
                 <!--
@@ -174,7 +175,7 @@
             </svg>
             Skip
         </button>
-        <button class="focus-btn focus-btn-primary" id="focus-toggle-btn" onclick="toggleTimer()">
+        <button class="focus-btn focus-btn-primary shine-btn" id="focus-toggle-btn" onclick="toggleTimer()">
             Start
         </button>
     </div>

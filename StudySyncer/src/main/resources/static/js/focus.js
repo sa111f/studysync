@@ -29,8 +29,10 @@
  */
 
 // ── Inner clip path — must exactly match <clipPath id="fj-clip"> in HTML ──────
+// Uses the SAME path as the outer body so purple pixels fill right up to the
+// white border pixels with no dark wall gap in between.
 const FJ_INNER_CLIP_D =
-    'M 62,62 L 238,62 C 252,88 228,162 166,198 Q 150,212 134,198 C 72,162 48,88 62,62 Z';
+    'M 48,48 L 252,48 C 268,70 242,162 176,205 Q 150,220 124,205 C 58,162 32,70 48,48 Z';
 
 // ── Outer body segments used for border pixel sampling ────────────────────────
 // Each cubic: [P0, CP1, CP2, P3]   Quad: [P0, CP, P1]
@@ -96,7 +98,8 @@ function _quad(p0, cp, p1, n) {
  *   · Right outer cubic  (252,48) → (176,205)
  *   · Bottom base arc    (176,205) → (124,205)
  *   · Left outer cubic   (124,205) → (48,48)
- *   · Inner rim line     y=62, x=62–238   (the cup's opening lip)
+ *
+ * The inner rim line is intentionally omitted — no dark separator line.
  */
 function _initBorderPixels() {
     const group = document.getElementById('fj-border-pixels');
@@ -118,12 +121,6 @@ function _initBorderPixels() {
 
     // Left outer cubic
     _cubic(FJ_LEFT_CUBIC, 400).forEach(p => pts.push(p));
-
-    // Inner rim line (cup opening lip — visible as the inner top edge)
-    const RIM2_STEPS = 150;
-    for (let i = 0; i <= RIM2_STEPS; i++) {
-        pts.push({ x: 62 + i * (176 / RIM2_STEPS), y: 62 });
-    }
 
     // Snap to pixel grid and deduplicate
     const SNAP = FJ_BORDER_SNAP;
@@ -173,17 +170,22 @@ function _buildPixelGrid() {
     const SZ     = FJ_PX_SIZE;
     const STEP   = FJ_PX_STEP;
 
-    for (let py = 64; py < 212; py += STEP) {
-        for (let px = 60; px < 242; px += STEP) {
+    for (let py = 50; py < 222; py += STEP) {
+        for (let px = 44; px < 258; px += STEP) {
             let inside = false;
             if (useAPI) {
                 const pt = svg.createSVGPoint();
                 pt.x = px + SZ / 2;
                 pt.y = py + SZ / 2;
                 try { inside = probe.isPointInFill(pt); }
-                catch (_) { inside = px >= 68 && px <= 228 && py >= 62 && py <= 206; }
+                catch (_) {
+                    // Fallback: linear approximation of cup interior (trapezoid)
+                    const halfW = 102 - (py + SZ / 2 - 48) * 0.49;
+                    inside = Math.abs(px + SZ / 2 - 150) < halfW && py >= 48 && py <= 215;
+                }
             } else {
-                inside = px >= 68 && px <= 228 && py >= 62 && py <= 206;
+                const halfW = 102 - (py + SZ / 2 - 48) * 0.49;
+                inside = Math.abs(px + SZ / 2 - 150) < halfW && py >= 48 && py <= 215;
             }
             if (inside) pixels.push({ x: px, y: py, el: null });
         }
@@ -201,21 +203,11 @@ function _initPixels() {
 
     _allPixels = _buildPixelGrid();
 
-    const NS   = 'http://www.w3.org/2000/svg';
-    const minY = _allPixels.length ? _allPixels[0].y                          : 62;
-    const maxY = _allPixels.length ? _allPixels[_allPixels.length - 1].y : 206;
+    const NS = 'http://www.w3.org/2000/svg';
+    // Single unified purple — no gradient, no multi-tone, just one consistent color
+    const FILL = '#7c5cfc';
 
     _allPixels.forEach(px => {
-        // Colour gradient: bright lavender at top → deep purple at bottom
-        const rel = (px.y - minY) / Math.max(1, maxY - minY);
-        let fill;
-        if      (rel < 0.16) fill = '#ede9fe';
-        else if (rel < 0.32) fill = '#ddd6fe';
-        else if (rel < 0.50) fill = '#c4b5fd';
-        else if (rel < 0.67) fill = '#a78bfa';
-        else if (rel < 0.82) fill = '#7c3aed';
-        else                 fill = '#5b21b6';
-
         const r = document.createElementNS(NS, 'rect');
         r.setAttribute('x',      String(px.x));
         r.setAttribute('y',      String(px.y));
@@ -223,7 +215,7 @@ function _initPixels() {
         r.setAttribute('height', String(FJ_PX_SIZE));
         r.setAttribute('rx',     '0.8');
         r.setAttribute('ry',     '0.8');
-        r.setAttribute('fill',   fill);
+        r.setAttribute('fill',   FILL);
         group.appendChild(r);
         px.el = r;
     });

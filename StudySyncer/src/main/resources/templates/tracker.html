@@ -8,12 +8,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" th:href="@{/css/style.css}" />
+    <link rel="stylesheet" th:href="@{/css/ds.css}" />
 </head>
 <body>
 
 <header>
     <div class="nav-inner">
-        <a href="/" class="nav-logo-link">StudySync</a>
+        <a href="/" class="nav-logo-link"><span class="logo-study">Study</span><span class="logo-sync">Sync</span></a>
         <nav class="nav-links">
             <span class="nav-page-label">Study Tracker</span>
         </nav>
@@ -31,9 +32,10 @@
 
     <!-- Tab bar -->
     <div class="tracker-tab-bar">
-        <button class="tracker-tab active" data-tab="summary" onclick="switchTab('summary')">Summary</button>
-        <button class="tracker-tab"        data-tab="detail"  onclick="switchTab('detail')">Detail</button>
-        <button class="tracker-tab"        data-tab="ranking" onclick="switchTab('ranking')">Ranking</button>
+        <button class="tracker-tab active" data-tab="summary"   onclick="switchTab('summary')">Summary</button>
+        <button class="tracker-tab"        data-tab="detail"    onclick="switchTab('detail')">Detail</button>
+        <button class="tracker-tab"        data-tab="deadlines" onclick="switchTab('deadlines')">Deadlines</button>
+        <button class="tracker-tab"        data-tab="ranking"   onclick="switchTab('ranking')">Ranking</button>
     </div>
 
     <!-- ══════════════════════════════════════════════════
@@ -41,7 +43,7 @@
          ══════════════════════════════════════════════════ -->
     <div id="tab-summary" class="tracker-panel">
 
-        <!-- Stat cards with icons -->
+        <!-- Stat cards -->
         <div class="tracker-stat-section">
             <div class="tracker-stat-cards">
 
@@ -100,24 +102,55 @@
             </div>
         </div>
 
+        <!-- ── Today's Goal ─────────────────────────────────── -->
+        <div class="today-goal-card" id="today-goal-card">
+            <div class="today-goal-row">
+                <div class="today-goal-left">
+                    <span class="today-goal-label">Today's Goal</span>
+                    <span class="today-goal-badge">optional</span>
+                </div>
+                <div class="today-goal-right">
+                    <div class="today-goal-input-group">
+                        <input type="number" id="today-goal-input" class="today-goal-input"
+                               placeholder="—" min="1" max="720"
+                               onkeydown="if(event.key==='Enter')applyGoal()" />
+                        <span class="today-goal-unit">min</span>
+                    </div>
+                    <button class="today-goal-btn" onclick="applyGoal()">Set</button>
+                    <button class="today-goal-clear hidden" id="today-goal-clear" onclick="clearGoal()">Clear</button>
+                </div>
+            </div>
+            <!-- Progress bar — visible only when goal is active on the current period -->
+            <div class="today-goal-progress hidden" id="today-goal-progress">
+                <div class="today-goal-bar-track">
+                    <div class="today-goal-bar-fill" id="today-goal-bar-fill" style="width:0%"></div>
+                </div>
+                <span class="today-goal-status-text" id="today-goal-status-text"></span>
+            </div>
+        </div>
+
         <!-- Focus chart card -->
         <div class="tracker-card">
             <div class="tracker-card-header">
-                <div class="range-toggle">
-                    <button class="range-btn active" data-range="week"  onclick="setRange('week')">Week</button>
-                    <button class="range-btn"        data-range="month" onclick="setRange('month')">Month</button>
-                    <!-- Year is locked — coming soon -->
-                    <span class="range-btn-year-wrap">
-                        <button class="range-btn" data-range="year" disabled>
-                            Year <span class="year-lock-icon">&#128274;</span>
-                        </button>
-                        <span class="year-lock-tip">Coming soon</span>
-                    </span>
+                <div class="tracker-card-header-left">
+                    <div class="range-toggle">
+                        <button class="range-btn active" data-range="week"  onclick="setRange('week')">Week</button>
+                        <button class="range-btn"        data-range="month" onclick="setRange('month')">Month</button>
+                        <!-- Year is locked — coming soon -->
+                        <span class="range-btn-year-wrap">
+                            <button class="range-btn" data-range="year" disabled>
+                                Year <span class="year-lock-icon">&#128274;</span>
+                            </button>
+                            <span class="year-lock-tip">Coming soon</span>
+                        </span>
+                    </div>
                 </div>
-                <div class="period-nav">
-                    <button class="period-nav-btn" onclick="navigatePeriod(-1)" title="Previous period">&#8249;</button>
-                    <span   class="period-label"   id="period-label">This Week</span>
-                    <button class="period-nav-btn" onclick="navigatePeriod(1)" id="btn-next-period" title="Next period">&#8250;</button>
+                <div class="tracker-card-header-right">
+                    <div class="period-nav">
+                        <button class="period-nav-btn" onclick="navigatePeriod(-1)" title="Previous period">&#8249;</button>
+                        <span   class="period-label"   id="period-label">This Week</span>
+                        <button class="period-nav-btn" onclick="navigatePeriod(1)" id="btn-next-period" title="Next period">&#8250;</button>
+                    </div>
                 </div>
             </div>
 
@@ -133,13 +166,11 @@
                 <div id="chart-total" class="chart-total-label"></div>
                 <div class="chart-canvas-wrap">
                     <canvas id="focus-chart" height="220"></canvas>
-                    <!-- Hover tooltip -->
                     <div id="chart-tooltip" class="chart-tooltip hidden"></div>
                 </div>
                 <div id="chart-empty" class="tracker-empty hidden">
                     No study sessions recorded for this period.
                 </div>
-                <!-- Edit button -->
                 <button class="chart-edit-btn" onclick="showEditToast()">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -185,7 +216,6 @@
             <!-- Session table (logged-in users) -->
             <div id="session-list-area">
 
-                <!-- Search / filter -->
                 <div class="session-search-wrap">
                     <input type="search" id="session-search" class="session-search-input"
                            placeholder="Filter by material, mode, or date…"
@@ -213,6 +243,112 @@
     </div><!-- /tab-detail -->
 
     <!-- ══════════════════════════════════════════════════
+         DEADLINES TAB
+         ══════════════════════════════════════════════════ -->
+    <div id="tab-deadlines" class="tracker-panel hidden">
+
+        <!-- ── What to Study Next recommendation ── -->
+        <div class="tracker-card dl-rec-card">
+            <div id="dl-recommendation" class="dl-recommendation">
+                <!-- Populated by deadlines.js -->
+            </div>
+        </div>
+
+        <!-- ── Deadline list + controls ── -->
+        <div class="tracker-card dl-main-card">
+            <div class="dl-card-header">
+                <h3 class="tracker-section-title" style="margin:0">Upcoming Deadlines</h3>
+                <button class="dl-add-trigger-btn shine-btn" id="dl-add-btn" onclick="expandForm()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                         stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                        <line x1="12" y1="5" x2="12" y2="19"/>
+                        <line x1="5"  y1="12" x2="19" y2="12"/>
+                    </svg>
+                    Add Deadline
+                </button>
+            </div>
+
+            <!-- ── Add / Edit form ── -->
+            <div id="dl-form-panel" class="dl-form-panel hidden">
+                <div class="dl-form-header">
+                    <span class="dl-form-title" id="dl-form-title">Add Deadline</span>
+                    <button class="dl-form-cancel" onclick="cancelEdit()" aria-label="Cancel">&#10005;</button>
+                </div>
+                <form id="dl-form" class="dl-form" onsubmit="event.preventDefault(); saveDeadline()">
+
+                    <div class="dl-form-row dl-form-row-2">
+                        <div class="dl-field">
+                            <label class="dl-label" for="dl-title">Title <span class="dl-required">*</span></label>
+                            <input type="text" id="dl-title" class="field-input dl-input"
+                                   placeholder="e.g. Midterm Exam, Lab Report 3…" maxlength="200" />
+                            <span class="auth-field-error hidden" id="dl-title-err"></span>
+                        </div>
+                        <div class="dl-field">
+                            <label class="dl-label" for="dl-subject">Subject / Course</label>
+                            <input type="text" id="dl-subject" class="field-input dl-input"
+                                   placeholder="e.g. EECS 2030, Calculus II…" maxlength="100" />
+                        </div>
+                    </div>
+
+                    <div class="dl-form-row dl-form-row-3">
+                        <div class="dl-field">
+                            <label class="dl-label" for="dl-type">Type</label>
+                            <select id="dl-type" class="field-input dl-input dl-select">
+                                <option value="exam">Exam</option>
+                                <option value="quiz">Quiz</option>
+                                <option value="assignment" selected>Assignment</option>
+                                <option value="lab">Lab</option>
+                                <option value="project">Project</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="dl-field">
+                            <label class="dl-label" for="dl-due-date">Due Date <span class="dl-required">*</span></label>
+                            <input type="date" id="dl-due-date" class="field-input dl-input" />
+                            <span class="auth-field-error hidden" id="dl-date-err"></span>
+                        </div>
+                        <div class="dl-field">
+                            <label class="dl-label" for="dl-due-time">Due Time <span class="dl-optional">optional</span></label>
+                            <input type="time" id="dl-due-time" class="field-input dl-input" />
+                        </div>
+                    </div>
+
+                    <div class="dl-field">
+                        <label class="dl-label" for="dl-notes">Notes <span class="dl-optional">optional</span></label>
+                        <textarea id="dl-notes" class="field-input dl-input dl-textarea"
+                                  placeholder="Topics to review, weight, instructions…" maxlength="500" rows="2"></textarea>
+                    </div>
+
+                    <div id="dl-form-error" class="auth-error hidden"></div>
+
+                    <div class="dl-form-actions">
+                        <button type="submit" id="dl-form-submit" class="save-btn dl-submit-btn">Add Deadline</button>
+                        <button type="button" class="apply-btn dl-cancel-btn" onclick="cancelEdit()">Cancel</button>
+                    </div>
+                </form>
+            </div><!-- /dl-form-panel -->
+
+            <!-- ── Filter bar ── -->
+            <div class="dl-filter-bar">
+                <button class="dl-filter-btn active" data-filter="all"      onclick="setFilter('all')">All</button>
+                <button class="dl-filter-btn"        data-filter="overdue"  onclick="setFilter('overdue')">Overdue</button>
+                <button class="dl-filter-btn"        data-filter="today"    onclick="setFilter('today')">Today</button>
+                <button class="dl-filter-btn"        data-filter="tomorrow" onclick="setFilter('tomorrow')">Tomorrow</button>
+                <button class="dl-filter-btn"        data-filter="soon"     onclick="setFilter('soon')">Soon</button>
+                <button class="dl-filter-btn"        data-filter="upcoming" onclick="setFilter('upcoming')">Upcoming</button>
+                <button class="dl-filter-btn"        data-filter="later"    onclick="setFilter('later')">Later</button>
+            </div>
+
+            <!-- ── Deadline list ── -->
+            <div id="dl-list" class="dl-list">
+                <!-- Populated by deadlines.js -->
+            </div>
+
+        </div><!-- /dl-main-card -->
+
+    </div><!-- /tab-deadlines -->
+
+    <!-- ══════════════════════════════════════════════════
          RANKING TAB
          ══════════════════════════════════════════════════ -->
     <div id="tab-ranking" class="tracker-panel hidden">
@@ -221,7 +357,6 @@
             <h3>Community Ranking — Coming Soon</h3>
             <p class="ranking-cta">Keep building your streak — here's a preview of what's coming:</p>
 
-            <!-- Blurred leaderboard mockup -->
             <div class="leaderboard-mockup" aria-hidden="true">
                 <div class="lb-row">
                     <span class="lb-rank gold">1</span>
@@ -271,5 +406,18 @@
 </footer>
 
 <script th:src="@{/js/tracker.js}"></script>
+<script th:src="@{/js/deadlines.js}"></script>
+<script>
+    // Boot deadlines when the Deadlines tab is first opened
+    let _dlInited = false;
+    const _origSwitchTab = switchTab;
+    switchTab = function(tab) {
+        _origSwitchTab(tab);
+        if (tab === 'deadlines' && !_dlInited) {
+            _dlInited = true;
+            initDeadlines();
+        }
+    };
+</script>
 </body>
 </html>

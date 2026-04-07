@@ -3,7 +3,17 @@
     "allow": [
       "Bash(./mvnw.cmd compile:*)",
       "Bash(./mvnw.cmd test:*)",
-      "Bash(./mvnw compile:*)"
+      "Bash(./mvnw compile:*)",
+      "Bash(wc:*)",
+      "Bash(python append_css.py)",
+      "Bash(python3 append_css.py)",
+      "Bash(where node:*)",
+      "Bash(where java:*)",
+      "Bash(java -version)",
+      "Bash(n/* test:*)",
+      "Bash(powershell -Command \"Add-Content -Path 'C:\\\\Users\\\\Saif0\\\\OneDrive\\\\Desktop\\\\StudySyncer\\\\StudySyncer\\\\src\\\\main\\\\resources\\\\static\\\\css\\\\style.css' -Value \\\\\"`n/* test CSS append worked */\\\\n\\\\\"\" && echo \"done\")",
+      "Bash(powershell -File \"C:/Users/Saif0/OneDrive/Desktop/StudySyncer/append_css.py\")",
+      "Bash(powershell:*)"
     ]
   }
 }

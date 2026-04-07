@@ -8,6 +8,10 @@ let currentOffset = 0;
 // All sessions cached for client-side search filtering
 let _allSessions = [];
 
+// Today's goal — persisted in localStorage
+let todayGoalMins   = 0;   // goal set by user (0 = no goal)
+let todayActualMins = 0;   // today's actual focused minutes (from chart data)
+
 // Dot colors for the material breakdown
 const MATERIAL_COLORS = [
     '#7C5CFF', '#FF6B6B', '#5ebe78', '#ffd27e',
@@ -15,9 +19,6 @@ const MATERIAL_COLORS = [
 ];
 
 // ── Boot ───────────────────────────────────────────────
-/**
- * Entry point — checks auth state, then either shows guest state or loads data.
- */
 async function initTracker() {
     let username = null;
     try {
@@ -31,6 +32,7 @@ async function initTracker() {
         isLoggedIn = false;
     }
 
+    loadGoal();       // restore saved goal before first render
     updateNextBtn();
 
     if (!isLoggedIn) {
@@ -42,8 +44,6 @@ async function initTracker() {
 }
 
 // ── Auth UI helpers ────────────────────────────────────
-
-/** Hides every guest overlay and lock — shows all data panels. */
 function showLoggedInState() {
     document.getElementById('tracker-guest-banner').classList.add('hidden');
     document.getElementById('guest-stat-overlay').classList.add('hidden');
@@ -53,7 +53,6 @@ function showLoggedInState() {
     document.getElementById('session-list-area').classList.remove('hidden');
 }
 
-/** Shows all guest locks — hides data panels. */
 function showGuestState() {
     document.getElementById('tracker-guest-banner').classList.remove('hidden');
     document.getElementById('guest-stat-overlay').classList.remove('hidden');
@@ -64,10 +63,6 @@ function showGuestState() {
 }
 
 // ── Tab switching ──────────────────────────────────────
-/**
- * Switches the visible tracker tab with a fade-in transition.
- * @param {string} tab - 'summary' | 'detail' | 'ranking'
- */
 function switchTab(tab) {
     document.querySelectorAll('.tracker-tab').forEach(b =>
         b.classList.toggle('active', b.dataset.tab === tab));
@@ -75,15 +70,10 @@ function switchTab(tab) {
         p.classList.add('hidden'));
     const panel = document.getElementById('tab-' + tab);
     panel.classList.remove('hidden');
-    // Populate the ranking stat row if real data is available
     if (tab === 'ranking') _syncRankingStats();
 }
 
 // ── Range filter ───────────────────────────────────────
-/**
- * Changes the active time range and reloads all data.
- * @param {string} range - 'week' | 'month' | 'year'
- */
 function setRange(range) {
     if (currentRange === range) return;
     currentRange  = range;
@@ -95,10 +85,6 @@ function setRange(range) {
 }
 
 // ── Period navigation ──────────────────────────────────
-/**
- * Moves one period forward (dir=1) or backward (dir=-1).
- * @param {number} dir
- */
 function navigatePeriod(dir) {
     const next = currentOffset + dir;
     if (next > 0) return;
@@ -163,14 +149,27 @@ async function loadChart() {
         const emptyEl = document.getElementById('chart-empty');
         const canvas  = document.getElementById('focus-chart');
 
-        if (isEmpty) {
-            emptyEl.classList.remove('hidden');
-            canvas.style.display = 'none';
-        } else {
+        // Identify today's bar and extract today's actual minutes
+        const todayIdx = (currentOffset === 0)
+            ? getTodayBarIndex(data.labels || [])
+            : -1;
+
+        if (!isEmpty) {
+            todayActualMins = (todayIdx >= 0 && data.values[todayIdx] != null)
+                ? data.values[todayIdx]
+                : 0;
+
             emptyEl.classList.add('hidden');
             canvas.style.display = '';
-            drawChart(canvas, data.labels, data.values);
+            drawChart(canvas, data.labels, data.values, todayIdx, todayGoalMins);
+        } else {
+            todayActualMins = 0;
+            emptyEl.classList.remove('hidden');
+            canvas.style.display = 'none';
         }
+
+        // Refresh goal progress UI with latest actual data
+        updateGoalUI();
 
         loadMaterials();
     } catch (_) {}
@@ -192,8 +191,8 @@ async function loadMaterials() {
         const maxMins = Math.max(...data.map(m => m.minutes), 1);
 
         el.innerHTML = data.map((m, i) => {
-            const color   = MATERIAL_COLORS[i % MATERIAL_COLORS.length];
-            const pct     = Math.round((m.minutes / maxMins) * 100);
+            const color = MATERIAL_COLORS[i % MATERIAL_COLORS.length];
+            const pct   = Math.round((m.minutes / maxMins) * 100);
             return `
             <div class="material-row">
                 <span class="material-dot" style="background:${color}"></span>
@@ -218,10 +217,6 @@ async function loadSessions() {
     } catch (_) {}
 }
 
-/**
- * Renders the session table rows from a given list.
- * @param {Array} sessions
- */
 function renderSessionRows(sessions) {
     const emptyEl = document.getElementById('sessions-empty');
     const table   = document.getElementById('sessions-table');
@@ -248,16 +243,9 @@ function renderSessionRows(sessions) {
         </tr>`).join('');
 }
 
-/**
- * Filters the session table by the search input value (client-side).
- * Matched against date, material name, timer mode (case-insensitive).
- */
 function filterSessions() {
     const q = (document.getElementById('session-search')?.value || '').toLowerCase().trim();
-    if (!q) {
-        renderSessionRows(_allSessions);
-        return;
-    }
+    if (!q) { renderSessionRows(_allSessions); return; }
     const filtered = _allSessions.filter(s =>
         (s.date         || '').toLowerCase().includes(q) ||
         (s.materialName || '').toLowerCase().includes(q) ||
@@ -272,12 +260,10 @@ function setPeriodLabels(label) {
 }
 
 // ── Ranking stats sync ─────────────────────────────────
-/** Fills in the "You" row of the ranking mockup with real streak/hours from summary. */
 function _syncRankingStats() {
     const hoursEl  = document.getElementById('lb-your-hours');
     const streakEl = document.getElementById('lb-your-streak');
     if (!hoursEl || !streakEl) return;
-
     const hours  = document.getElementById('stat-hours-val')?.textContent;
     const streak = document.getElementById('stat-streak-val')?.textContent;
     if (hours  && hours  !== '—') hoursEl.textContent  = hours;
@@ -286,7 +272,6 @@ function _syncRankingStats() {
 
 // ── Edit toast ─────────────────────────────────────────
 function showEditToast() {
-    // Remove any existing toast
     document.querySelectorAll('.cs-toast').forEach(t => t.remove());
     const toast = document.createElement('div');
     toast.className = 'cs-toast';
@@ -295,19 +280,137 @@ function showEditToast() {
     setTimeout(() => toast.remove(), 2200);
 }
 
+// ══════════════════════════════════════════════════════
+// TODAY'S GOAL — localStorage-backed daily target
+// ══════════════════════════════════════════════════════
+
+const GOAL_KEY = 'studysync_today_goal_mins';
+
+/**
+ * Restores the saved goal from localStorage and updates the input + UI.
+ * Called once on page load before the first data fetch.
+ */
+function loadGoal() {
+    const saved = localStorage.getItem(GOAL_KEY);
+    todayGoalMins = saved ? parseInt(saved, 10) : 0;
+    if (todayGoalMins > 0) {
+        const input = document.getElementById('today-goal-input');
+        if (input) input.value = String(todayGoalMins);
+        document.getElementById('today-goal-clear')?.classList.remove('hidden');
+    }
+}
+
+/**
+ * Reads the input, validates, saves to localStorage, and refreshes the chart
+ * and progress bar. Called by the "Set" button and Enter key.
+ */
+function applyGoal() {
+    const input = document.getElementById('today-goal-input');
+    if (!input) return;
+    const val = parseInt(input.value, 10);
+    if (isNaN(val) || val <= 0) {
+        clearGoal();
+        return;
+    }
+    todayGoalMins = val;
+    localStorage.setItem(GOAL_KEY, String(val));
+    document.getElementById('today-goal-clear')?.classList.remove('hidden');
+    updateGoalUI();
+    loadChart();   // redraw chart so today's bar picks up the new color
+}
+
+/**
+ * Removes the goal, resets the input, and redraws without goal coloring.
+ */
+function clearGoal() {
+    todayGoalMins = 0;
+    localStorage.removeItem(GOAL_KEY);
+    const input = document.getElementById('today-goal-input');
+    if (input) input.value = '';
+    document.getElementById('today-goal-clear')?.classList.add('hidden');
+    updateGoalUI();
+    loadChart();
+}
+
+/**
+ * Updates the progress bar and status text based on current goal and actual mins.
+ * Shows the progress row only when: goal is set AND viewing the current period AND logged in.
+ */
+function updateGoalUI() {
+    const progressEl = document.getElementById('today-goal-progress');
+    const barFill    = document.getElementById('today-goal-bar-fill');
+    const statusText = document.getElementById('today-goal-status-text');
+    if (!progressEl) return;
+
+    // Hide progress when: no goal, not current period, or not logged in
+    if (todayGoalMins <= 0 || currentOffset !== 0 || !isLoggedIn) {
+        progressEl.classList.add('hidden');
+        return;
+    }
+
+    progressEl.classList.remove('hidden');
+
+    const pct   = Math.min(100, Math.round((todayActualMins / todayGoalMins) * 100));
+    const met   = todayActualMins >= todayGoalMins;
+    const color = met ? '#34d399' : '#FF6B6B';
+
+    if (barFill) {
+        barFill.style.width      = pct + '%';
+        barFill.style.background = color;
+        // Subtle glow on the fill bar
+        barFill.style.boxShadow  = met
+            ? '0 0 8px rgba(52,211,153,0.45)'
+            : '0 0 8px rgba(255,107,107,0.35)';
+    }
+
+    if (statusText) {
+        statusText.className = 'today-goal-status-text ' + (met ? 'goal-met' : 'goal-unmet');
+        statusText.textContent = met
+            ? `Goal reached! (${fmtMins(todayActualMins)})`
+            : `${fmtMins(todayActualMins)} of ${fmtMins(todayGoalMins)} — ${pct}%`;
+    }
+}
+
+/**
+ * Finds the index of today's bar in the chart labels array.
+ * Supports week ranges (3-letter day abbrs like "Mon") and
+ * month ranges (day numbers like "6" or "15").
+ * Returns -1 if today cannot be identified.
+ */
+function getTodayBarIndex(labels) {
+    const now      = new Date();
+    const dayAbbrs = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const abbr     = dayAbbrs[now.getDay()];   // e.g. "Mon"
+    const dayNum   = String(now.getDate());     // e.g. "6"
+
+    // Exact 3-letter match (week range API)
+    let idx = labels.findIndex(l => l === abbr);
+    if (idx >= 0) return idx;
+
+    // 2-letter prefix (some locales / API variants use "Mo", "Tu", etc.)
+    idx = labels.findIndex(l => l === abbr.slice(0, 2));
+    if (idx >= 0) return idx;
+
+    // Numeric day match (month range API returns "1", "2", ..., "31")
+    idx = labels.findIndex(l => String(l) === dayNum);
+    if (idx >= 0) return idx;
+
+    return -1;
+}
+
 // ── Bar chart (pure Canvas, no library) ───────────────
-// Stores bar geometry for tooltip hit-testing
 let _chartBars = [];
 
 /**
- * Draws an animated bar chart onto the given canvas.
- * Bars animate in over ~400ms via requestAnimationFrame.
+ * Draws an animated bar chart.
  *
  * @param {HTMLCanvasElement} canvas
  * @param {string[]} labels
- * @param {number[]} values   - Minutes per bar
+ * @param {number[]} values       Minutes per bar
+ * @param {number}   todayIdx     Index of today's bar (-1 = unknown / not current period)
+ * @param {number}   goalMins     Goal in minutes (0 = no goal)
  */
-function drawChart(canvas, labels, values) {
+function drawChart(canvas, labels, values, todayIdx = -1, goalMins = 0) {
     const dpr  = window.devicePixelRatio || 1;
     const W    = canvas.parentElement.offsetWidth || 720;
     const H    = 220;
@@ -320,7 +423,7 @@ function drawChart(canvas, labels, values) {
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
 
-    const padL = 46, padR = 12, padT = 18, padB = 38;
+    const padL = 46, padR = 12, padT = 18, padB = 42;
     const chartW = W - padL - padR;
     const chartH = H - padT - padB;
     const n      = values.length;
@@ -329,10 +432,28 @@ function drawChart(canvas, labels, values) {
     const gap  = Math.max(2, Math.floor(chartW / n * 0.18));
     const barW = Math.max(4, (chartW - gap * (n - 1)) / n);
 
-    const accent     = '#7C5CFF';
-    const accentFade = 'rgba(124,92,255,0.22)';
+    // Color palette
+    const ACCENT       = '#7C5CFF';
+    const ACCENT_FADE  = 'rgba(124,92,255,0.22)';
+    const RED          = '#FF6B6B';
+    const RED_FADE     = 'rgba(255,107,107,0.22)';
+    const GREEN        = '#34d399';
+    const GREEN_FADE   = 'rgba(52,211,153,0.22)';
 
-    // Pre-compute bar positions for tooltips
+    /**
+     * Returns the correct gradient colors for a given bar index.
+     * Today's bar changes color based on whether the goal is met.
+     */
+    function barColors(i) {
+        if (i !== todayIdx || goalMins <= 0) {
+            return { top: ACCENT, fade: ACCENT_FADE };
+        }
+        return values[i] >= goalMins
+            ? { top: GREEN, fade: GREEN_FADE }
+            : { top: RED,   fade: RED_FADE   };
+    }
+
+    // Pre-compute bar positions for tooltip hit-testing
     _chartBars = values.map((v, i) => ({
         x:     padL + i * (barW + gap),
         fullH: v > 0 ? Math.max(4, (v / maxVal) * chartH) : 0,
@@ -341,11 +462,11 @@ function drawChart(canvas, labels, values) {
     }));
 
     // ── Animation ──
-    const START     = performance.now();
-    const DURATION  = 420;
+    const START    = performance.now();
+    const DURATION = 420;
 
     function frame(now) {
-        const t   = Math.min((now - START) / DURATION, 1);
+        const t    = Math.min((now - START) / DURATION, 1);
         const ease = 1 - Math.pow(1 - t, 3);   // cubic ease-out
 
         ctx.clearRect(0, 0, W, H);
@@ -370,31 +491,46 @@ function drawChart(canvas, labels, values) {
             ctx.fillText(lbl, padL - 6, y + 4);
         }
 
-        // Bars
+        // ── Draw bars ──
         for (let i = 0; i < n; i++) {
-            const bar = _chartBars[i];
-            const x   = bar.x;
-            const bh  = bar.fullH * ease;
-            const y   = padT + chartH - bh;
+            const bar      = _chartBars[i];
+            const bh       = bar.fullH * ease;
+            const y        = padT + chartH - bh;
+            const isToday  = i === todayIdx;
+            const colors   = barColors(i);
 
             if (bh > 0) {
                 const grad = ctx.createLinearGradient(0, y, 0, padT + chartH);
-                grad.addColorStop(0, accent);
-                grad.addColorStop(1, accentFade);
+                grad.addColorStop(0, colors.top);
+                grad.addColorStop(1, colors.fade);
                 ctx.fillStyle = grad;
-                drawRoundedTopRect(ctx, x, y, barW, bh, Math.min(4, barW / 2));
+                drawRoundedTopRect(ctx, bar.x, y, barW, bh, Math.min(4, barW / 2));
                 ctx.fill();
             } else {
-                ctx.fillStyle = 'rgba(46,50,80,0.6)';
-                ctx.fillRect(x, padT + chartH - 2, barW, 2);
+                // Zero-height placeholder tick
+                ctx.fillStyle = isToday
+                    ? 'rgba(124,92,255,0.20)'
+                    : 'rgba(46,50,80,0.6)';
+                ctx.fillRect(bar.x, padT + chartH - 2, barW, 2);
             }
 
-            // X axis label — skip some when many bars
+            // ── X-axis label ──
             const skip = n > 20 ? 4 : n > 12 ? 2 : 1;
             if (i % skip === 0) {
-                ctx.fillStyle = '#8b8fa8';
+                // Today's label is slightly brighter
+                ctx.fillStyle = isToday ? '#c4b5fd' : '#8b8fa8';
                 ctx.textAlign = 'center';
-                ctx.fillText(bar.label, x + barW / 2, padT + chartH + 20);
+                ctx.fillText(bar.label, bar.x + barW / 2, padT + chartH + 18);
+
+                // Small dot below today's label — color reflects goal state
+                if (isToday) {
+                    ctx.beginPath();
+                    ctx.arc(bar.x + barW / 2, padT + chartH + 30, 2.5, 0, Math.PI * 2);
+                    ctx.fillStyle = goalMins > 0
+                        ? colors.top    // red or green based on goal
+                        : ACCENT;       // default purple dot
+                    ctx.fill();
+                }
             }
         }
 
@@ -403,19 +539,17 @@ function drawChart(canvas, labels, values) {
 
     requestAnimationFrame(frame);
 
-    // ── Tooltip on hover ──
+    // Tooltip on hover
     _attachChartTooltip(canvas, padL, padT, chartH, barW, gap);
 }
 
 /**
  * Attaches a mousemove listener to the canvas for bar tooltips.
- * Replaces any previous listener by using a named property.
  */
 function _attachChartTooltip(canvas, padL, padT, chartH, barW, gap) {
     const tooltip = document.getElementById('chart-tooltip');
     if (!tooltip) return;
 
-    // Remove old listener if any
     if (canvas._tooltipHandler) {
         canvas.removeEventListener('mousemove', canvas._tooltipHandler);
         canvas.removeEventListener('mouseleave', canvas._tooltipLeaveHandler);
@@ -439,19 +573,15 @@ function _attachChartTooltip(canvas, padL, padT, chartH, barW, gap) {
         if (hit) {
             tooltip.textContent = `${hit.label}: ${fmtMins(hit.value)}`;
             tooltip.classList.remove('hidden');
-            // Position relative to canvas wrap
             const wrapRect = canvas.parentElement.getBoundingClientRect();
-            const tx = e.clientX - wrapRect.left + 10;
-            const ty = e.clientY - wrapRect.top  - 28;
-            tooltip.style.left = tx + 'px';
-            tooltip.style.top  = ty + 'px';
+            tooltip.style.left = (e.clientX - wrapRect.left + 10) + 'px';
+            tooltip.style.top  = (e.clientY - wrapRect.top  - 28) + 'px';
         } else {
             tooltip.classList.add('hidden');
         }
     };
 
     canvas._tooltipLeaveHandler = () => tooltip.classList.add('hidden');
-
     canvas.addEventListener('mousemove', canvas._tooltipHandler);
     canvas.addEventListener('mouseleave', canvas._tooltipLeaveHandler);
 }
@@ -470,7 +600,6 @@ function drawRoundedTopRect(ctx, x, y, w, h, r) {
 }
 
 // ── Utilities ──────────────────────────────────────────
-/** Formats minutes into a human-readable "1h 30m" style string. */
 function fmtMins(mins) {
     if (mins < 60) return `${mins} min`;
     const h = Math.floor(mins / 60);
@@ -478,7 +607,6 @@ function fmtMins(mins) {
     return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-/** Safe HTML escaping. */
 function esc(str) {
     if (str == null) return '';
     return String(str)

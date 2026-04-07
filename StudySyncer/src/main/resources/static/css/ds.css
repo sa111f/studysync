@@ -1,0 +1,682 @@
+/*
+ * ds.css — StudySync Design System  v1.0
+ * ═══════════════════════════════════════════════════════════════════
+ * Loaded AFTER style.css / focus.css on every page.
+ * Strategy: enhance existing class names — no HTML renames needed.
+ *
+ * What lives here:
+ *   1. Token overrides  — warmer purple-tinted borders, better glows
+ *   2. Body / header    — richer background, refined glass header
+ *   3. Shine sweep      — .shine-btn + primary buttons
+ *   4. Button tiers     — primary / secondary / ghost / danger
+ *   5. Tabs             — tracker-tab, range-btn, mode-btn
+ *   6. Inputs           — unified focus ring across all fields
+ *   7. Cards / panels   — subtle surface gradient + glow on hover
+ *   8. Auth modal       — gradient border, surface gloss
+ *   9. Misc elements    — chart tooltip, drop zone, leaderboard rows
+ * ═══════════════════════════════════════════════════════════════════
+ */
+
+/* ════════════════════════════════════════════════════════════════
+   1. DESIGN TOKENS
+   Override / extend base variables from style.css / focus.css.
+   ════════════════════════════════════════════════════════════════ */
+:root {
+    /* Border: warmer purple-tinted instead of cold blue-gray #2e3250 */
+    --border:         rgba(124, 92, 252, 0.18);
+    --border-hover:   rgba(124, 92, 252, 0.35);
+    --border-focus:   rgba(124, 92, 252, 0.58);
+
+    /* Glow helpers */
+    --accent-glow:    rgba(124, 92, 252, 0.28);
+    --accent-dim:     rgba(124, 92, 252, 0.10);
+    --accent-mid-dim: rgba(124, 92, 252, 0.16);
+
+    /* Surface micro-gloss (top edge highlight on cards) */
+    --surface-gloss:  rgba(255, 255, 255, 0.030);
+
+    /* Radius tokens */
+    --r-btn:  10px;
+    --r-card: 14px;
+    --r-sm:   8px;
+
+    /* Transition helpers */
+    --t:      0.18s ease;
+    --t-slow: 0.30s ease;
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   2. BODY / PAGE BACKGROUND
+   Richer ambient glow anchored at the top.
+   ════════════════════════════════════════════════════════════════ */
+body {
+    background:
+        radial-gradient(ellipse 100% 42% at 50% -2%,
+            rgba(124,92,252,0.090) 0%, transparent 68%),
+        radial-gradient(ellipse 60% 38% at -5% 85%,
+            rgba(124,92,252,0.038) 0%, transparent 62%),
+        #0c0d14;
+    background-attachment: fixed;
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   3. HEADER
+   Deeper glass blur, warmer border.
+   ════════════════════════════════════════════════════════════════ */
+header {
+    background: rgba(11, 12, 19, 0.84);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border-bottom: 1px solid var(--border);
+}
+
+/* Nav links — pill with soft hover glow */
+.header-nav-link {
+    border-radius: var(--r-btn);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 0.84rem;
+    padding: 7px 18px;
+    transition: border-color var(--t), color var(--t), background var(--t), box-shadow var(--t);
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+}
+.header-nav-link:hover {
+    border-color: var(--border-hover);
+    color: var(--accent);
+    background: var(--accent-dim);
+    box-shadow: 0 0 10px rgba(124,92,252,0.12);
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   4. SHINE SWEEP
+   Light diagonal wipe from left to right on hover.
+   Applied to primary buttons and the standalone .shine-btn class.
+   ════════════════════════════════════════════════════════════════ */
+
+/* Base setup — overflow hidden to contain the pseudo-element */
+.shine-btn,
+.save-btn,
+.ctrl-btn.start {
+    position: relative;
+    overflow: hidden;
+}
+
+/* The sweep stripe */
+.shine-btn::after,
+.save-btn::after,
+.ctrl-btn.start::after {
+    content: '';
+    position: absolute;
+    top: -60%;
+    left: -80%;
+    width: 45%;
+    height: 220%;
+    background: linear-gradient(
+        105deg,
+        rgba(255,255,255,0)    0%,
+        rgba(255,255,255,0.07) 38%,
+        rgba(255,255,255,0.12) 50%,
+        rgba(255,255,255,0.07) 62%,
+        rgba(255,255,255,0)   100%
+    );
+    transform: skewX(-10deg);
+    transition: left 0.65s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    pointer-events: none;
+    z-index: 0;
+}
+.shine-btn:hover::after,
+.save-btn:hover::after,
+.ctrl-btn.start:hover::after { left: 130%; }
+
+/* Children float above the sweep */
+.shine-btn > *,
+.save-btn > *,
+.ctrl-btn.start > * { position: relative; z-index: 1; }
+
+/* auth-link-btn.accent gets shine too — has no nested children  */
+.auth-link-btn.accent {
+    position: relative;
+    overflow: hidden;
+}
+.auth-link-btn.accent::after {
+    content: '';
+    position: absolute;
+    top: -60%; left: -80%;
+    width: 45%; height: 220%;
+    background: linear-gradient(
+        105deg,
+        rgba(255,255,255,0) 0%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0) 100%
+    );
+    transform: skewX(-10deg);
+    transition: left 0.60s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    pointer-events: none; z-index: 0;
+}
+.auth-link-btn.accent:hover::after { left: 130%; }
+
+
+/* ════════════════════════════════════════════════════════════════
+   5. BUTTON TIERS
+
+   Tier 1 — Primary   (.save-btn, .ctrl-btn.start, .auth-link-btn.accent)
+   Tier 2 — Secondary (.apply-btn, .add-subject-btn)
+   Tier 3 — Ghost     (.clear-btn, .auth-link-btn plain, .chart-edit-btn)
+   Tier 4 — Compact   (period-nav-btn, small utility)
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Tier 1: Primary ── */
+.save-btn {
+    border-radius: var(--r-btn);
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    font-weight: 600;
+    box-shadow: 0 3px 18px var(--accent-glow);
+    transition: background var(--t), box-shadow var(--t), transform 0.1s;
+}
+.save-btn:hover:not(:disabled) {
+    background: #8b6ffd;
+    box-shadow: 0 5px 30px rgba(124,92,252,0.50);
+    transform: translateY(-1px);
+}
+.save-btn:active:not(:disabled) {
+    transform: scale(0.96);
+    box-shadow: 0 2px 10px var(--accent-glow);
+}
+
+.ctrl-btn.start {
+    border-radius: var(--r-btn);
+    box-shadow: 0 3px 18px var(--accent-glow);
+    transition: background var(--t), box-shadow var(--t), transform 0.1s;
+}
+.ctrl-btn.start:hover:not(:disabled) {
+    background: #8b6ffd;
+    box-shadow: 0 5px 30px rgba(124,92,252,0.50);
+}
+
+.auth-link-btn.accent {
+    border-radius: var(--r-btn);
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 3px 14px var(--accent-glow);
+    transition: background var(--t), box-shadow var(--t);
+}
+.auth-link-btn.accent:hover {
+    opacity: 1;
+    background: #8b6ffd;
+    border-color: #8b6ffd;
+    box-shadow: 0 5px 24px rgba(124,92,252,0.50);
+}
+
+/* ── Tier 2: Secondary ── */
+.apply-btn,
+.add-subject-btn {
+    border-radius: var(--r-btn);
+    border: 1px solid var(--border-hover);
+    color: var(--accent);
+    background: var(--accent-dim);
+    font-weight: 600;
+    transition: background var(--t), border-color var(--t), color var(--t), box-shadow var(--t), transform 0.1s;
+}
+.apply-btn:hover,
+.add-subject-btn:hover {
+    background: var(--accent-mid-dim);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 14px rgba(124,92,252,0.20);
+    transform: translateY(-1px);
+}
+.apply-btn:active,
+.add-subject-btn:active {
+    transform: scale(0.97);
+}
+
+/* ── Tier 3: Ghost ── */
+.clear-btn {
+    border-radius: var(--r-btn);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    transition: border-color var(--t), color var(--t), background var(--t);
+}
+.clear-btn:hover {
+    border-color: rgba(255,107,107,0.45);
+    color: var(--accent2);
+    background: rgba(255,107,107,0.07);
+}
+
+/* Plain (non-accent) auth-link-btn */
+.auth-link-btn:not(.accent) {
+    border-radius: var(--r-btn);
+    border: 1px solid var(--border);
+    transition: border-color var(--t), color var(--t), background var(--t);
+}
+.auth-link-btn:not(.accent):hover {
+    border-color: var(--border-hover);
+    color: var(--accent);
+    background: var(--accent-dim);
+}
+
+.chart-edit-btn {
+    border-radius: var(--r-btn);
+    border: 1px solid var(--border);
+    transition: border-color var(--t), color var(--t), background var(--t);
+}
+.chart-edit-btn:hover {
+    background: var(--accent-dim);
+    border-color: var(--border-hover);
+}
+
+/* ── Tier 4: Compact ── */
+.period-nav-btn {
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    transition: border-color var(--t), color var(--t), background var(--t), transform 0.12s;
+}
+.period-nav-btn:hover:not(:disabled) {
+    border-color: var(--border-hover);
+    background: var(--accent-dim);
+    color: var(--accent);
+}
+
+/* ── subject-remove-btn hover ── */
+.subject-remove-btn {
+    border-radius: 6px;
+    transition: color var(--t), background var(--t);
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   6. TABS
+
+   Unified tab language across:
+     · tracker-tab-bar / tracker-tab
+     · range-toggle / range-btn
+     · mode-toggle / mode-btn   (dashboard)
+     · focus-phase-tabs / focus-tab  (focus page)
+   ════════════════════════════════════════════════════════════════ */
+
+/* Tracker tab bar container */
+.tracker-tab-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    padding: 5px;
+    gap: 4px;
+}
+.tracker-tab {
+    border-radius: 9px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    transition: background var(--t), color var(--t), box-shadow var(--t);
+}
+.tracker-tab.active {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 2px 12px var(--accent-glow);
+}
+.tracker-tab:hover:not(.active) {
+    background: rgba(255,255,255,0.05);
+    color: var(--text);
+}
+
+/* Range toggle (week / month) */
+.range-toggle {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+}
+.range-btn {
+    border-radius: 7px;
+    font-weight: 500;
+    transition: background var(--t), color var(--t), box-shadow var(--t);
+}
+.range-btn.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 10px var(--accent-glow);
+}
+.range-btn:hover:not(.active):not(:disabled) {
+    background: rgba(255,255,255,0.06);
+    color: var(--text);
+}
+
+/* Dashboard mode toggle */
+.mode-toggle {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    padding: 4px;
+}
+.mode-btn {
+    border-radius: 8px;
+    border: none;
+    font-weight: 500;
+    transition: background var(--t), color var(--t), box-shadow var(--t);
+}
+.mode-btn.active {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 2px 10px var(--accent-glow);
+}
+.mode-btn:hover:not(.active) {
+    background: rgba(255,255,255,0.05);
+}
+
+/* Focus page tabs (focus.css owns most styles; just boost the active glow) */
+.focus-tab.active {
+    box-shadow: 0 2px 14px rgba(124,92,252,0.38);
+}
+.focus-phase-tabs {
+    border-color: var(--border);
+}
+
+/* Focus mode control buttons */
+.focus-btn-primary {
+    border-radius: var(--r-btn);
+    box-shadow: 0 3px 20px var(--accent-glow);
+    transition: background var(--t), box-shadow var(--t), transform 0.1s;
+}
+.focus-btn-primary:hover {
+    box-shadow: 0 6px 32px rgba(124,92,252,0.52);
+    transform: translateY(-1px);
+}
+.focus-btn-secondary {
+    border-radius: var(--r-btn);
+    border: 1px solid var(--border);
+    transition: border-color var(--t), background var(--t), color var(--t);
+}
+.focus-btn-secondary:hover {
+    border-color: var(--border-hover);
+    background: rgba(124,92,252,0.07);
+    color: var(--text);
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   7. INPUTS
+   Unified focus ring and border treatment across every field.
+   ════════════════════════════════════════════════════════════════ */
+.field-input,
+.subject-input,
+.session-search-input,
+.doc-file-input,
+.duration-input input[type="number"],
+.custom-time-input,
+textarea.subject-notes,
+.syllabus-card textarea {
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    transition: border-color var(--t), box-shadow var(--t);
+}
+
+.field-input:focus,
+.subject-input:focus,
+.session-search-input:focus,
+.duration-input input[type="number"]:focus,
+.custom-time-input:focus,
+textarea.subject-notes:focus,
+.syllabus-card textarea:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 3px rgba(124,92,252,0.13);
+}
+
+/* Invalid state */
+.field-input.field-invalid,
+.field-input:user-invalid {
+    border-color: rgba(255,107,107,0.55) !important;
+    box-shadow: 0 0 0 3px rgba(255,107,107,0.10);
+}
+
+/* Search input — preserve the icon background */
+.session-search-input {
+    border-radius: 9px;
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   8. CARDS & PANELS
+   Subtle top-gloss gradient + purple-tinted border.
+   Interactive cards get a soft glow on hover.
+   ════════════════════════════════════════════════════════════════ */
+
+/* Main dashboard cards */
+.timer-card,
+.syllabus-card,
+.results-card,
+.study-plan-card,
+.estimation-card {
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    background:
+        linear-gradient(158deg, var(--surface-gloss) 0%, transparent 42%),
+        var(--surface);
+    transition: border-color var(--t-slow), box-shadow var(--t-slow);
+}
+.timer-card:hover,
+.syllabus-card:hover,
+.results-card:hover {
+    border-color: var(--border-hover);
+    box-shadow: 0 0 36px rgba(124,92,252,0.09), var(--shadow);
+}
+
+/* Tracker cards */
+.tracker-card {
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    background:
+        linear-gradient(158deg, var(--surface-gloss) 0%, transparent 42%),
+        var(--surface);
+    transition: border-color var(--t-slow), box-shadow var(--t-slow);
+}
+.tracker-card:hover {
+    border-color: var(--border-hover);
+    box-shadow: 0 0 28px rgba(124,92,252,0.08);
+}
+
+/* Stat cards */
+.tracker-stat-card {
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    background:
+        linear-gradient(158deg, var(--surface-gloss) 0%, transparent 50%),
+        var(--surface);
+    transition: border-color var(--t-slow), box-shadow var(--t-slow);
+}
+.tracker-stat-card:hover {
+    border-color: var(--border-hover);
+    box-shadow: 0 0 20px rgba(124,92,252,0.10);
+}
+
+/* Guest banner — tracker */
+.tracker-guest-banner {
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    background:
+        linear-gradient(158deg, var(--surface-gloss) 0%, transparent 40%),
+        var(--surface);
+}
+
+/* Study plan items */
+.plan-item {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background:
+        linear-gradient(158deg, var(--surface-gloss) 0%, transparent 50%),
+        var(--surface2);
+    transition: border-color var(--t), box-shadow var(--t);
+}
+.plan-item:hover {
+    border-color: rgba(124,92,252,0.40);
+    box-shadow: 0 2px 16px rgba(124,92,252,0.10);
+}
+
+/* Estimation option cards */
+.estimation-option {
+    border: 1.5px solid var(--border);
+    border-radius: 11px;
+    background:
+        linear-gradient(158deg, var(--surface-gloss) 0%, transparent 50%),
+        var(--surface2);
+    transition: border-color var(--t), background var(--t), box-shadow var(--t);
+}
+.estimation-option:hover {
+    border-color: var(--border-hover);
+    box-shadow: 0 2px 18px rgba(124,92,252,0.10);
+}
+.estimation-option.selected {
+    border-color: var(--accent);
+    background: rgba(124,92,252,0.10);
+    box-shadow: 0 0 20px rgba(124,92,252,0.14);
+}
+
+/* Custom time card */
+.custom-time-card {
+    border: 1.5px solid var(--border);
+    border-radius: 11px;
+    transition: border-color var(--t), background var(--t), box-shadow var(--t);
+}
+.custom-time-card.selected {
+    border-color: var(--accent);
+    background: rgba(124,92,252,0.10);
+    box-shadow: 0 0 20px rgba(124,92,252,0.12);
+}
+
+/* Subject cards */
+.subject-card {
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    transition: border-color var(--t), box-shadow var(--t);
+}
+.subject-card:focus-within {
+    border-color: var(--border-hover);
+    box-shadow: 0 0 16px rgba(124,92,252,0.10);
+}
+
+/* Stat icon wrappers — inner ring */
+.stat-icon-hours  { box-shadow: inset 0 0 0 1px rgba(124,92,252,0.22); }
+.stat-icon-days   { box-shadow: inset 0 0 0 1px rgba(94,190,120,0.22); }
+.stat-icon-streak { box-shadow: inset 0 0 0 1px rgba(255,107,107,0.22); }
+
+
+/* ════════════════════════════════════════════════════════════════
+   9. AUTH MODAL
+   ════════════════════════════════════════════════════════════════ */
+
+/* Gradient border wrapper */
+.auth-modal-border {
+    background: linear-gradient(
+        140deg,
+        rgba(124,92,252,0.72) 0%,
+        rgba(255,107,107,0.45) 100%
+    );
+    padding: 1.5px;
+    border-radius: calc(var(--r-card) + 2px);
+}
+
+/* Modal box — gloss surface */
+.auth-modal-box {
+    background:
+        linear-gradient(160deg, rgba(255,255,255,0.028) 0%, transparent 38%),
+        var(--surface);
+}
+
+/* Google button — refined */
+.google-btn {
+    border: 1px solid var(--border);
+    border-radius: var(--r-btn);
+    transition: border-color var(--t), background var(--t), box-shadow var(--t);
+}
+.google-btn:hover {
+    border-color: rgba(66,133,244,0.55);
+    background: rgba(66,133,244,0.07);
+    box-shadow: 0 2px 14px rgba(66,133,244,0.14);
+    color: var(--text);
+    text-decoration: none;
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   10. MISCELLANEOUS
+   ════════════════════════════════════════════════════════════════ */
+
+/* Chart tooltip */
+.chart-tooltip {
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background:
+        linear-gradient(160deg, var(--surface-gloss) 0%, transparent 50%),
+        var(--surface2);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.52);
+}
+
+/* Drop zone */
+.drop-zone {
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    transition: border-color var(--t), background var(--t);
+}
+.drop-zone:hover {
+    border-color: var(--border-hover);
+    background: rgba(124,92,252,0.04);
+}
+
+/* Tables */
+.results-table th,
+.results-table td {
+    border-bottom: 1px solid var(--border);
+}
+#sessions-table th,
+#sessions-table td {
+    border-bottom: 1px solid var(--border);
+}
+
+/* Plan stale notice */
+.plan-stale-notice {
+    border-radius: 9px;
+}
+
+/* Leaderboard rows */
+.lb-row {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+}
+.lb-row.lb-you {
+    border-color: rgba(124,92,252,0.48);
+    background: rgba(124,92,252,0.10);
+    box-shadow: 0 0 18px rgba(124,92,252,0.12);
+}
+
+/* Auth / tracker banners */
+.auth-banner.success {
+    border-radius: 10px;
+}
+.auth-banner.error {
+    border-radius: 10px;
+    border: 1px solid rgba(255,107,107,0.30);
+}
+
+/* Toast */
+.cs-toast {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background:
+        linear-gradient(160deg, var(--surface-gloss) 0%, transparent 50%),
+        var(--surface2);
+}
+
+/* Range btn year-wrap tooltip */
+.year-lock-tip {
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--surface2);
+}
