@@ -59,11 +59,8 @@ async function loadDeadlines() {
 /** Save a deadline (create or update). */
 async function saveDeadline() {
     const title   = qs('#dl-title').value.trim();
-    const subject = qs('#dl-subject').value.trim();
-    const type    = qs('#dl-type').value;
     const dueDate = qs('#dl-due-date').value;
-    const dueTime = qs('#dl-due-time').value;
-    const notes   = qs('#dl-notes').value.trim();
+    const notes   = (qs('#dl-notes').value || '').trim();
 
     // Validate
     if (!title) { showFieldError('dl-title-err', 'Title is required.'); return; }
@@ -71,7 +68,7 @@ async function saveDeadline() {
     if (!dueDate) { showFieldError('dl-date-err', 'Due date is required.'); return; }
     clearFieldError('dl-date-err');
 
-    const payload = { title, subject, type, dueDate, dueTime: dueTime || null, notes: notes || null };
+    const payload = { title, subject: '', type: 'other', dueDate, dueTime: null, notes: notes || null };
 
     if (_dlLoggedIn) {
         try {
@@ -133,12 +130,9 @@ function startEdit(id) {
     if (!d) return;
     _editingId = id;
 
-    qs('#dl-title').value    = d.title    || '';
-    qs('#dl-subject').value  = d.subject  || '';
-    qs('#dl-type').value     = d.type     || 'other';
-    qs('#dl-due-date').value = d.dueDate  || '';
-    qs('#dl-due-time').value = d.dueTime  || '';
-    qs('#dl-notes').value    = d.notes    || '';
+    qs('#dl-title').value    = d.title   || '';
+    qs('#dl-due-date').value = d.dueDate || '';
+    qs('#dl-notes').value    = d.notes   || '';
 
     updateFormMode();
     expandForm();
@@ -267,9 +261,10 @@ function renderDeadlineList() {
     const container = qs('#dl-list');
     if (!container) return;
 
-    const filtered = _activeFilter === 'all'
-        ? _deadlines
-        : _deadlines.filter(d => d.urgency === _activeFilter);
+    const filtered = _activeFilter === 'all'   ? _deadlines
+                   : _activeFilter === 'past'  ? _deadlines.filter(d => d.urgency === 'overdue')
+                   : _activeFilter === 'still' ? _deadlines.filter(d => d.urgency !== 'overdue')
+                   : _deadlines;
 
     if (_deadlines.length === 0) {
         container.innerHTML = `
@@ -300,8 +295,8 @@ function renderDeadlineList() {
 }
 
 function _renderDeadlineItem(d) {
-    const daysStr  = _daysLabel(d);
-    const editing  = _editingId === d.id;
+    const isPast  = d.urgency === 'overdue';
+    const editing = _editingId === d.id;
 
     return `
     <div class="dl-item dl-item-${d.urgency}${editing ? ' dl-item-editing' : ''}" data-id="${d.id}">
@@ -310,9 +305,10 @@ function _renderDeadlineItem(d) {
             <div class="dl-item-top">
                 <div class="dl-item-info">
                     <span class="dl-item-title">${esc(d.title)}</span>
-                    ${d.subject ? `<span class="dl-item-subject">${esc(d.subject)}</span>` : ''}
+                    <span class="dl-item-date">${_fmtDate(d.dueDate)}</span>
                 </div>
                 <div class="dl-item-actions">
+                    <span class="dl-state-badge dl-state-${isPast ? 'past' : 'still'}">${isPast ? 'Past' : 'Still'}</span>
                     <button class="dl-action-btn dl-edit-btn" onclick="startEdit(${d.id})"
                             title="Edit" aria-label="Edit deadline">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -333,12 +329,6 @@ function _renderDeadlineItem(d) {
                         </svg>
                     </button>
                 </div>
-            </div>
-            <div class="dl-item-bottom">
-                <span class="dl-item-type-badge">${esc(_capitalize(d.type || 'other'))}</span>
-                <span class="dl-urgency-badge dl-urgency-${d.urgency}">${urgencyLabel(d)}</span>
-                <span class="dl-item-days">${daysStr}</span>
-                ${d.dueTime ? `<span class="dl-item-time">at ${_fmtTime(d.dueTime)}</span>` : ''}
             </div>
             ${d.notes ? `<div class="dl-item-notes">${esc(d.notes)}</div>` : ''}
         </div>

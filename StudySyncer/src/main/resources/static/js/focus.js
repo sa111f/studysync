@@ -44,7 +44,7 @@ const FJ_LEFT_CUBIC  = [[124, 205], [58, 162],  [32,  70],  [48,  48]];
 const FJ_PX_SIZE     = 4;   // inner pixel side length (SVG units)
 const FJ_PX_STEP     = 6;   // inner pixel grid step (size + gap)
 const FJ_BORDER_SNAP = 4;   // border grid snap interval
-const FJ_BORDER_SIZE = 3;   // border pixel side length
+const FJ_BORDER_SIZE = 5;   // border pixel side length
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const _barFill    = document.getElementById('focus-bar-fill');

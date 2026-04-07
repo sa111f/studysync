@@ -279,44 +279,20 @@
                     <div class="dl-form-row dl-form-row-2">
                         <div class="dl-field">
                             <label class="dl-label" for="dl-title">Title <span class="dl-required">*</span></label>
-                            <input type="text" id="dl-title" class="field-input dl-input"
-                                   placeholder="e.g. Midterm Exam, Lab Report 3…" maxlength="200" />
+                            <input type="text" id="dl-title" class="field-input dl-input" maxlength="200" />
                             <span class="auth-field-error hidden" id="dl-title-err"></span>
-                        </div>
-                        <div class="dl-field">
-                            <label class="dl-label" for="dl-subject">Subject / Course</label>
-                            <input type="text" id="dl-subject" class="field-input dl-input"
-                                   placeholder="e.g. EECS 2030, Calculus II…" maxlength="100" />
-                        </div>
-                    </div>
-
-                    <div class="dl-form-row dl-form-row-3">
-                        <div class="dl-field">
-                            <label class="dl-label" for="dl-type">Type</label>
-                            <select id="dl-type" class="field-input dl-input dl-select">
-                                <option value="exam">Exam</option>
-                                <option value="quiz">Quiz</option>
-                                <option value="assignment" selected>Assignment</option>
-                                <option value="lab">Lab</option>
-                                <option value="project">Project</option>
-                                <option value="other">Other</option>
-                            </select>
                         </div>
                         <div class="dl-field">
                             <label class="dl-label" for="dl-due-date">Due Date <span class="dl-required">*</span></label>
                             <input type="date" id="dl-due-date" class="field-input dl-input" />
                             <span class="auth-field-error hidden" id="dl-date-err"></span>
                         </div>
-                        <div class="dl-field">
-                            <label class="dl-label" for="dl-due-time">Due Time <span class="dl-optional">optional</span></label>
-                            <input type="time" id="dl-due-time" class="field-input dl-input" />
-                        </div>
                     </div>
 
                     <div class="dl-field">
                         <label class="dl-label" for="dl-notes">Notes <span class="dl-optional">optional</span></label>
                         <textarea id="dl-notes" class="field-input dl-input dl-textarea"
-                                  placeholder="Topics to review, weight, instructions…" maxlength="500" rows="2"></textarea>
+                                  maxlength="500" rows="2"></textarea>
                     </div>
 
                     <div id="dl-form-error" class="auth-error hidden"></div>
@@ -330,13 +306,9 @@
 
             <!-- ── Filter bar ── -->
             <div class="dl-filter-bar">
-                <button class="dl-filter-btn active" data-filter="all"      onclick="setFilter('all')">All</button>
-                <button class="dl-filter-btn"        data-filter="overdue"  onclick="setFilter('overdue')">Overdue</button>
-                <button class="dl-filter-btn"        data-filter="today"    onclick="setFilter('today')">Today</button>
-                <button class="dl-filter-btn"        data-filter="tomorrow" onclick="setFilter('tomorrow')">Tomorrow</button>
-                <button class="dl-filter-btn"        data-filter="soon"     onclick="setFilter('soon')">Soon</button>
-                <button class="dl-filter-btn"        data-filter="upcoming" onclick="setFilter('upcoming')">Upcoming</button>
-                <button class="dl-filter-btn"        data-filter="later"    onclick="setFilter('later')">Later</button>
+                <button class="dl-filter-btn active" data-filter="all"   onclick="setFilter('all')">All</button>
+                <button class="dl-filter-btn"        data-filter="past"  onclick="setFilter('past')">Past</button>
+                <button class="dl-filter-btn"        data-filter="still" onclick="setFilter('still')">Still</button>
             </div>
 
             <!-- ── Deadline list ── -->
@@ -401,9 +373,6 @@
 
 </main>
 
-<footer class="site-footer">
-    Made with &#10084;&#65039; by StudySync &nbsp;&middot;&nbsp; <span style="opacity:0.5">v1.0</span>
-</footer>
 
 <script th:src="@{/js/tracker.js}"></script>
 <script th:src="@{/js/deadlines.js}"></script>

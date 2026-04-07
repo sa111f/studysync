@@ -680,3 +680,229 @@ textarea.subject-notes:focus,
     border-radius: 7px;
     background: var(--surface2);
 }
+
+
+/* ════════════════════════════════════════════════════════════════
+   11. TRACKER PAGE SPACING
+   ════════════════════════════════════════════════════════════════ */
+
+/* Breathe between sticky header and first tracker element */
+.tracker-main {
+    padding-top: 32px;
+}
+
+/* ── Tab bar ── give it more visual separation from page top */
+.tracker-tab-bar {
+    margin-bottom: 4px;
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   12. TODAY GOAL BUTTONS
+   Polished inline Set / Clear buttons.
+   ════════════════════════════════════════════════════════════════ */
+
+.today-goal-btn {
+    border-radius: var(--r-btn);
+    border: 1px solid var(--border-hover);
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-weight: 600;
+    transition: background var(--t), border-color var(--t), color var(--t), box-shadow var(--t);
+}
+.today-goal-btn:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 12px var(--accent-glow);
+}
+
+.today-goal-clear {
+    border-radius: var(--r-btn);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    transition: border-color var(--t), color var(--t);
+}
+.today-goal-clear:hover {
+    border-color: rgba(255,107,107,0.45);
+    color: var(--accent2);
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   13. ADD DEADLINE BUTTON
+   dl-add-trigger-btn already has .shine-btn sweep.
+   Enhance the base style to match primary tier.
+   ════════════════════════════════════════════════════════════════ */
+
+.dl-add-trigger-btn {
+    border-radius: var(--r-btn);
+    box-shadow: 0 2px 14px var(--accent-glow);
+    transition: background var(--t), box-shadow var(--t), transform 0.1s, opacity var(--t);
+}
+.dl-add-trigger-btn:hover {
+    opacity: 1;
+    background: #8b6ffd;
+    box-shadow: 0 4px 24px rgba(124,92,252,0.50);
+    transform: translateY(-1px);
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   14. DEADLINE FILTER BAR
+   Clean pill-style filter buttons.
+   ════════════════════════════════════════════════════════════════ */
+
+.dl-filter-bar {
+    background: transparent;
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    gap: 8px;
+}
+
+.dl-filter-btn {
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.80rem;
+    font-weight: 500;
+    padding: 5px 16px;
+    transition: border-color var(--t), color var(--t), background var(--t), box-shadow var(--t);
+}
+.dl-filter-btn:hover {
+    border-color: var(--border-hover);
+    color: var(--accent);
+    background: var(--accent-dim);
+}
+.dl-filter-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 1px 8px var(--accent-glow);
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   15. DEADLINE ITEM — SIMPLIFIED DISPLAY
+   ════════════════════════════════════════════════════════════════ */
+
+/* Date line under the title */
+.dl-item-date {
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* State badges: Past (red) / Still (purple) */
+.dl-state-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.dl-state-past {
+    background: rgba(255,107,107,0.12);
+    color: #FF6B6B;
+}
+.dl-state-still {
+    background: var(--accent-dim);
+    color: var(--accent);
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   16. FOCUS PAGE BUTTON POLISH
+   ════════════════════════════════════════════════════════════════ */
+
+/* Skip button — polished amber ghost */
+.focus-btn-secondary {
+    border-radius: var(--r-btn);
+    border: 1px solid rgba(255,210,126,0.28);
+    background: rgba(255,210,126,0.06);
+    color: #c9a44e;
+    transition: border-color var(--t), background var(--t), color var(--t), box-shadow var(--t);
+}
+.focus-btn-secondary:hover {
+    border-color: rgba(255,210,126,0.55);
+    background: rgba(255,210,126,0.12);
+    color: #ffd27e;
+    box-shadow: 0 2px 12px rgba(255,210,126,0.15);
+}
+
+/* Back link — subtle hover glow */
+.focus-back-btn {
+    border-radius: var(--r-sm);
+    padding: 4px 6px;
+    transition: color var(--t), background var(--t);
+}
+.focus-back-btn:hover {
+    background: rgba(255,255,255,0.05);
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   17. TRACKER BACK BUTTON POLISH
+   ════════════════════════════════════════════════════════════════ */
+
+/* Back to App button on tracker */
+.tracker-back-btn {
+    font-size: 0.83rem;
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   18. GENERAL CONSISTENCY PASS
+   ════════════════════════════════════════════════════════════════ */
+
+/* Chart edit btn — inherit ghost tier cleanly */
+.chart-edit-btn {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--muted);
+    gap: 5px;
+}
+.chart-edit-btn:hover {
+    color: var(--accent);
+}
+
+/* Session search — consistent with input tier */
+.session-search-input {
+    font-size: 0.875rem;
+}
+
+/* Stat cards — tighter value spacing */
+.stat-value {
+    letter-spacing: -0.02em;
+}
+
+/* Period nav buttons — consistent compact size */
+.period-nav-btn {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--muted);
+}
+
+/* dl-item actions alignment with badge */
+.dl-item-actions {
+    align-items: center;
+    gap: 6px;
+}
+
+/* dl-item body padding tighter */
+.dl-item-body {
+    padding: 14px 18px 14px 14px;
+}
+
+/* remove .site-footer if it slips in anywhere */
+.site-footer { display: none !important; }
