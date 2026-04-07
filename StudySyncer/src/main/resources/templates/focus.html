@@ -11,7 +11,7 @@
 </head>
 <body>
 
-<!-- ── Minimal top bar ──────────────────────────────────────── -->
+<!-- ── Minimal top bar ──────────────────────────────────────────── -->
 <div class="focus-topbar">
     <a href="/" class="focus-back-btn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -24,7 +24,7 @@
     <span class="focus-spacer" aria-hidden="true"></span>
 </div>
 
-<!-- ── Main focus area ──────────────────────────────────────── -->
+<!-- ── Main focus area ──────────────────────────────────────────── -->
 <main class="focus-main">
 
     <!-- Phase tabs -->
@@ -40,144 +40,165 @@
                 onclick="setPhase('longbreak')">Long Break</button>
     </div>
 
-    <!-- ══════════════════════════════════════════════════════
-         FINJAN SCENE — redrawn Arabic qahwa cup
-         Shape: wide flared rim → dramatic inward curve → narrow waist → rounded base
-         Interior: pixel grid clipped to cup, generated + depleted by focus.js
-         Exterior: thin gold (#d4a847) geometric lines only — no glow filters
-         Timer text is the HTML element #finjan-time BELOW the SVG
-         Click → fullscreen toggle
-         ══════════════════════════════════════════════════════ -->
+    <!-- ══════════════════════════════════════════════════════════════
+         FINJAN — Arabic qahwa cup, redrawn for correct proportions.
+
+         Shape: wide flared rim (170 px) → gentle taper → narrower base.
+         The cup is roughly as tall as it is wide (balanced, not lanky).
+         Interior clip follows the inner ceramic wall ~14 px inside.
+
+         Fill mechanism:
+           #fj-fill-rect  y and height are updated each tick by focus.js.
+           Full timer  → y=FINJAN_TOP (60), height=FINJAN_FILL_HEIGHT (140).
+           Empty timer → y=200, height=0.  Liquid drains from the top.
+           A gradient keeps the surface bright and the bottom deep.
+
+         ViewBox 0 0 300 270  |  CSS height: 420 px
+         FINJAN_TOP = 60       (top of interior clip, y=60)
+         FINJAN_FILL_HEIGHT = 140  (y=60 → y=200)
+         Click → fullscreen toggle (wired in focus.js)
+         ══════════════════════════════════════════════════════════════ -->
     <div class="finjan-scene" id="finjan-scene">
 
-        <!--
-            ViewBox 0 0 240 280  |  CSS height: 400 px → ~343 px wide
-            FINJAN_TOP = 44        (top of interior clip, y=44)
-            FINJAN_FILL_HEIGHT = 170  (interior y 44 → 214)
-        -->
         <svg id="finjan-svg"
-             viewBox="0 0 240 280"
+             viewBox="0 0 300 270"
              xmlns="http://www.w3.org/2000/svg"
              role="button"
              tabindex="0"
              aria-label="Focus timer — click to toggle fullscreen">
+
             <defs>
+
                 <!--
-                    Interior clip: follows the inner ceramic wall.
-                    Wide at the rim opening, curves inward to a narrow waist,
-                    gently rounds to the base.
-                    Top y=44, bottom y=214.  FINJAN_FILL_HEIGHT = 170.
+                    Interior wall clip path.
+                    Follows the inner ceramic surface: 14 px inside
+                    the outer body on each side.  Top y=60, bottom
+                    Q-arc centre y=208.
                 -->
                 <clipPath id="fj-clip">
-                    <path d="M 52,44 L 188,44
-                             C 188,90 163,128 155,148
-                             C 151,174 151,198 150,214
-                             Q 120,224 90,214
-                             C 89,198 89,174 85,148
-                             C 77,128 52,90 52,44 Z"/>
+                    <path d="M 79,60  L 221,60
+                             C 225,98  214,154 200,192
+                             Q 150,208 100,192
+                             C  86,154  75, 98  79, 60 Z"/>
                 </clipPath>
-            </defs>
-
-            <!-- ══ Ground shadow — subtle ellipse under the base ══ -->
-            <ellipse cx="120" cy="272" rx="54" ry="5" fill="rgba(0,0,0,0.32)"/>
-
-            <!-- ══ Cup outer ceramic body ══
-                 Wide flared rim (y=18–40, x=38–202).
-                 Curves steeply inward: waist at x≈82–158, y≈148.
-                 Rounds gently to a small base and bottom arc. -->
-            <path d="M 38,18 L 202,18 L 202,40
-                     C 200,88 170,126 162,148
-                     C 158,174 157,200 157,218
-                     Q 120,230 83,218
-                     C 83,200 82,174 78,148
-                     C 70,126 40,88 38,40 Z"
-                  fill="#17103a"
-                  stroke="rgba(140,110,220,0.45)"
-                  stroke-width="1.2"/>
-
-            <!-- ══ Rim top edge — thin gold line across the opening ══ -->
-            <line x1="38" y1="18" x2="202" y2="18"
-                  stroke="#d4a847" stroke-width="1.5" stroke-linecap="round" opacity="0.75"/>
-
-            <!-- Rim bottom edge — separates the lip from the body -->
-            <line x1="41" y1="40" x2="199" y2="40"
-                  stroke="#d4a847" stroke-width="0.9" stroke-linecap="round" opacity="0.5"/>
-
-            <!-- ══ Interior pixel region (clipped to cup shape) ══ -->
-            <g clip-path="url(#fj-clip)">
-                <!-- Dark background fills the cup interior -->
-                <rect x="0" y="0" width="240" height="280" fill="#0c0820"/>
-
-                <!-- Pixel grid — populated by focus.js _generatePixels() -->
-                <g id="finjan-pixels"/>
 
                 <!--
-                    Cover rect — opaque dark; anchored at y=FINJAN_TOP (44).
-                    height=0 when timer is full; grows to 170 as time drains.
-                    focus.js: height = Math.round((1−progress) × 170)
+                    Liquid gradient — anchored to user-space y=60 (surface)
+                    → y=200 (bottom).  Because the gradient is fixed to SVG
+                    co-ordinates, the surface colour is always bright lavender
+                    regardless of the current fill level.
                 -->
-                <rect id="finjan-cover" x="0" y="44" width="240" height="0" fill="#0c0820"/>
+                <linearGradient id="fj-fill-grad"
+                                x1="0" y1="60" x2="0" y2="200"
+                                gradientUnits="userSpaceOnUse">
+                    <stop offset="0%"   stop-color="#e9d5ff" stop-opacity="0.98"/>
+                    <stop offset="22%"  stop-color="#8b5cf6"/>
+                    <stop offset="60%"  stop-color="#4c1d95"/>
+                    <stop offset="100%" stop-color="#180a30"/>
+                </linearGradient>
+
+                <!--
+                    Depth-glow radial — centred on the fill rect (objectBoundingBox)
+                    so it stays centred on the liquid mass as it drains.
+                -->
+                <radialGradient id="fj-depth-glow" cx="50%" cy="45%" r="58%">
+                    <stop offset="0%"   stop-color="#a78bfa" stop-opacity="0.38"/>
+                    <stop offset="100%" stop-color="#6d28d9" stop-opacity="0"/>
+                </radialGradient>
+
+                <!--
+                    Shimmer strip — a 14 px tall fade at the liquid surface.
+                    objectBoundingBox → always at the top of the fill rect.
+                -->
+                <linearGradient id="fj-shimmer-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"   stop-color="#ede9fe" stop-opacity="0.55"/>
+                    <stop offset="100%" stop-color="#ede9fe" stop-opacity="0"/>
+                </linearGradient>
+
+            </defs>
+
+            <!-- ── Ground shadow ── -->
+            <ellipse cx="150" cy="262" rx="60" ry="5" fill="rgba(0,0,0,0.36)"/>
+
+            <!--
+                Outer cup body — the Arabic finjan silhouette.
+
+                Dimensions:
+                  Rim:  y=44,  x=65–235  (opening 170 px)
+                  Base: y≈196, x=88–212  (base    124 px, 73% of opening)
+                  Height to bottom arc: 218−44 = 174 px
+                  Aspect: 170 × 174 — nearly square, characteristic of a finjan.
+
+                Right side curve: C 240,88  226,152  212,196
+                Bottom arc:       Q 150,218  88,196
+                Left side mirror: C  74,152   60, 88  65, 44
+            -->
+            <path id="fj-body"
+                  d="M 65,44 L 235,44
+                     C 240,88  226,152 212,196
+                     Q 150,218  88,196
+                     C  74,152  60, 88  65, 44 Z"
+                  fill="#0d0826"
+                  stroke="rgba(124,92,252,0.32)"
+                  stroke-width="1.8"/>
+
+            <!-- ══ Interior — clipped to inner wall ══ -->
+            <g clip-path="url(#fj-clip)">
+
+                <!-- Dark empty-cup background -->
+                <rect x="0" y="0" width="300" height="270" fill="#060414"/>
+
+                <!-- Liquid fill — focus.js updates y + height each tick -->
+                <rect id="fj-fill-rect" x="0" y="60" width="300" height="140"
+                      fill="url(#fj-fill-grad)"/>
+
+                <!-- Radial depth glow over the liquid -->
+                <rect id="fj-depth-rect" x="0" y="60" width="300" height="140"
+                      fill="url(#fj-depth-glow)"/>
+
+                <!--
+                    Surface shimmer strip — 14 px fade at the liquid top.
+                    focus.js sets y to match fj-fill-rect.y.
+                -->
+                <rect id="fj-shimmer-rect" x="0" y="60" width="300" height="14"
+                      fill="url(#fj-shimmer-grad)"/>
+
+                <!-- Surface hairline — marks exact liquid level -->
+                <line id="fj-surface" x1="0" y1="60" x2="300" y2="60"
+                      stroke="#ddd6fe" stroke-width="1.4" opacity="0.55"/>
+
             </g>
 
-            <!-- ══ Exterior decoration — thin gold geometric lines only ══
+            <!--
+                Ceramic rim band — the thick lip between the outer rim (y=44)
+                and the interior opening (y=60).  Gives a sense of wall depth.
+            -->
+            <path d="M 65,44 L 235,44 L 221,60 Q 150,65 79,60 Z"
+                  fill="rgba(109,40,217,0.10)"
+                  stroke="rgba(139,92,246,0.25)"
+                  stroke-width="0.9"/>
 
-                 Band 1 (upper body, y≈50–100):
-                   Two border lines with a diamond-chain between them.
-                   3 diamonds, centers at x=96,120,144, half-w=12, half-h=24.
+            <!-- Rim top highlight line -->
+            <line x1="65" y1="44" x2="235" y2="44"
+                  stroke="#b4a0fb" stroke-width="1.8" opacity="0.5"
+                  stroke-linecap="round"/>
 
-                 Band 2 (mid body, y≈155–175):
-                   Two horizontal lines with small V-chevrons between them.
-            ══ -->
+            <!-- Small foot ring at the base — grounds the silhouette -->
+            <ellipse cx="150" cy="215" rx="47" ry="5.5"
+                     fill="#0d0826"
+                     stroke="rgba(124,92,252,0.24)"
+                     stroke-width="1.4"/>
 
-            <!-- Band 1: upper border line -->
-            <line x1="44" y1="52" x2="196" y2="52"
-                  stroke="#d4a847" stroke-width="1" opacity="0.6"/>
+            <!-- Subtle gloss on left inner wall — very faint -->
+            <path d="M 83,66 C 81,100 80,148 82,184"
+                  fill="none" stroke="rgba(255,255,255,0.045)"
+                  stroke-width="10" stroke-linecap="round"/>
 
-            <!-- Band 1: diamond chain
-                 D1 centre x=96:  (84,76)-(96,52)-(108,76)-(96,100)
-                 D2 centre x=120: (108,76)-(120,52)-(132,76)-(120,100)
-                 D3 centre x=144: (132,76)-(144,52)-(156,76)-(144,100)
-                 Diamonds share vertices horizontally. -->
-            <polyline points="84,76 96,52 108,76 120,52 132,76 144,52 156,76"
-                      fill="none" stroke="#d4a847" stroke-width="1.1"
-                      stroke-linecap="round" stroke-linejoin="round" opacity="0.65"/>
-            <polyline points="84,76 96,100 108,76 120,100 132,76 144,100 156,76"
-                      fill="none" stroke="#d4a847" stroke-width="1.1"
-                      stroke-linecap="round" stroke-linejoin="round" opacity="0.65"/>
-
-            <!-- Band 1: lower border line -->
-            <line x1="76" y1="100" x2="164" y2="100"
-                  stroke="#d4a847" stroke-width="1" opacity="0.6"/>
-
-            <!-- Band 2: upper border line (at the waist/lower body) -->
-            <line x1="83" y1="156" x2="157" y2="156"
-                  stroke="#d4a847" stroke-width="0.9" opacity="0.5"/>
-
-            <!-- Band 2: three small V-chevrons -->
-            <polyline points="91,156 99,168 107,156"
-                      fill="none" stroke="#d4a847" stroke-width="1"
-                      stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
-            <polyline points="112,156 120,168 128,156"
-                      fill="none" stroke="#d4a847" stroke-width="1"
-                      stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
-            <polyline points="133,156 141,168 149,156"
-                      fill="none" stroke="#d4a847" stroke-width="1"
-                      stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
-
-            <!-- Band 2: lower border line -->
-            <line x1="83" y1="174" x2="157" y2="174"
-                  stroke="#d4a847" stroke-width="0.9" opacity="0.5"/>
-
-            <!-- Subtle gloss on the left wall (white, very faint) -->
-            <path d="M 42,44 C 43,76 44,110 46,148 C 47,168 48,192 50,214"
-                  fill="none" stroke="rgba(255,255,255,0.04)"
-                  stroke-width="12" stroke-linecap="round"/>
-
-        </svg><!-- /finjan-svg -->
+        </svg>
 
     </div><!-- /finjan-scene -->
 
-    <!-- Timer countdown — displayed below the cup, not inside it -->
+    <!-- Timer countdown — sits directly below the cup -->
     <p class="finjan-time-display" id="finjan-time">25:00</p>
 
     <!-- Progress bar -->

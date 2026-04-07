@@ -7,37 +7,38 @@
  *
  * Responsibilities:
  *   - Subscribe to TimerCore and drive the finjan (Arabic coffee-cup) SVG
- *   - Generate a pixel grid inside the cup interior; pixels drain as time passes
+ *   - Update the gradient liquid fill level inside the cup each tick
  *   - Update phase tabs, progress bar, session label, toggle button
  *   - POST completed sessions to /api/tracker/sessions
  *   - Handle fullscreen toggle on finjan click
  *
- * Finjan fill mechanism
- *   The SVG contains:
- *     1. A pixel grid <g id="finjan-pixels"> populated with colored squares,
- *        all clipped to the cup interior via #fj-clip.
- *     2. A dark cover rect (#finjan-cover) anchored at y=FINJAN_TOP (44),
- *        height=0 when full. As progress decreases from 1→0,
- *        cover height grows from 0→FINJAN_FILL_HEIGHT (170),
- *        hiding pixels from the top down — coffee drains visually.
+ * Fill mechanism
+ *   The SVG contains a gradient fill rect (#fj-fill-rect) clipped to
+ *   the interior cup shape.  Each tick, focus.js sets:
+ *
+ *     fillY  = FINJAN_TOP + (1 − progress) × FINJAN_FILL_HEIGHT
+ *     fillH  = progress × FINJAN_FILL_HEIGHT
+ *
+ *   The bottom of the fill rect stays fixed at y=200; the top rises as
+ *   time drains — liquid depletes from the top down.
+ *   The gradient is anchored in SVG user-space so the surface colour
+ *   (bright lavender) always appears at the current liquid level.
  */
 
 // ── Finjan geometry (must match the SVG viewBox in focus.html) ─
-const FINJAN_TOP         = 44;   // y where cup interior starts (top of clip)
-const FINJAN_FILL_HEIGHT = 170;  // interior height: y=44 to y=214
-
-// ── Pixel grid constants ──────────────────────────────────────
-const PIXEL_SIZE   = 8;    // px square side
-const PIXEL_GAP    = 2;    // gap between squares
-const PIXEL_STEP   = PIXEL_SIZE + PIXEL_GAP;   // 10
-const PIXEL_COLORS = ['#7c3aed', '#8b5cf6', '#a78bfa', '#6d28d9', '#9061f9'];
+const FINJAN_TOP         = 60;   // y where cup interior begins
+const FINJAN_FILL_HEIGHT = 140;  // interior height used for fill (y=60→200)
 
 // ── DOM refs ──────────────────────────────────────────────────
-const _barFill     = document.getElementById('focus-bar-fill');
-const _sessionLbl  = document.getElementById('focus-session-label');
-const _toggleBtn   = document.getElementById('focus-toggle-btn');
-const _finjanCover = document.getElementById('finjan-cover');
-const _finjanScene = document.getElementById('finjan-scene');
+const _barFill    = document.getElementById('focus-bar-fill');
+const _sessionLbl = document.getElementById('focus-session-label');
+const _toggleBtn  = document.getElementById('focus-toggle-btn');
+
+// SVG fill elements
+const _fjFill    = document.getElementById('fj-fill-rect');
+const _fjDepth   = document.getElementById('fj-depth-rect');
+const _fjShimmer = document.getElementById('fj-shimmer-rect');
+const _fjSurface = document.getElementById('fj-surface');
 
 // ── Time formatter ────────────────────────────────────────────
 function _fmt(secs) {
@@ -46,51 +47,45 @@ function _fmt(secs) {
     return `${m}:${s}`;
 }
 
-// ── Generate pixel grid inside the cup ───────────────────────
-// Fills #finjan-pixels with a grid of 8x8 SVG rects covering the
-// interior bounding box. The clip-path #fj-clip masks out anything
-// outside the actual cup shape. Colors are assigned pseudo-randomly
-// per position so the grid looks textured rather than uniform.
-function _generatePixels() {
-    const container = document.getElementById('finjan-pixels');
-    if (!container) return;
-
-    // Bounding box of the interior (matches FINJAN_TOP + FINJAN_FILL_HEIGHT)
-    const startX = 44;   // left margin inside clip
-    const endX   = 196;  // right margin
-    const startY = FINJAN_TOP;
-    const endY   = FINJAN_TOP + FINJAN_FILL_HEIGHT; // 214
-
-    const rects = [];
-    for (let y = startY; y < endY; y += PIXEL_STEP) {
-        for (let x = startX; x < endX; x += PIXEL_STEP) {
-            // Deterministic color based on position (avoid uniform look)
-            const ci = ((x * 3) ^ (y * 7)) % PIXEL_COLORS.length;
-            const color = PIXEL_COLORS[Math.abs(ci)];
-            rects.push(
-                `<rect x="${x}" y="${y}" width="${PIXEL_SIZE}" height="${PIXEL_SIZE}" fill="${color}" opacity="0.82"/>`
-            );
-        }
-    }
-    container.innerHTML = rects.join('');
-}
-
 // ── Update all finjan visuals from a state snapshot ──────────
 function _updateFinjan(state, visState) {
-    const progress = state.totalSeconds > 0 ? state.remaining / state.totalSeconds : 0;
+    const progress = state.totalSeconds > 0
+        ? state.remaining / state.totalSeconds
+        : 0;
 
-    // 1. Timer text (HTML element below SVG)
+    // 1. Timer text below SVG
     const timeEl = document.getElementById('finjan-time');
     if (timeEl) timeEl.textContent = _fmt(state.remaining);
 
-    // 2. Cover rect height = (1 − progress) × FINJAN_FILL_HEIGHT
-    //    Grows from top — pixels drain from top as time passes.
-    if (_finjanCover) {
-        const coverH = Math.round((1 - progress) * FINJAN_FILL_HEIGHT);
-        _finjanCover.setAttribute('height', String(Math.max(0, coverH)));
+    // 2. Liquid fill level
+    //    Bottom of fill stays fixed at FINJAN_TOP + FINJAN_FILL_HEIGHT (y=200).
+    //    Top rises as time drains.
+    const fillH = Math.max(0, Math.round(progress * FINJAN_FILL_HEIGHT));
+    const fillY = FINJAN_TOP + FINJAN_FILL_HEIGHT - fillH;  // top of liquid
+
+    if (_fjFill) {
+        _fjFill.setAttribute('y',      String(fillY));
+        _fjFill.setAttribute('height', String(fillH));
+    }
+    if (_fjDepth) {
+        _fjDepth.setAttribute('y',      String(fillY));
+        _fjDepth.setAttribute('height', String(fillH));
     }
 
-    // 3. Progress bar (HTML element, CSS-transitioned for smooth fill)
+    // Shimmer strip: 14 px at the liquid surface, hidden when cup is empty
+    if (_fjShimmer) {
+        _fjShimmer.setAttribute('y', String(fillY));
+        _fjShimmer.style.opacity = fillH > 6 ? '1' : '0';
+    }
+
+    // Surface hairline
+    if (_fjSurface) {
+        _fjSurface.setAttribute('y1', String(fillY));
+        _fjSurface.setAttribute('y2', String(fillY));
+        _fjSurface.style.opacity = fillH > 4 ? '0.55' : '0';
+    }
+
+    // 3. Progress bar
     if (_barFill) _barFill.style.width = (progress * 100) + '%';
 
     // 4. Body state classes drive CSS animations
@@ -104,7 +99,6 @@ function _updateTabs(state) {
     ['pomodoro', 'shortbreak', 'longbreak'].forEach(p => {
         const tab = document.getElementById('ftab-' + p);
         if (!tab) return;
-        // countdown shares the pomodoro tab highlight
         const active = (p === state.phase)
                     || (state.phase === 'countdown' && p === 'pomodoro');
         tab.classList.toggle('active', active);
@@ -129,13 +123,11 @@ function _updateSessionLabel(state) {
 
 // ── TimerCore event subscriber ────────────────────────────────
 function _onCoreEvent(event, state) {
-    // Compute visual state
     let visState;
     if      (event === 'done')  visState = 'done';
     else if (event === 'pause') visState = 'paused';
     else                        visState = state.isRunning ? 'running' : '';
 
-    // Update finjan visuals for all events except logging-only
     if (event !== 'sessionEnd' && event !== 'skip') {
         _updateFinjan(state, visState);
         _updateTabs(state);
@@ -143,18 +135,17 @@ function _onCoreEvent(event, state) {
         if (_toggleBtn) _toggleBtn.textContent = state.isRunning ? 'Pause' : 'Start';
     }
 
-    // Session logging — only when focus page is the active page / master
+    // Session logging
     if (event === 'sessionEnd') {
         if (window.currentUser) {
             const mins = Math.round(state.totalSeconds / 60);
-            const mode = _phaseLabel(state.phase);
             fetch('/api/tracker/sessions', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     materialName:    'Focus Session',
                     durationMinutes: mins,
-                    timerMode:       mode,
+                    timerMode:       _phaseLabel(state.phase),
                     completed:       true,
                 }),
             }).catch(() => {});
@@ -225,16 +216,13 @@ document.addEventListener('keydown', e => {
 
 // ── Init ──────────────────────────────────────────────────────
 (function () {
-    // Build pixel grid first (static; doesn't change per tick)
-    _generatePixels();
-
     const state = TimerCore.getState();
     _updateFinjan(state, state.isRunning ? 'running' : '');
     _updateTabs(state);
     _updateSessionLabel(state);
     if (_toggleBtn) _toggleBtn.textContent = state.isRunning ? 'Pause' : 'Start';
 
-    // Wire finjan click → fullscreen toggle
+    // Wire finjan click → fullscreen
     const finjanSvg = document.getElementById('finjan-svg');
     if (finjanSvg) {
         finjanSvg.addEventListener('click', _toggleFullscreen);
