@@ -41,20 +41,23 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════════════
-         FINJAN — Arabic qahwa cup silhouette.
+         FINJAN — Arabic qahwa cup, pixel-art inspired.
 
-         Shape: wide flared rim (196 px, x=52–248) with a gentle outward
-         curve near the top, rounding into a tapered body that narrows to
-         a 92 px base (x=104–196) at y≈204.  Stocky and wide — not glassy.
+         Shape:  204 px wide rim (x=48–252) with a distinct outward flare
+         (CP x=268) creating the authentic Arabic shoulder, then a strong
+         inward sweep to a 52 px base span at y≈205.
+         Height rim → bottom arc ≈ 172 px.  Aspect ≈ 1.19 : 1 — wide and
+         stocky, matching an Arabic finjan front view.
 
-         Fill mechanism (pixel-based):
-           focus.js generates a grid of small purple <rect> pixels inside
-           the interior clip region.  Each tick it shows the bottom N pixels
-           where N = ceil(progress × totalPixels).
-           As time drains, pixels disappear from the top first.
+         Cup border: white 3×3 pixel squares generated in focus.js, snapped
+         to a 4 px grid, tracing the outer silhouette + inner rim opening.
+         Placed in #fj-border-pixels (outside the interior clip).
+
+         Fill: 4×4 purple micro-pixel <rect> elements inside the interior
+         clip region, driven by timer progress.  Bottom pixels always show
+         first; top pixels vanish as time runs out.
 
          ViewBox 0 0 300 270  |  CSS height: 420 px
-         Inner clip top y=62, inner clip bottom ≈ y=214
          Click → fullscreen toggle (wired in focus.js)
          ══════════════════════════════════════════════════════════════ -->
     <div class="finjan-scene" id="finjan-scene">
@@ -70,39 +73,25 @@
 
                 <!--
                     Interior clip — inner ceramic wall, ~14 px inside the
-                    outer body on each side.  All pixel rects are masked here.
-                    Top y=62 (flat), bottom arc peaks near y=207.
+                    outer body.  Purple fill pixels are masked to stay here.
+                    Top y=62 (flat), bottom arc peaks near y=212.
                 -->
                 <clipPath id="fj-clip">
-                    <path d="M 68,62 L 232,62
-                             C 248,86  232,162  188,200
-                             Q 150,214  112,200
-                             C  52,162  52, 86  68, 62 Z"/>
+                    <path d="M 62,62 L 238,62
+                             C 252,88  228,162  166,198
+                             Q 150,212  134,198
+                             C  72,162   48, 88   62, 62 Z"/>
                 </clipPath>
 
                 <!--
-                    Ceramic body gradient — horizontal, bright centre,
-                    shaded edges to give the cup a rounded, three-dimensional
-                    feel without looking flat or boring.
-                -->
-                <linearGradient id="fj-ceramic" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%"   stop-color="#a898e8"/>
-                    <stop offset="12%"  stop-color="#d8d0ff"/>
-                    <stop offset="30%"  stop-color="#f0ecff"/>
-                    <stop offset="50%"  stop-color="#ffffff"/>
-                    <stop offset="70%"  stop-color="#f0ecff"/>
-                    <stop offset="88%"  stop-color="#d8d0ff"/>
-                    <stop offset="100%" stop-color="#a898e8"/>
-                </linearGradient>
-
-                <!--
-                    Soft glow filter applied to the pixel group — gives each
-                    small square a subtle purple bloom without being noisy.
+                    Soft purple glow — applied to the inner pixel group only.
+                    Keeps a controlled bloom without bleeding onto the white
+                    border pixels.
                 -->
                 <filter id="fj-px-glow"
                         x="-25%" y="-25%" width="150%" height="150%"
                         color-interpolation-filters="sRGB">
-                    <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="blur"/>
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="1.4" result="blur"/>
                     <feMerge>
                         <feMergeNode in="blur"/>
                         <feMergeNode in="SourceGraphic"/>
@@ -112,59 +101,53 @@
             </defs>
 
             <!--
-                Outer cup body — Arabic finjan silhouette.
+                Cup body shell — almost-transparent fill so the ceramic wall
+                area reads as subtly solid against the dark background.
+                The visible border is entirely white pixel squares generated
+                by focus.js and placed in #fj-border-pixels.
 
-                Rim:  y=46, x=52–248  → 196 px wide
-                The right side curve C(265,75)(248,165) creates a very slight
-                outward flare near the top (the classic finjan shoulder), then
-                sweeps strongly inward to the base at (196,204).
-                Base arc: Q 150,222 → 104,204  (92 px span, wide rounded base)
-                Height rim→base arc ≈ 176 px.  Aspect ≈ 196 × 176 — stocky.
+                Outer silhouette:
+                  Rim  y=48, x=48–252  →  204 px wide
+                  Right: C(268,70)(242,162) → (176,205)   strong outward shoulder
+                  Base Q: 150,220 → (124,205)              52 px wide base
+                  Left: mirror of right (symmetric around x=150)
             -->
             <path id="fj-body"
-                  d="M 52,46 L 248,46
-                     C 265,75  248,165  196,204
-                     Q 150,222  104,204
-                     C  52,165  35, 75  52, 46 Z"
-                  fill="url(#fj-ceramic)"
-                  stroke="rgba(175,155,255,0.55)"
-                  stroke-width="1.5"/>
+                  d="M 48,48 L 252,48
+                     C 268,70  242,162  176,205
+                     Q 150,220  124,205
+                     C  58,162   32, 70   48, 48 Z"
+                  fill="rgba(255,255,255,0.022)"
+                  stroke="none"/>
 
-            <!-- ══ Interior — clipped to inner wall ══ -->
+            <!-- ── Interior — clipped to inner ceramic wall ── -->
             <g clip-path="url(#fj-clip)">
-
                 <!-- Deep dark empty-cup background -->
                 <rect x="0" y="0" width="300" height="270" fill="#06031a"/>
-
-                <!-- Purple pixel fill — populated and driven by focus.js -->
+                <!-- Purple micro-pixel fill — built and driven by focus.js -->
                 <g id="fj-pixels" filter="url(#fj-px-glow)"></g>
-
             </g>
 
             <!--
-                Ceramic rim band — the thick lip between the outer rim (y=46)
-                and the interior opening (y=62).  Gives a sense of wall depth.
+                White pixel border — focus.js samples the outer silhouette
+                and inner rim line, snaps points to a 4 px grid, and renders
+                3×3 white squares here.  This group sits on top of the clip
+                so the border is always fully visible.
             -->
-            <path d="M 52,46 L 248,46 L 232,62 Q 150,68 68,62 Z"
-                  fill="rgba(200,185,255,0.10)"
-                  stroke="rgba(200,180,255,0.28)"
-                  stroke-width="0.9"/>
+            <g id="fj-border-pixels"></g>
 
-            <!-- Rim top highlight line -->
-            <line x1="52" y1="46" x2="248" y2="46"
-                  stroke="#e0d8ff" stroke-width="2.2" opacity="0.55"
+            <!-- Foot ring — very subtle arc grounding the base -->
+            <ellipse cx="150" cy="213" rx="36" ry="4"
+                     fill="none"
+                     stroke="rgba(200,185,255,0.15)"
+                     stroke-width="1.1"/>
+
+            <!-- Left inner-wall gloss — barely visible depth hint -->
+            <path d="M 68,70 C 64,106 62,158 66,190"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.030)"
+                  stroke-width="12"
                   stroke-linecap="round"/>
-
-            <!-- Foot ring at the base — grounds the silhouette -->
-            <ellipse cx="150" cy="215" rx="44" ry="5.5"
-                     fill="url(#fj-ceramic)"
-                     stroke="rgba(175,155,255,0.35)"
-                     stroke-width="1.3"/>
-
-            <!-- Subtle gloss on left inner wall — very faint -->
-            <path d="M 74,70 C 70,106 68,154 72,188"
-                  fill="none" stroke="rgba(255,255,255,0.038)"
-                  stroke-width="12" stroke-linecap="round"/>
 
         </svg>
 

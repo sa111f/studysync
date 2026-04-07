@@ -173,12 +173,12 @@ body {
 
 /* ── Body state classes ───────────────────────────────────── */
 
-/* ── Pixel transition — smooth fade when pixels appear / disappear ── */
+/* ── Pixel transitions ────────────────────────────────────────── */
 #fj-pixels rect {
-    transition: opacity 0.7s ease;
+    transition: opacity 0.65s ease;
 }
 
-/* ·· RUNNING — pixels breathe gently, time turns violet */
+/* ·· RUNNING — pixels + border breathe, time turns violet */
 .is-running .finjan-time-display {
     color: #c4b5fd;
     text-shadow: 0 0 32px rgba(167,139,250,0.55);
@@ -188,11 +188,19 @@ body {
     animation: fj-pixel-breathe 3.2s ease-in-out infinite;
 }
 @keyframes fj-pixel-breathe {
-    0%, 100% { opacity: 0.88; }
+    0%, 100% { opacity: 0.86; }
     50%       { opacity: 1.00; }
 }
 
-/* ·· PAUSED — time blinks slowly, pixels dim */
+.is-running #fj-border-pixels {
+    animation: fj-border-breathe 3.2s ease-in-out infinite;
+}
+@keyframes fj-border-breathe {
+    0%, 100% { opacity: 0.80; }
+    50%       { opacity: 1.00; }
+}
+
+/* ·· PAUSED — time blinks, cup dims */
 .is-paused .finjan-time-display {
     color: var(--muted);
     text-shadow: none;
@@ -203,9 +211,8 @@ body {
     50%       { opacity: 0.38; }
 }
 
-.is-paused #fj-pixels {
-    opacity: 0.50;
-}
+.is-paused #fj-pixels         { opacity: 0.45; }
+.is-paused #fj-border-pixels  { opacity: 0.50; }
 
 /* ·· DONE — bright celebratory flash on the whole cup */
 .is-done #finjan-svg {
