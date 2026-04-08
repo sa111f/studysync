@@ -74,7 +74,10 @@ public class DailyGoal {
      * True after the missed-goal email has been sent to the user's registered email.
      * Tracked separately from notificationSent (which covers the SMS accountability contact).
      */
-    @Column(name = "email_alert_sent", nullable = false)
+    // columnDefinition is required so Hibernate generates DEFAULT false in the ALTER TABLE.
+    // Without it, adding a NOT NULL column to an existing table fails in PostgreSQL
+    // because existing rows get NULL, which violates the constraint.
+    @Column(name = "email_alert_sent", nullable = false, columnDefinition = "boolean NOT NULL DEFAULT false")
     private boolean emailAlertSent = false;
 
     /** Timestamp of when the missed-goal email was sent. */
