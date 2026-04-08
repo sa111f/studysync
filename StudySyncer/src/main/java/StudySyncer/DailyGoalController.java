@@ -91,26 +91,28 @@ public class DailyGoalController {
 
         Map<String, Object> m = new HashMap<>();
         if (g == null) {
-            m.put("goalMinutes",         0);
-            m.put("completedMinutes",    actualMinutes);
-            m.put("status",              "none");
-            m.put("notificationEnabled", false);
-            m.put("accountabilityEmail", "");
-            m.put("emailAlertSent",      false);
-            m.put("username",            user != null ? user.getUsername() : "");
+            m.put("goalMinutes",             0);
+            m.put("completedMinutes",        actualMinutes);
+            m.put("status",                  "none");
+            m.put("notificationEnabled",     false);
+            m.put("accountabilityEmail",     "");
+            m.put("goalReachedEmailSent",    false);
+            m.put("emailAlertSent",          false);
+            m.put("username",                user != null ? user.getUsername() : "");
             return m;
         }
 
         int    goal   = g.getGoalMinutes();
         String status = (goal == 0) ? "none" : (actualMinutes >= goal ? "achieved" : "in_progress");
 
-        m.put("goalMinutes",         goal);
-        m.put("completedMinutes",    actualMinutes);
-        m.put("status",              status);
-        m.put("notificationEnabled", g.isNotificationEnabled());
-        m.put("accountabilityEmail", g.getAccountabilityEmail() != null ? g.getAccountabilityEmail() : "");
-        m.put("emailAlertSent",      g.isEmailAlertSent());
-        m.put("username",            g.getUser().getUsername());
+        m.put("goalMinutes",             goal);
+        m.put("completedMinutes",        actualMinutes);
+        m.put("status",                  status);
+        m.put("notificationEnabled",     g.isNotificationEnabled());
+        m.put("accountabilityEmail",     g.getAccountabilityEmail() != null ? g.getAccountabilityEmail() : "");
+        m.put("goalReachedEmailSent",    g.isGoalReachedEmailSent());
+        m.put("emailAlertSent",          g.isEmailAlertSent());
+        m.put("username",                g.getUser().getUsername());
         return m;
     }
 

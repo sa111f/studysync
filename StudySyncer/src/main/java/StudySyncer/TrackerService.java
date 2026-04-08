@@ -1,6 +1,7 @@
 package StudySyncer;
 
 import StudySyncer.dto.*;
+import StudySyncer.entity.DailyGoal;
 import StudySyncer.entity.StudySession;
 import StudySyncer.entity.User;
 import StudySyncer.repository.StudySessionRepository;
@@ -40,9 +41,15 @@ public class TrackerService {
         s.setStudyDate(now.toLocalDate());
         sessionRepo.save(s);
 
-        // Sync today's goal progress after every session save — completed or not —
-        // so the goal card always matches the Study Tracker's Today total.
-        dailyGoalService.addCompletedMinutes(user, durationMinutes);
+        // Step 1: sync today's goal progress inside its own @Transactional.
+        // addCompletedMinutes commits before returning, so the DB is up-to-date.
+        DailyGoal updatedGoal = dailyGoalService.addCompletedMinutes(user, durationMinutes);
+
+        // Step 2: check whether the goal threshold was just crossed and send
+        // the goal-reached email if needed.  Called AFTER the transaction commits
+        // so the email fires outside the DB transaction — no open connection during
+        // the Resend HTTP call, and no rollback risk on email failure.
+        dailyGoalService.triggerGoalReachedEmailIfNeeded(updatedGoal);
     }
 
     // ── Date range ────────────────────────────────────────

@@ -310,7 +310,7 @@
                            onchange="onEmailToggle()" />
                     <span class="accountability-toggle-text">Enable accountability email</span>
                 </label>
-                <p class="accountability-hint">If you miss your daily goal, StudySyncer will send an accountability email.</p>
+                <p class="accountability-hint">When you reach your goal, StudySyncer emails you instantly. If you miss it by end of day, you'll get a reminder.</p>
             </div>
 
             <div class="accountability-fields" id="accountability-fields" style="display:none">
@@ -582,27 +582,36 @@ function handlePdfDrop(e) {
 
         if (!data) return;
 
-        const enabled    = !!data.notificationEnabled;
-        const emailValue = data.accountabilityEmail || '';
-        const alertSent  = !!data.emailAlertSent;
+        const enabled          = !!data.notificationEnabled;
+        const emailValue       = data.accountabilityEmail || '';
+        const goalReachedSent  = !!data.goalReachedEmailSent;   // success email
+        const missedAlertSent  = !!data.emailAlertSent;         // missed-goal email
 
         if (toggle)  toggle.checked = enabled;
         if (emailEl) emailEl.value  = emailValue;
         if (fields)  fields.style.display = enabled ? '' : 'none';
 
-        // Status badge
+        // Status badge — shows the most relevant state for today
         if (statusRow && badge) {
             if (!enabled) {
+                // Accountability is off — hide badge entirely
                 statusRow.style.display = 'none';
                 badge.textContent = '';
                 badge.className   = 'accountability-status-badge';
-            } else if (alertSent) {
+            } else if (goalReachedSent) {
+                // Goal was reached today — success email already sent
                 statusRow.style.display = '';
-                badge.textContent = 'Missed-goal email sent for today.';
+                badge.textContent = '✓ Goal reached email sent for today!';
+                badge.className   = 'accountability-status-badge badge-sent badge-success';
+            } else if (missedAlertSent) {
+                // End-of-day passed and goal was missed — missed-goal email sent
+                statusRow.style.display = '';
+                badge.textContent = 'Missed-goal reminder sent for today.';
                 badge.className   = 'accountability-status-badge badge-sent badge-failure';
             } else {
+                // Accountability is active, nothing sent yet today
                 statusRow.style.display = '';
-                badge.textContent = 'Email accountability enabled — you\'ll be notified if you miss today\'s goal.';
+                badge.textContent = 'Email accountability on — you\'ll hear from us when you hit your goal or at end of day if you miss it.';
                 badge.className   = 'accountability-status-badge badge-pending';
             }
         }

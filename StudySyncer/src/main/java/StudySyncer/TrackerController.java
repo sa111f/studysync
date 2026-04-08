@@ -48,7 +48,8 @@ public class TrackerController {
         trackerService.saveSession(user,
                 dto.getMaterialName(), dto.getDurationMinutes(),
                 dto.getTimerMode(), dto.isCompleted());
-        // addCompletedMinutes is handled inside trackerService.saveSession — no duplicate call here
+        // Goal-progress sync and goal-reached email check are both handled inside
+        // trackerService.saveSession — do NOT add a duplicate call here.
         return ResponseEntity.ok(Map.of("message", "Session saved."));
     }
 
