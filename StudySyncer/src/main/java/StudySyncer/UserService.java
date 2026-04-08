@@ -159,6 +159,21 @@ public class UserService {
         return AuthResult.success(user);
     }
 
+    // ── Accountability email ──────────────────────────────
+
+    /**
+     * Saves a persistent accountability email on the user's account.
+     * Pass null or blank to remove it.
+     */
+    @Transactional
+    public User updateAccountabilityEmail(Long userId, String email) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found."));
+        String trimmed = (email != null && !email.isBlank()) ? email.trim() : null;
+        user.setAccountabilityEmail(trimmed);
+        return userRepository.save(user);
+    }
+
     // ── Lookup ────────────────────────────────────────────
 
     public Optional<User> findById(Long id) {

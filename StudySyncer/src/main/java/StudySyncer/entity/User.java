@@ -47,6 +47,14 @@ public class User {
             columnDefinition = "BOOLEAN DEFAULT TRUE")
     private boolean emailVerified = true;
 
+    /**
+     * Persistent accountability email saved by the user via the "Set Email" button.
+     * Used as the default recipient for goal-reached and missed-goal emails.
+     * Falls back to this.email if null.
+     */
+    @Column(name = "accountability_email", length = 255)
+    private String accountabilityEmail;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -67,20 +75,22 @@ public class User {
 
     // ── Getters ───────────────────────────────────────────
 
-    public Long          getId()             { return id; }
-    public String        getUsername()       { return username; }
-    public String        getEmail()          { return email; }
-    public String        getPasswordHash()   { return passwordHash; }
-    public String        getOauthProvider()  { return oauthProvider; }
-    public boolean       isEmailVerified()   { return emailVerified; }
-    public LocalDateTime getCreatedAt()      { return createdAt; }
-    public LocalDateTime getUpdatedAt()      { return updatedAt; }
+    public Long          getId()                    { return id; }
+    public String        getUsername()              { return username; }
+    public String        getEmail()                 { return email; }
+    public String        getPasswordHash()          { return passwordHash; }
+    public String        getOauthProvider()         { return oauthProvider; }
+    public boolean       isEmailVerified()          { return emailVerified; }
+    public String        getAccountabilityEmail()   { return accountabilityEmail; }
+    public LocalDateTime getCreatedAt()             { return createdAt; }
+    public LocalDateTime getUpdatedAt()             { return updatedAt; }
 
     // ── Setters ───────────────────────────────────────────
 
-    public void setUsername(String username)             { this.username = username; }
-    public void setEmail(String email)                   { this.email = email; }
-    public void setPasswordHash(String passwordHash)     { this.passwordHash = passwordHash; }
-    public void setOauthProvider(String oauthProvider)   { this.oauthProvider = oauthProvider; }
-    public void setEmailVerified(boolean verified)       { this.emailVerified = verified; }
+    public void setUsername(String username)                    { this.username = username; }
+    public void setEmail(String email)                          { this.email = email; }
+    public void setPasswordHash(String passwordHash)            { this.passwordHash = passwordHash; }
+    public void setOauthProvider(String oauthProvider)          { this.oauthProvider = oauthProvider; }
+    public void setEmailVerified(boolean verified)              { this.emailVerified = verified; }
+    public void setAccountabilityEmail(String email)            { this.accountabilityEmail = email; }
 }

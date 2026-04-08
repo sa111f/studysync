@@ -141,10 +141,15 @@ public class AccountabilityScheduler {
 
         String userName = goal.getUser().getUsername();
 
-        // Resolve recipient: prefer the accountability email on the goal,
-        // then fall back to the user's registered email.
-        // EmailService handles the final fallback to ALERT_TO_EMAIL.
+        // Resolve recipient:
+        //   1. Per-day accountability email on the goal
+        //   2. User's persistent accountability email (set via "Set Email" button)
+        //   3. User's registered email address
+        //   EmailService handles the final fallback to ALERT_TO_EMAIL.
         String recipientEmail = goal.getAccountabilityEmail();
+        if (recipientEmail == null || recipientEmail.isBlank()) {
+            recipientEmail = goal.getUser().getAccountabilityEmail();
+        }
         if (recipientEmail == null || recipientEmail.isBlank()) {
             recipientEmail = goal.getUser().getEmail();
         }

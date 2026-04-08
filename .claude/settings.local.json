@@ -16,7 +16,8 @@
       "Bash(powershell:*)",
       "Bash(mvn compile:*)",
       "Bash(cmd //c \"mvnw.cmd compile\")",
-      "Bash(bash mvnw:*)"
+      "Bash(bash mvnw:*)",
+      "Bash(find:*)"
     ]
   }
 }

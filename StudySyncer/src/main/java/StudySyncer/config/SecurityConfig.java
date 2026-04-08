@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -32,6 +33,14 @@ public class SecurityConfig {
             .httpBasic(basic -> basic.disable())
             .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
             .csrf(csrf -> csrf.disable())
+            // Explicit session management:
+            //   IF_REQUIRED — create a session only when needed (the default, but stated clearly).
+            //   migrateSession — on OAuth2 success, copy attributes to a new session ID to prevent
+            //                    session fixation. Our "userId" attribute is preserved during migration.
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
+                .sessionFixation().migrateSession()
+            )
             .oauth2Login(oauth -> oauth
                 .loginPage("/")
                 .successHandler(oauth2SuccessHandler)

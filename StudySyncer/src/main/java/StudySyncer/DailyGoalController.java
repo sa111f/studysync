@@ -89,13 +89,18 @@ public class DailyGoalController {
         // Always compute from session records — same source as the Study Tracker.
         int actualMinutes = (user != null) ? dailyGoalService.computeTodayActualMinutes(user) : 0;
 
+        // Persistent email saved on the user's account (set via "Set Email" button).
+        // This is the value shown in the email input for preloading.
+        String userAccountabilityEmail = (user != null && user.getAccountabilityEmail() != null)
+                ? user.getAccountabilityEmail() : "";
+
         Map<String, Object> m = new HashMap<>();
         if (g == null) {
             m.put("goalMinutes",             0);
             m.put("completedMinutes",        actualMinutes);
             m.put("status",                  "none");
             m.put("notificationEnabled",     false);
-            m.put("accountabilityEmail",     "");
+            m.put("accountabilityEmail",     userAccountabilityEmail);
             m.put("goalReachedEmailSent",    false);
             m.put("emailAlertSent",          false);
             m.put("username",                user != null ? user.getUsername() : "");
@@ -109,7 +114,9 @@ public class DailyGoalController {
         m.put("completedMinutes",        actualMinutes);
         m.put("status",                  status);
         m.put("notificationEnabled",     g.isNotificationEnabled());
-        m.put("accountabilityEmail",     g.getAccountabilityEmail() != null ? g.getAccountabilityEmail() : "");
+        // Always show the user's persistent email in the input (not the per-day snapshot).
+        // The per-day DailyGoal.accountabilityEmail is used internally for email sending only.
+        m.put("accountabilityEmail",     userAccountabilityEmail);
         m.put("goalReachedEmailSent",    g.isGoalReachedEmailSent());
         m.put("emailAlertSent",          g.isEmailAlertSent());
         m.put("username",                g.getUser().getUsername());

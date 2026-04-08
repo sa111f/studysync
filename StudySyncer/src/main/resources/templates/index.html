@@ -319,12 +319,19 @@
                         <label class="accountability-label" for="accountability-email-input">
                             Accountability email <span class="optional-tag">(optional)</span>
                         </label>
-                        <input type="email" id="accountability-email-input"
-                               class="field-input accountability-email-input"
-                               placeholder="Enter email address"
-                               autocomplete="email" maxlength="255" />
+                        <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+                            <input type="email" id="accountability-email-input"
+                                   class="field-input accountability-email-input"
+                                   placeholder="Enter email address"
+                                   autocomplete="email" maxlength="255"
+                                   onkeydown="if(event.key==='Enter')setAccountabilityEmail()"
+                                   style="flex:1;min-width:0" />
+                            <button class="apply-btn" onclick="setAccountabilityEmail()"
+                                    style="white-space:nowrap;flex-shrink:0">Set Email</button>
+                        </div>
+                        <p id="set-email-status" class="accountability-hint" style="display:none;margin-top:2px"></p>
                         <p class="accountability-hint" style="margin-top:4px">
-                            Leave blank to use your registered email address.
+                            Leave blank and click Set Email to remove the saved address.
                         </p>
                     </div>
                 </div>
@@ -713,6 +720,65 @@ function handlePdfDrop(e) {
         const toggle = el('email-enabled-toggle');
         const fields = el('accountability-fields');
         if (fields) fields.style.display = (toggle && toggle.checked) ? '' : 'none';
+    };
+
+    // ════════════════════════════════════════════════════
+    // Public: Save persistent accountability email
+    // ════════════════════════════════════════════════════
+
+    window.setAccountabilityEmail = async function () {
+        const emailEl  = el('accountability-email-input');
+        const statusEl = el('set-email-status');
+        const email    = emailEl ? emailEl.value.trim() : '';
+
+        // Client-side format check (only when non-empty)
+        if (email && !email.includes('@')) {
+            if (statusEl) {
+                statusEl.textContent  = 'Please enter a valid email address.';
+                statusEl.style.color  = 'var(--accent2, #e74c3c)';
+                statusEl.style.display = '';
+            }
+            return;
+        }
+
+        if (!window.currentUser) {
+            if (statusEl) {
+                statusEl.textContent  = 'Please log in to save your email.';
+                statusEl.style.color  = 'var(--accent2, #e74c3c)';
+                statusEl.style.display = '';
+            }
+            return;
+        }
+
+        try {
+            const res  = await fetch('/api/auth/accountability-email', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ email }),
+            });
+            const data = await res.json().catch(() => ({}));
+
+            if (res.ok) {
+                if (statusEl) {
+                    statusEl.textContent  = data.message || (email ? 'Accountability email saved.' : 'Accountability email removed.');
+                    statusEl.style.color  = 'var(--success, #2ecc71)';
+                    statusEl.style.display = '';
+                    setTimeout(() => { statusEl.style.display = 'none'; }, 3500);
+                }
+            } else {
+                if (statusEl) {
+                    statusEl.textContent  = data.error || 'Failed to save. Please try again.';
+                    statusEl.style.color  = 'var(--accent2, #e74c3c)';
+                    statusEl.style.display = '';
+                }
+            }
+        } catch (_) {
+            if (statusEl) {
+                statusEl.textContent  = 'Could not reach server. Please try again.';
+                statusEl.style.color  = 'var(--accent2, #e74c3c)';
+                statusEl.style.display = '';
+            }
+        }
     };
 
     // ════════════════════════════════════════════════════

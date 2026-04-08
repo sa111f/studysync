@@ -146,9 +146,15 @@ public class DailyGoalService {
 
         String userName = goal.getUser().getUsername();
 
-        // Resolve recipient: prefer accountability email on the goal, then user's registered email.
-        // EmailService will further fall back to ALERT_TO_EMAIL if both are null/blank.
+        // Resolve recipient:
+        //   1. Per-day accountability email on the goal (snapshot saved when goal was set)
+        //   2. User's persistent accountability email (set via "Set Email" button)
+        //   3. User's registered email address
+        //   EmailService handles the final fallback to ALERT_TO_EMAIL.
         String recipient = goal.getAccountabilityEmail();
+        if (recipient == null || recipient.isBlank()) {
+            recipient = goal.getUser().getAccountabilityEmail();
+        }
         if (recipient == null || recipient.isBlank()) {
             recipient = goal.getUser().getEmail();
         }

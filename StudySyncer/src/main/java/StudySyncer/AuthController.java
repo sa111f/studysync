@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import HashMap;
 import java.util.Map;
 
 /**
@@ -140,12 +141,61 @@ public class AuthController {
                 .body(Map.of("error", "Not logged in."));
         }
         return userService.findById(userId)
-            .<ResponseEntity<?>>map(u -> ResponseEntity.ok(Map.of(
-                "username", u.getUsername(),
-                "email",    u.getEmail() != null ? u.getEmail() : ""
-            )))
+            .<ResponseEntity<?>>map(u -> {
+                Map<String, Object> body = new HashMap<>();
+                body.put("username",            u.getUsername());
+                body.put("email",               u.getEmail() != null ? u.getEmail() : "");
+                body.put("accountabilityEmail", u.getAccountabilityEmail() != null ? u.getAccountabilityEmail() : "");
+                return ResponseEntity.ok(body);
+            })
             .orElse(ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(Map.of("error", "Session invalid.")));
+    }
+
+    // ── Accountability email ───────────────────────────────
+
+    /**
+     * Saves a persistent accountability email on the user's account.
+     * Body: { "email": "someone@example.com" }
+     * Send an empty string or omit to remove the saved email.
+     */
+    @PostMapping("/accountability-email")
+    public ResponseEntity<?> setAccountabilityEmail(
+            @RequestBody Map<String, String> body,
+            HttpSession session) {
+
+        Long userId = resolveUserId(session);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("error", "Not logged in."));
+        }
+
+        String email = body.get("email");
+
+        // Validate format when a non-empty value is provided
+        if (email != null && !email.isBlank()) {
+            email = email.trim();
+            if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Please enter a valid email address."));
+            }
+        } else {
+            email = null; // treat blank as "remove"
+        }
+
+        try {
+            userService.updateAccountabilityEmail(userId, email);
+            String msg = (email == null) ? "Accountability email removed." : "Accountability email saved.";
+            log.info("[ACCT-EMAIL] userId={} email={}", userId, email != null ? email : "(removed)");
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("message",             msg);
+            resp.put("accountabilityEmail", email != null ? email : "");
+            return ResponseEntity.ok(resp);
+        } catch (Exception e) {
+            log.error("[ACCT-EMAIL] Failed to save accountability email for userId={}: {}", userId, e.getMessage(), e);
+            return ResponseEntity.internalServerError()
+                .body(Map.of("error", "Failed to save email. Please try again."));
+        }
     }
 
     // ── Shared utility ────────────────────────────────────
