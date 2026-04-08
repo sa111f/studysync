@@ -300,53 +300,37 @@
         </div>
         <p class="goal-error-msg field-error hidden" id="goal-error-msg"></p>
 
-        <!-- ── Phase 4: Accountability SMS ── -->
+        <!-- ── Email Accountability ── -->
         <div class="accountability-section" id="accountability-section" style="display:none">
             <div class="accountability-divider"></div>
 
             <div class="accountability-toggle-row">
                 <label class="accountability-toggle-label">
-                    <input type="checkbox" id="sms-enabled-toggle" class="accountability-checkbox"
-                           onchange="onSmsToggle()" />
-                    <span class="accountability-toggle-text">Enable accountability SMS</span>
+                    <input type="checkbox" id="email-enabled-toggle" class="accountability-checkbox"
+                           onchange="onEmailToggle()" />
+                    <span class="accountability-toggle-text">Enable accountability email</span>
                 </label>
-                <p class="accountability-hint">Goal reached? They get a success message instantly. Goal missed? They get a message at end of day.</p>
+                <p class="accountability-hint">If you miss your daily goal, StudySyncer will send an accountability email.</p>
             </div>
 
             <div class="accountability-fields" id="accountability-fields" style="display:none">
                 <div class="accountability-field-row">
-                    <div class="accountability-phone-group">
-                        <label class="accountability-label" for="sms-phone-input">Phone number</label>
-                        <input type="tel" id="sms-phone-input"
-                               class="field-input accountability-phone-input"
-                               placeholder="+1 555 000 0000"
-                               autocomplete="tel" />
-                    </div>
-                    <div class="accountability-name-group">
-                        <label class="accountability-label" for="sms-contact-name">Contact name <span class="optional-tag">(optional)</span></label>
-                        <input type="text" id="sms-contact-name"
-                               class="field-input accountability-name-input"
-                               placeholder="e.g. Mom, Study buddy"
-                               autocomplete="off" maxlength="100" />
-                    </div>
-                </div>
-                <label class="accountability-consent-label">
-                    <input type="checkbox" id="sms-consent-checkbox" class="accountability-checkbox" />
-                    <span>I confirm this contact agreed to receive StudySyncer accountability messages.</span>
-                </label>
-
-                <!-- Preview SMS -->
-                <div class="sms-preview-row">
-                    <button class="sms-preview-btn" onclick="previewSms()">Preview SMS</button>
-                    <div class="sms-preview-box" id="sms-preview-box" style="display:none">
-                        <span class="sms-preview-label">SMS Preview</span>
-                        <span class="sms-preview-message" id="sms-preview-message"></span>
-                        <span class="sms-preview-note">Preview only — no SMS sent</span>
+                    <div class="accountability-email-group">
+                        <label class="accountability-label" for="accountability-email-input">
+                            Accountability email <span class="optional-tag">(optional)</span>
+                        </label>
+                        <input type="email" id="accountability-email-input"
+                               class="field-input accountability-email-input"
+                               placeholder="Enter email address"
+                               autocomplete="email" maxlength="255" />
+                        <p class="accountability-hint" style="margin-top:4px">
+                            Leave blank to use your registered email address.
+                        </p>
                     </div>
                 </div>
             </div>
 
-            <!-- Notification status badge (populated by JS after load) -->
+            <!-- Email alert status badge (populated by JS after load) -->
             <div class="accountability-status-row" id="accountability-status-row" style="display:none">
                 <span class="accountability-status-badge" id="accountability-status-badge"></span>
             </div>
@@ -514,11 +498,11 @@ function handlePdfDrop(e) {
 }
 </script>
 <script>
-/* ── Today's Goal + Accountability SMS (Phase 2 / 3 / 4) ── */
+/* ── Today's Goal + Email Accountability ── */
 (function () {
     function el(id) { return document.getElementById(id); }
 
-    // Cached API response — used by previewSms()
+    // Cached API response — used by renderAccountability()
     let lastGoalData = null;
 
     // ════════════════════════════════════════════════════
@@ -540,7 +524,8 @@ function handlePdfDrop(e) {
             if (mins > 0 && input) input.value = String(mins);
             if (label) label.textContent = mins > 0 ? 'Current goal: ' + mins + ' min' : 'No goal set for today.';
             if (progressRow) progressRow.classList.add('hidden');
-            el('accountability-section').style.display = 'none';
+            const accSection = el('accountability-section');
+            if (accSection) accSection.style.display = 'none';
             return;
         }
 
@@ -585,56 +570,39 @@ function handlePdfDrop(e) {
     }
 
     // ════════════════════════════════════════════════════
-    // Render: accountability SMS section
+    // Render: email accountability section
     // ════════════════════════════════════════════════════
 
     function renderAccountability(data) {
-        const toggle   = el('sms-enabled-toggle');
-        const fields   = el('accountability-fields');
-        const phoneEl  = el('sms-phone-input');
-        const nameEl   = el('sms-contact-name');
-        const consent  = el('sms-consent-checkbox');
+        const toggle    = el('email-enabled-toggle');
+        const fields    = el('accountability-fields');
+        const emailEl   = el('accountability-email-input');
         const statusRow = el('accountability-status-row');
-        const badge    = el('accountability-status-badge');
+        const badge     = el('accountability-status-badge');
 
         if (!data) return;
 
-        const enabled   = !!data.notificationEnabled;
-        const phone     = data.accountabilityPhone || '';
-        const name      = data.contactName         || '';
-        const confirmed = !!data.consentConfirmed;
-        const sent      = !!data.notificationSent;
-        const notifStat = data.notificationStatus || 'disabled';
+        const enabled    = !!data.notificationEnabled;
+        const emailValue = data.accountabilityEmail || '';
+        const alertSent  = !!data.emailAlertSent;
 
-        if (toggle)  toggle.checked  = enabled;
-        if (phoneEl) phoneEl.value   = phone;
-        if (nameEl)  nameEl.value    = name;
-        if (consent) consent.checked = confirmed;
+        if (toggle)  toggle.checked = enabled;
+        if (emailEl) emailEl.value  = emailValue;
         if (fields)  fields.style.display = enabled ? '' : 'none';
 
         // Status badge
         if (statusRow && badge) {
-            if (notifStat === 'disabled') {
+            if (!enabled) {
                 statusRow.style.display = 'none';
                 badge.textContent = '';
                 badge.className   = 'accountability-status-badge';
-            } else if (notifStat === 'success_sent') {
+            } else if (alertSent) {
                 statusRow.style.display = '';
-                badge.textContent = 'Success SMS sent.';
-                badge.className   = 'accountability-status-badge badge-sent badge-success';
-            } else if (notifStat === 'failure_sent') {
-                statusRow.style.display = '';
-                badge.textContent = 'Missed-goal SMS sent.';
+                badge.textContent = 'Missed-goal email sent for today.';
                 badge.className   = 'accountability-status-badge badge-sent badge-failure';
-            } else if (notifStat === 'sent') {
-                // Fallback for legacy records without notificationType
-                statusRow.style.display = '';
-                badge.textContent = 'Notification sent for today.';
-                badge.className   = 'accountability-status-badge badge-sent';
             } else {
-                // pending
                 statusRow.style.display = '';
-                badge.textContent = 'Accountability SMS enabled — failure message will be sent at end of day if goal is missed.';
+                badge.textContent = 'Email accountability enabled — you\'ll be notified if you miss today\'s goal.';
                 badge.className   = 'accountability-status-badge badge-pending';
             }
         }
@@ -679,10 +647,8 @@ function handlePdfDrop(e) {
     window.saveGoalAndSettings = async function () {
         const input   = el('main-goal-input');
         const val     = parseInt(input ? input.value : '0', 10);
-        const toggle  = el('sms-enabled-toggle');
-        const phoneEl = el('sms-phone-input');
-        const nameEl  = el('sms-contact-name');
-        const consent = el('sms-consent-checkbox');
+        const toggle  = el('email-enabled-toggle');
+        const emailEl = el('accountability-email-input');
 
         renderGoalError(null);
 
@@ -696,17 +662,12 @@ function handlePdfDrop(e) {
         if (!val || val < 1)  { renderGoalError('Please enter a positive number of minutes.'); return; }
         if (val > 1440)       { renderGoalError('Goal cannot exceed 1440 minutes (24 hours).'); return; }
 
-        const smsEnabled   = toggle  ? toggle.checked  : false;
-        const phone        = phoneEl ? phoneEl.value.trim() : '';
-        const contactName  = nameEl  ? nameEl.value.trim()  : '';
-        const consentGiven = consent ? consent.checked : false;
+        const emailEnabled = toggle  ? toggle.checked       : false;
+        const emailAddr    = emailEl ? emailEl.value.trim() : '';
 
-        if (smsEnabled && !phone) {
-            renderGoalError('Enter a phone number for the accountability SMS.');
-            return;
-        }
-        if (smsEnabled && !consentGiven) {
-            renderGoalError('Please confirm the contact agreed to receive messages.');
+        // Basic client-side check: if an email was entered it must look like one
+        if (emailEnabled && emailAddr && !emailAddr.includes('@')) {
+            renderGoalError('Please enter a valid email address.');
             return;
         }
 
@@ -716,10 +677,8 @@ function handlePdfDrop(e) {
                 headers: { 'Content-Type': 'application/json' },
                 body:    JSON.stringify({
                     goalMinutes:         val,
-                    notificationEnabled: smsEnabled,
-                    accountabilityPhone: phone,
-                    contactName:         contactName,
-                    consentConfirmed:    consentGiven,
+                    notificationEnabled: emailEnabled,
+                    accountabilityEmail: emailAddr,
                 }),
             });
             const data = await res.json().catch(() => ({}));
@@ -738,45 +697,13 @@ function handlePdfDrop(e) {
     window.setMainGoal = window.saveGoalAndSettings;
 
     // ════════════════════════════════════════════════════
-    // Public: SMS toggle change handler
+    // Public: Email accountability toggle change handler
     // ════════════════════════════════════════════════════
 
-    window.onSmsToggle = function () {
-        const toggle = el('sms-enabled-toggle');
+    window.onEmailToggle = function () {
+        const toggle = el('email-enabled-toggle');
         const fields = el('accountability-fields');
         if (fields) fields.style.display = (toggle && toggle.checked) ? '' : 'none';
-        // Hide preview when SMS is toggled off
-        if (toggle && !toggle.checked) {
-            const box = el('sms-preview-box');
-            if (box) box.style.display = 'none';
-        }
-    };
-
-    // ════════════════════════════════════════════════════
-    // Public: SMS preview (no real SMS sent)
-    // ════════════════════════════════════════════════════
-
-    window.previewSms = function () {
-        const box     = el('sms-preview-box');
-        const msgEl   = el('sms-preview-message');
-        if (!box || !msgEl) return;
-
-        const data     = lastGoalData;
-        const username = (data && data.username) ? data.username : 'you';
-        const goal     = data ? (data.goalMinutes     || 0) : 0;
-        const done     = data ? (data.completedMinutes || 0) : 0;
-
-        let message;
-        if (goal === 0) {
-            message = 'No goal set for today — set a goal first.';
-        } else if (done >= goal) {
-            message = 'StudySyncer alert: ' + username + ' reached today\u2019s study goal.';
-        } else {
-            message = 'StudySyncer alert: ' + username + ' didn\u2019t reach today\u2019s study goal.';
-        }
-
-        msgEl.textContent = message;
-        box.style.display = '';
     };
 
     // ════════════════════════════════════════════════════

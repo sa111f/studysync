@@ -31,9 +31,9 @@ public class DailyGoalController {
         this.scheduler        = scheduler;
     }
 
-    // ── GET /api/daily-goal/today ──────────────────────────
+    // ── GET /api/daily-goal/today ──────────────────────────────────────────────
 
-    /** Returns current goal, progress, and accountability settings for today. */
+    /** Returns current goal, progress, and email accountability settings for today. */
     @GetMapping("/today")
     public ResponseEntity<?> getToday(HttpSession session) {
         User user = resolveUser(session);
@@ -42,11 +42,10 @@ public class DailyGoalController {
         return ResponseEntity.ok(toMap(opt.orElse(null), user));
     }
 
-    // ── POST /api/daily-goal ───────────────────────────────
+    // ── POST /api/daily-goal ───────────────────────────────────────────────────
 
     /**
-     * Save today's goal minutes + accountability SMS settings in one call.
-     * Replaces the old simple {goalMinutes} endpoint with a richer request body.
+     * Saves today's goal minutes + email accountability settings in one call.
      */
     @PostMapping
     public ResponseEntity<?> saveGoal(@RequestBody GoalSaveRequest req, HttpSession session) {
@@ -54,7 +53,7 @@ public class DailyGoalController {
         if (user == null) return ResponseEntity.status(401).body(Map.of("error", "Not logged in."));
         try {
             DailyGoal goal = dailyGoalService.saveGoalAndSettings(user, req);
-            log.info("[GOAL] Saved — userId={} goalMinutes={} smsEnabled={}",
+            log.info("[GOAL] Saved — userId={} goalMinutes={} emailEnabled={}",
                     user.getId(), goal.getGoalMinutes(), goal.isNotificationEnabled());
             return ResponseEntity.ok(toMap(goal, user));
         } catch (IllegalArgumentException e) {
@@ -62,75 +61,11 @@ public class DailyGoalController {
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────
-
-    /**
-     * Converts a DailyGoal (or null) to the JSON shape the frontend expects.
-     *
-     * <p>completedMinutes is always derived from the live session total via
-     * {@link DailyGoalService#computeTodayActualMinutes}, NOT from the stored
-     * {@code goal.completedMinutes} counter.  This guarantees the goal card and the
-     * Study Tracker's Today view always display the same number, regardless of how or
-     * when sessions were saved.</p>
-     */
-    private Map<String, Object> toMap(DailyGoal g, User user) {
-        // Always compute from session records — same source as the Study Tracker.
-        int actualMinutes = (user != null) ? dailyGoalService.computeTodayActualMinutes(user) : 0;
-
-        Map<String, Object> m = new HashMap<>();
-        if (g == null) {
-            m.put("goalMinutes",          0);
-            m.put("completedMinutes",     actualMinutes);
-            m.put("status",               "none");
-            m.put("notificationEnabled",  false);
-            m.put("notificationSent",     false);
-            m.put("notificationType",     "");
-            m.put("notificationStatus",   "disabled");
-            m.put("accountabilityPhone",  "");
-            m.put("contactName",          "");
-            m.put("consentConfirmed",     false);
-            m.put("username",             user != null ? user.getUsername() : "");
-            return m;
-        }
-
-        int    goal   = g.getGoalMinutes();
-        // Use the live actual minutes for both the progress value and the achieved check.
-        String status = (goal == 0) ? "none" : (actualMinutes >= goal ? "achieved" : "in_progress");
-
-        // notificationStatus values consumed by the frontend badge:
-        //   "disabled"      — SMS not enabled
-        //   "pending"       — enabled, not yet sent
-        //   "success_sent"  — success SMS fired immediately when goal was reached
-        //   "failure_sent"  — failure SMS sent by end-of-day scheduler
-        String notifStatus;
-        if (!g.isNotificationEnabled()) {
-            notifStatus = "disabled";
-        } else if (g.isNotificationSent()) {
-            notifStatus = "SUCCESS".equals(g.getNotificationType()) ? "success_sent" : "failure_sent";
-        } else {
-            notifStatus = "pending";
-        }
-
-        m.put("goalMinutes",          goal);
-        m.put("completedMinutes",     actualMinutes);
-        m.put("status",               status);
-        m.put("notificationEnabled",  g.isNotificationEnabled());
-        m.put("notificationSent",     g.isNotificationSent());
-        m.put("notificationType",     g.getNotificationType() != null ? g.getNotificationType() : "");
-        m.put("notificationStatus",   notifStatus);
-        m.put("accountabilityPhone",  g.getAccountabilityPhone()  != null ? g.getAccountabilityPhone()  : "");
-        m.put("contactName",          g.getContactName()          != null ? g.getContactName()          : "");
-        m.put("consentConfirmed",     g.isConsentConfirmed());
-        m.put("username",             g.getUser().getUsername());
-        return m;
-    }
-
     // ── POST /api/daily-goal/trigger-notifications (testing only) ─────────────
 
     /**
      * Manually triggers the end-of-day scheduler right now.
      * Useful during development/testing so you don't have to wait until 23:59.
-     * Remove or guard this endpoint in a production-hardened release.
      */
     @PostMapping("/trigger-notifications")
     public ResponseEntity<?> triggerNow(HttpSession session) {
@@ -141,7 +76,43 @@ public class DailyGoalController {
         return ResponseEntity.ok(Map.of("message", "Scheduler triggered. Check server logs for results."));
     }
 
-    // ── Helpers ───────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Converts a DailyGoal (or null) to the JSON shape the frontend expects.
+     *
+     * completedMinutes is always derived from the live session total via
+     * DailyGoalService.computeTodayActualMinutes, NOT from the stored counter.
+     * This guarantees the goal card and the Study Tracker always show the same number.
+     */
+    private Map<String, Object> toMap(DailyGoal g, User user) {
+        // Always compute from session records — same source as the Study Tracker.
+        int actualMinutes = (user != null) ? dailyGoalService.computeTodayActualMinutes(user) : 0;
+
+        Map<String, Object> m = new HashMap<>();
+        if (g == null) {
+            m.put("goalMinutes",         0);
+            m.put("completedMinutes",    actualMinutes);
+            m.put("status",              "none");
+            m.put("notificationEnabled", false);
+            m.put("accountabilityEmail", "");
+            m.put("emailAlertSent",      false);
+            m.put("username",            user != null ? user.getUsername() : "");
+            return m;
+        }
+
+        int    goal   = g.getGoalMinutes();
+        String status = (goal == 0) ? "none" : (actualMinutes >= goal ? "achieved" : "in_progress");
+
+        m.put("goalMinutes",         goal);
+        m.put("completedMinutes",    actualMinutes);
+        m.put("status",              status);
+        m.put("notificationEnabled", g.isNotificationEnabled());
+        m.put("accountabilityEmail", g.getAccountabilityEmail() != null ? g.getAccountabilityEmail() : "");
+        m.put("emailAlertSent",      g.isEmailAlertSent());
+        m.put("username",            g.getUser().getUsername());
+        return m;
+    }
 
     private User resolveUser(HttpSession session) {
         Long id = AuthController.resolveUserId(session);

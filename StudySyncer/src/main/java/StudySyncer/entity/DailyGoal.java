@@ -68,15 +68,24 @@ public class DailyGoal {
     @Column(name = "notification_type", length = 10)
     private String notificationType;
 
+    // ── Phase 5: Email accountability settings ───────────────────────────────
+
+    /**
+     * Optional email address to send the missed-goal alert to.
+     * If blank, EmailService falls back to the user's registered email,
+     * then to ALERT_TO_EMAIL.
+     */
+    @Column(name = "accountability_email", length = 255)
+    private String accountabilityEmail;
+
     // ── Phase 5: Email alert tracking ────────────────────────────────────────
 
     /**
-     * True after the missed-goal email has been sent to the user's registered email.
-     * Tracked separately from notificationSent (which covers the SMS accountability contact).
+     * True after the missed-goal email has been sent for this day.
+     * Used as an idempotency guard — prevents duplicate sends.
      */
-    // columnDefinition is required so Hibernate generates DEFAULT false in the ALTER TABLE.
-    // Without it, adding a NOT NULL column to an existing table fails in PostgreSQL
-    // because existing rows get NULL, which violates the constraint.
+    // columnDefinition ensures Hibernate adds DEFAULT false in PostgreSQL ALTER TABLE,
+    // so existing rows don't violate the NOT NULL constraint when this column is added.
     @Column(name = "email_alert_sent", nullable = false, columnDefinition = "boolean NOT NULL DEFAULT false")
     private boolean emailAlertSent = false;
 
@@ -119,6 +128,7 @@ public class DailyGoal {
     public LocalDateTime getNotificationSentAt()  { return notificationSentAt; }
     public String        getNotificationMessage() { return notificationMessage; }
     public String        getNotificationType()    { return notificationType; }
+    public String        getAccountabilityEmail() { return accountabilityEmail; }
     public boolean       isEmailAlertSent()       { return emailAlertSent; }
     public LocalDateTime getEmailAlertSentAt()    { return emailAlertSentAt; }
     public LocalDateTime getCreatedAt()           { return createdAt; }
@@ -138,6 +148,7 @@ public class DailyGoal {
     public void setNotificationSentAt(LocalDateTime sentAt)  { this.notificationSentAt = sentAt; }
     public void setNotificationMessage(String message)       { this.notificationMessage = message; }
     public void setNotificationType(String type)             { this.notificationType = type; }
+    public void setAccountabilityEmail(String email)         { this.accountabilityEmail = email; }
     public void setEmailAlertSent(boolean sent)              { this.emailAlertSent = sent; }
     public void setEmailAlertSentAt(LocalDateTime sentAt)    { this.emailAlertSentAt = sentAt; }
 }
