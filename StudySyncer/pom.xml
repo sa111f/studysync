@@ -94,6 +94,13 @@
 			<artifactId>twilio</artifactId>
 			<version>10.1.0</version>
 		</dependency>
+
+		<!-- Resend Java SDK — transactional email (missed-goal alerts) -->
+		<dependency>
+			<groupId>com.resend</groupId>
+			<artifactId>resend-java</artifactId>
+			<version>3.1.0</version>
+		</dependency>
 	</dependencies>
 
 	<build>

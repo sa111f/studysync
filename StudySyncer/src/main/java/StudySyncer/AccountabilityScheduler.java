@@ -10,15 +10,21 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * End-of-day scheduler that sends accountability SMS messages.
+ * End-of-day scheduler that sends accountability notifications.
+ *
+ * Runs two independent batches:
+ *   1. SMS batch  — sends a Twilio SMS to the user's accountability contact
+ *                   (only if the user opted in with notificationEnabled + consentConfirmed).
+ *   2. Email batch — sends a Resend email to the user's own registered email address
+ *                   (sent for any user who set a goal and missed it, no extra opt-in needed).
  *
  * Default schedule: 23:59 every day in the configured timezone.
  * Override via environment variables:
  *   NOTIFICATION_CRON      — Spring cron expression (6-part: s m h d M W)
  *   NOTIFICATION_TIMEZONE  — Java timezone ID (e.g. "America/New_York", "UTC")
  *
- * The scheduler is idempotent: it skips any record where notificationSent=true,
- * so running it more than once for a given day is safe.
+ * Both batches are idempotent: the notificationSent / emailAlertSent flags prevent
+ * duplicate sends even if the scheduler is triggered more than once for a given day.
  */
 @Component
 public class AccountabilityScheduler {
@@ -27,10 +33,15 @@ public class AccountabilityScheduler {
 
     private final DailyGoalService dailyGoalService;
     private final SmsService       smsService;
+    private final EmailService     emailService;
 
-    public AccountabilityScheduler(DailyGoalService dailyGoalService, SmsService smsService) {
+    // Constructor injection — preferred over @Autowired field injection
+    public AccountabilityScheduler(DailyGoalService dailyGoalService,
+                                   SmsService smsService,
+                                   EmailService emailService) {
         this.dailyGoalService = dailyGoalService;
         this.smsService       = smsService;
+        this.emailService     = emailService;
     }
 
     /**
@@ -57,25 +68,40 @@ public class AccountabilityScheduler {
         LocalDate today = LocalDate.now();
         log.info("[SCHEDULER] Running accountability check for date={}", today);
 
-        List<DailyGoal> pending = dailyGoalService.findPendingNotifications(today);
-        log.info("[SCHEDULER] Found {} pending notification(s) for {}", pending.size(), today);
+        // ── Batch 1: SMS notifications ──────────────────────────────────────
+        List<DailyGoal> smsPending = dailyGoalService.findPendingNotifications(today);
+        log.info("[SCHEDULER] SMS batch: {} pending for {}", smsPending.size(), today);
 
-        int sent  = 0;
-        int failed = 0;
-
-        for (DailyGoal goal : pending) {
+        int smsSent = 0, smsFailed = 0;
+        for (DailyGoal goal : smsPending) {
             try {
-                processGoal(goal);
-                sent++;
+                processSmSGoal(goal);
+                smsSent++;
             } catch (Exception e) {
                 // Never let one failure stop the rest of the batch
-                log.error("[SCHEDULER] Unexpected error processing goalId={}: {}",
+                log.error("[SCHEDULER] Unexpected error in SMS batch for goalId={}: {}",
                         goal.getId(), e.getMessage(), e);
-                failed++;
+                smsFailed++;
             }
         }
+        log.info("[SCHEDULER] SMS batch done for {} — sent={} failed={}", today, smsSent, smsFailed);
 
-        log.info("[SCHEDULER] Done for {} — sent={} failed={}", today, sent, failed);
+        // ── Batch 2: Email alerts ────────────────────────────────────────────
+        List<DailyGoal> emailPending = dailyGoalService.findPendingEmailAlerts(today);
+        log.info("[SCHEDULER] Email batch: {} pending for {}", emailPending.size(), today);
+
+        int emailSent = 0, emailFailed = 0;
+        for (DailyGoal goal : emailPending) {
+            try {
+                processEmailGoal(goal);
+                emailSent++;
+            } catch (Exception e) {
+                log.error("[SCHEDULER] Unexpected error in email batch for goalId={}: {}",
+                        goal.getId(), e.getMessage(), e);
+                emailFailed++;
+            }
+        }
+        log.info("[SCHEDULER] Email batch done for {} — sent={} failed={}", today, emailSent, emailFailed);
     }
 
     // ── Manual trigger endpoint (for testing) ─────────────────────────────────
@@ -91,7 +117,8 @@ public class AccountabilityScheduler {
 
     // ── Private logic ──────────────────────────────────────────────────────────
 
-    private void processGoal(DailyGoal goal) {
+    /** Handles the SMS accountability notification for a single DailyGoal record. */
+    private void processSmSGoal(DailyGoal goal) {
         String username = goal.getUser().getUsername();
         String phone    = goal.getAccountabilityPhone();
         int    goalMin  = goal.getGoalMinutes();
@@ -134,6 +161,51 @@ public class AccountabilityScheduler {
             dailyGoalService.markNotificationSent(goal, message, "FAILURE");
         } else {
             log.error("[SCHEDULER] SMS failed for goalId={} userId={} — will retry on next scheduler run",
+                    goal.getId(), goal.getUser().getId());
+        }
+    }
+
+    /**
+     * Handles the email missed-goal alert for a single DailyGoal record.
+     *
+     * Logic:
+     *   - Only send if the goal was actually missed (completedMinutes < goalMinutes).
+     *   - Email goes to the user's registered email address; falls back to ALERT_TO_EMAIL.
+     *   - emailAlertSent guard prevents duplicate sends (idempotent).
+     */
+    private void processEmailGoal(DailyGoal goal) {
+        // Double-check idempotency guard (query already filtered, but be safe)
+        if (goal.isEmailAlertSent()) {
+            log.info("[EMAIL] Skipping goalId={} — email alert already sent", goal.getId());
+            return;
+        }
+
+        int goalMin = goal.getGoalMinutes();
+        int doneMin = goal.getCompletedMinutes();
+
+        // Only alert if the goal was actually missed
+        if (doneMin >= goalMin) {
+            log.info("[EMAIL] Skipping goalId={} — goal was met (done={}min goal={}min)",
+                    goal.getId(), doneMin, goalMin);
+            // Mark as sent so we don't re-check this record tomorrow
+            dailyGoalService.markEmailAlertSent(goal);
+            return;
+        }
+
+        String userName  = goal.getUser().getUsername();
+        String userEmail = goal.getUser().getEmail();   // may be null for OAuth-only users
+
+        log.info("[EMAIL] Sending missed-goal alert — goalId={} userId={} done={}min goal={}min",
+                goal.getId(), goal.getUser().getId(), doneMin, goalMin);
+
+        // EmailService resolves recipient: uses userEmail if set, falls back to ALERT_TO_EMAIL
+        boolean ok = emailService.sendMissedGoalEmail(
+                userEmail, userName, goalMin, doneMin, goal.getGoalDate());
+
+        if (ok) {
+            dailyGoalService.markEmailAlertSent(goal);
+        } else {
+            log.error("[EMAIL] Email failed for goalId={} userId={} — will retry on next scheduler run",
                     goal.getId(), goal.getUser().getId());
         }
     }

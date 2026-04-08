@@ -68,6 +68,19 @@ public class DailyGoal {
     @Column(name = "notification_type", length = 10)
     private String notificationType;
 
+    // ── Phase 5: Email alert tracking ────────────────────────────────────────
+
+    /**
+     * True after the missed-goal email has been sent to the user's registered email.
+     * Tracked separately from notificationSent (which covers the SMS accountability contact).
+     */
+    @Column(name = "email_alert_sent", nullable = false)
+    private boolean emailAlertSent = false;
+
+    /** Timestamp of when the missed-goal email was sent. */
+    @Column(name = "email_alert_sent_at")
+    private LocalDateTime emailAlertSentAt;
+
     // ── Audit ─────────────────────────────────────────────────────────────────
 
     @Column(name = "created_at", updatable = false)
@@ -103,6 +116,8 @@ public class DailyGoal {
     public LocalDateTime getNotificationSentAt()  { return notificationSentAt; }
     public String        getNotificationMessage() { return notificationMessage; }
     public String        getNotificationType()    { return notificationType; }
+    public boolean       isEmailAlertSent()       { return emailAlertSent; }
+    public LocalDateTime getEmailAlertSentAt()    { return emailAlertSentAt; }
     public LocalDateTime getCreatedAt()           { return createdAt; }
     public LocalDateTime getUpdatedAt()           { return updatedAt; }
 
@@ -120,4 +135,6 @@ public class DailyGoal {
     public void setNotificationSentAt(LocalDateTime sentAt)  { this.notificationSentAt = sentAt; }
     public void setNotificationMessage(String message)       { this.notificationMessage = message; }
     public void setNotificationType(String type)             { this.notificationType = type; }
+    public void setEmailAlertSent(boolean sent)              { this.emailAlertSent = sent; }
+    public void setEmailAlertSentAt(LocalDateTime sentAt)    { this.emailAlertSentAt = sentAt; }
 }

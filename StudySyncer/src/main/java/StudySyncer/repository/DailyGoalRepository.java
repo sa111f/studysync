@@ -20,4 +20,12 @@ public interface DailyGoalRepository extends JpaRepository<DailyGoal, Long> {
      */
     List<DailyGoal> findAllByGoalDateAndNotificationEnabledTrueAndConsentConfirmedTrueAndNotificationSentFalse(
             LocalDate goalDate);
+
+    /**
+     * Used by the end-of-day email scheduler: fetch every record for today where
+     * the email alert hasn't been sent yet and the user actually set a goal (> 0 min).
+     * The caller checks whether the goal was missed before sending.
+     */
+    List<DailyGoal> findAllByGoalDateAndEmailAlertSentFalseAndGoalMinutesGreaterThan(
+            LocalDate goalDate, int goalMinutes);
 }

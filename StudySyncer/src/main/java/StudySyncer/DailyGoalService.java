@@ -209,6 +209,28 @@ public class DailyGoalService {
                 goal.getId(), goal.getUser().getId(), goal.getGoalDate(), type);
     }
 
+    /**
+     * Returns all DailyGoal records for the given date where the email alert
+     * hasn't been sent yet and the user set a real goal (> 0 minutes).
+     * The caller (scheduler) decides whether the goal was missed before sending.
+     */
+    public List<DailyGoal> findPendingEmailAlerts(LocalDate date) {
+        return repo.findAllByGoalDateAndEmailAlertSentFalseAndGoalMinutesGreaterThan(date, 0);
+    }
+
+    /**
+     * Marks a DailyGoal's email alert as sent.
+     * Only call this after Resend confirms the email was dispatched.
+     */
+    @Transactional
+    public void markEmailAlertSent(DailyGoal goal) {
+        goal.setEmailAlertSent(true);
+        goal.setEmailAlertSentAt(LocalDateTime.now());
+        repo.save(goal);
+        log.info("[EMAIL] Marked email alert sent — goalId={} userId={} date={}",
+                goal.getId(), goal.getUser().getId(), goal.getGoalDate());
+    }
+
     // ── Queries ────────────────────────────────────────────
 
     /** Returns today's DailyGoal for the user, or empty if none exists. */
