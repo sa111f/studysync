@@ -22,10 +22,14 @@ public class DailyGoalService {
 
     private final DailyGoalRepository    repo;
     private final StudySessionRepository sessionRepo;
+    private final EmailService           emailService;
 
-    public DailyGoalService(DailyGoalRepository repo, StudySessionRepository sessionRepo) {
-        this.repo        = repo;
-        this.sessionRepo = sessionRepo;
+    public DailyGoalService(DailyGoalRepository repo,
+                            StudySessionRepository sessionRepo,
+                            EmailService emailService) {
+        this.repo         = repo;
+        this.sessionRepo  = sessionRepo;
+        this.emailService = emailService;
     }
 
     // ── Session-based progress (single source of truth) ────────────────────────
@@ -55,31 +59,38 @@ public class DailyGoalService {
     // ── Completed minutes ───────────────────────────────────────────────────────
 
     /**
-     * Syncs today's completedMinutes with the real session total.
+     * Syncs today's completedMinutes with the real session total, then checks
+     * whether the user just crossed their daily goal threshold and — if so —
+     * fires an immediate goal-reached email.
+     *
      * Called after every session save so goal progress always matches the tracker.
      *
      * @param user    the user whose goal should be synced
-     * @param minutes the session duration just saved (used as a guard; actual
-     *                counter is recomputed from DB, not incremented)
+     * @param minutes the duration of the session just saved (used as a guard; the
+     *                counter is recomputed from DB records, not blindly incremented)
      */
     @Transactional
     public void addCompletedMinutes(User user, int minutes) {
         if (minutes <= 0) return;
+
         LocalDate today = LocalDate.now();
         DailyGoal goal = findOrCreate(user, today);
 
         // Recompute from ALL sessions for today — same query the tracker uses.
         int actualTotal = computeTodayActualMinutes(user);
         goal.setCompletedMinutes(actualTotal);
-        repo.save(goal);
+        goal = repo.save(goal);
+
+        // Immediate success trigger: fire as soon as the goal threshold is crossed.
+        // The goalReachedEmailSent flag ensures this runs at most once per day.
+        checkAndSendGoalReachedEmail(goal);
     }
 
     // ── Goal + email accountability settings in one call ────────────────────────
 
     /**
      * Saves goal minutes AND email accountability settings from a single UI request.
-     * Validates that an email address is provided (or the user has one registered)
-     * when accountability is enabled.
+     * Validates that an email address is available when accountability is enabled.
      *
      * Throws IllegalArgumentException with a user-facing message on bad input.
      */
@@ -89,19 +100,17 @@ public class DailyGoalService {
             throw new IllegalArgumentException("Goal must be between 1 and 1440 minutes.");
         }
 
-        // When email accountability is enabled, verify there's somewhere to send the alert.
+        // When email accountability is enabled, verify there is somewhere to send the alert.
         if (req.isNotificationEnabled()) {
-            String enteredEmail = req.getAccountabilityEmail();
-            boolean hasEnteredEmail  = enteredEmail != null && !enteredEmail.isBlank();
-            boolean hasRegisteredEmail = user.getEmail() != null && !user.getEmail().isBlank();
+            String enteredEmail  = req.getAccountabilityEmail();
+            boolean hasEntered   = enteredEmail != null && !enteredEmail.isBlank();
+            boolean hasRegistered = user.getEmail() != null && !user.getEmail().isBlank();
 
-            if (!hasEnteredEmail && !hasRegisteredEmail) {
+            if (!hasEntered && !hasRegistered) {
                 throw new IllegalArgumentException(
                         "Please enter an email address, or register with an email to use accountability emails.");
             }
-
-            // Basic email format check when one was entered
-            if (hasEnteredEmail && !enteredEmail.contains("@")) {
+            if (hasEntered && !enteredEmail.contains("@")) {
                 throw new IllegalArgumentException("Please enter a valid email address.");
             }
         }
@@ -112,7 +121,7 @@ public class DailyGoalService {
         goal.setGoalMinutes(req.getGoalMinutes());
         goal.setNotificationEnabled(req.isNotificationEnabled());
 
-        // Store the accountability email only when accountability is enabled
+        // Store accountability email only when accountability is enabled
         String emailToStore = null;
         if (req.isNotificationEnabled()) {
             String entered = req.getAccountabilityEmail();
@@ -126,19 +135,34 @@ public class DailyGoalService {
     // ── Scheduler helpers ───────────────────────────────────────────────────────
 
     /**
-     * Returns all DailyGoal records for the given date where:
-     *   - the user enabled email accountability (notificationEnabled=true)
-     *   - the email alert hasn't been sent yet
-     *   - the user actually set a real goal (> 0 min)
-     *
-     * The scheduler checks whether the goal was missed before sending.
+     * Returns all DailyGoal records for the given date that need a missed-goal email.
+     * Only returns records where:
+     *   - accountability is enabled
+     *   - missed-goal email not yet sent
+     *   - goal-reached email not yet sent (goal was not reached → may need missed-goal email)
+     *   - a real goal was set (> 0 min)
      */
     public List<DailyGoal> findPendingEmailAlerts(LocalDate date) {
-        return repo.findAllByGoalDateAndNotificationEnabledTrueAndEmailAlertSentFalseAndGoalMinutesGreaterThan(date, 0);
+        return repo
+            .findAllByGoalDateAndNotificationEnabledTrueAndEmailAlertSentFalseAndGoalReachedEmailSentFalseAndGoalMinutesGreaterThan(
+                date, 0);
     }
 
     /**
-     * Marks a DailyGoal's email alert as sent.
+     * Marks a DailyGoal's goal-reached email as sent.
+     * Only call this after Resend confirms the email was dispatched.
+     */
+    @Transactional
+    public void markGoalReachedEmailSent(DailyGoal goal) {
+        goal.setGoalReachedEmailSent(true);
+        goal.setGoalReachedEmailSentAt(LocalDateTime.now());
+        repo.save(goal);
+        log.info("[EMAIL] Marked goal-reached email sent — goalId={} userId={} date={}",
+                goal.getId(), goal.getUser().getId(), goal.getGoalDate());
+    }
+
+    /**
+     * Marks a DailyGoal's missed-goal email as sent.
      * Only call this after Resend confirms the email was dispatched.
      */
     @Transactional
@@ -146,7 +170,7 @@ public class DailyGoalService {
         goal.setEmailAlertSent(true);
         goal.setEmailAlertSentAt(LocalDateTime.now());
         repo.save(goal);
-        log.info("[EMAIL] Marked email alert sent — goalId={} userId={} date={}",
+        log.info("[EMAIL] Marked missed-goal email sent — goalId={} userId={} date={}",
                 goal.getId(), goal.getUser().getId(), goal.getGoalDate());
     }
 
@@ -158,6 +182,62 @@ public class DailyGoalService {
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────────
+
+    /**
+     * Checks whether the user just reached their daily goal and, if all conditions
+     * are met, sends the goal-reached email immediately.
+     *
+     * Conditions (all must be true):
+     *   - goalMinutes > 0 (a real goal is set)
+     *   - completedMinutes >= goalMinutes (threshold just crossed)
+     *   - notificationEnabled = true (user opted in)
+     *   - goalReachedEmailSent = false (idempotency — send at most once per day)
+     *
+     * Email failure is caught internally — it must never crash the session save flow.
+     */
+    private void checkAndSendGoalReachedEmail(DailyGoal goal) {
+        // Guard: no goal set, or threshold not yet reached
+        if (goal.getGoalMinutes() <= 0)                                  return;
+        if (goal.getCompletedMinutes() < goal.getGoalMinutes())          return;
+        // Guard: user didn't opt in to email accountability
+        if (!goal.isNotificationEnabled())                               return;
+        // Guard: already sent today — idempotency
+        if (goal.isGoalReachedEmailSent())                               return;
+
+        String userName = goal.getUser().getUsername();
+
+        // Resolve recipient: prefer the accountability email on the goal record,
+        // then fall back to the user's registered email.
+        // EmailService handles the final fallback to ALERT_TO_EMAIL.
+        String recipient = goal.getAccountabilityEmail();
+        if (recipient == null || recipient.isBlank()) {
+            recipient = goal.getUser().getEmail();
+        }
+
+        log.info("[EMAIL] Immediate goal-reached trigger — goalId={} userId={} done={}min goal={}min",
+                goal.getId(), goal.getUser().getId(),
+                goal.getCompletedMinutes(), goal.getGoalMinutes());
+
+        // Wrap in try/catch so a failure here never breaks the timer or session save
+        try {
+            boolean ok = emailService.sendGoalReachedEmail(
+                    recipient, userName, goal.getGoalMinutes(),
+                    goal.getCompletedMinutes(), goal.getGoalDate());
+
+            if (ok) {
+                markGoalReachedEmailSent(goal);
+            } else {
+                log.warn("[EMAIL] Goal-reached email failed for goalId={} userId={} — " +
+                        "will not retry (missed-goal email will also be suppressed at end of day)",
+                        goal.getId(), goal.getUser().getId());
+            }
+        } catch (Exception e) {
+            // Safety net: should never reach here since EmailService catches its own errors,
+            // but we guard here too so the session-save transaction is never affected.
+            log.error("[EMAIL] Unexpected error in goal-reached trigger for goalId={}: {}",
+                    goal.getId(), e.getMessage(), e);
+        }
+    }
 
     private DailyGoal findOrCreate(User user, LocalDate date) {
         return repo.findByUserAndGoalDate(user, date).orElseGet(() -> {

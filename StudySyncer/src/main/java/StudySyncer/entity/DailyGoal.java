@@ -78,15 +78,33 @@ public class DailyGoal {
     @Column(name = "accountability_email", length = 255)
     private String accountabilityEmail;
 
-    // ── Phase 5: Email alert tracking ────────────────────────────────────────
+    // ── Email tracking ────────────────────────────────────────────────────────
 
     /**
-     * True after the missed-goal email has been sent for this day.
-     * Used as an idempotency guard — prevents duplicate sends.
+     * True after the "goal reached" success email has been sent for this day.
+     * Set immediately when the user crosses the goal threshold during the day.
+     * Also used by the scheduler as a guard: if this is true, no missed-goal
+     * email is needed at end of day.
+     *
+     * columnDefinition is required so Hibernate generates DEFAULT false when
+     * adding this column to an existing PostgreSQL table.
      */
-    // columnDefinition ensures Hibernate adds DEFAULT false in PostgreSQL ALTER TABLE,
-    // so existing rows don't violate the NOT NULL constraint when this column is added.
-    @Column(name = "email_alert_sent", nullable = false, columnDefinition = "boolean NOT NULL DEFAULT false")
+    @Column(name = "goal_reached_email_sent", nullable = false,
+            columnDefinition = "boolean NOT NULL DEFAULT false")
+    private boolean goalReachedEmailSent = false;
+
+    /** Timestamp of when the goal-reached email was sent. */
+    @Column(name = "goal_reached_email_sent_at")
+    private LocalDateTime goalReachedEmailSentAt;
+
+    /**
+     * True after the missed-goal email has been sent at end of day.
+     * Used as an idempotency guard — prevents duplicate sends.
+     *
+     * columnDefinition is required for the same PostgreSQL ADD COLUMN reason above.
+     */
+    @Column(name = "email_alert_sent", nullable = false,
+            columnDefinition = "boolean NOT NULL DEFAULT false")
     private boolean emailAlertSent = false;
 
     /** Timestamp of when the missed-goal email was sent. */
@@ -128,9 +146,11 @@ public class DailyGoal {
     public LocalDateTime getNotificationSentAt()  { return notificationSentAt; }
     public String        getNotificationMessage() { return notificationMessage; }
     public String        getNotificationType()    { return notificationType; }
-    public String        getAccountabilityEmail() { return accountabilityEmail; }
-    public boolean       isEmailAlertSent()       { return emailAlertSent; }
-    public LocalDateTime getEmailAlertSentAt()    { return emailAlertSentAt; }
+    public String        getAccountabilityEmail()       { return accountabilityEmail; }
+    public boolean       isGoalReachedEmailSent()      { return goalReachedEmailSent; }
+    public LocalDateTime getGoalReachedEmailSentAt()   { return goalReachedEmailSentAt; }
+    public boolean       isEmailAlertSent()            { return emailAlertSent; }
+    public LocalDateTime getEmailAlertSentAt()         { return emailAlertSentAt; }
     public LocalDateTime getCreatedAt()           { return createdAt; }
     public LocalDateTime getUpdatedAt()           { return updatedAt; }
 
@@ -148,7 +168,9 @@ public class DailyGoal {
     public void setNotificationSentAt(LocalDateTime sentAt)  { this.notificationSentAt = sentAt; }
     public void setNotificationMessage(String message)       { this.notificationMessage = message; }
     public void setNotificationType(String type)             { this.notificationType = type; }
-    public void setAccountabilityEmail(String email)         { this.accountabilityEmail = email; }
-    public void setEmailAlertSent(boolean sent)              { this.emailAlertSent = sent; }
-    public void setEmailAlertSentAt(LocalDateTime sentAt)    { this.emailAlertSentAt = sentAt; }
+    public void setAccountabilityEmail(String email)              { this.accountabilityEmail = email; }
+    public void setGoalReachedEmailSent(boolean sent)             { this.goalReachedEmailSent = sent; }
+    public void setGoalReachedEmailSentAt(LocalDateTime sentAt)   { this.goalReachedEmailSentAt = sentAt; }
+    public void setEmailAlertSent(boolean sent)                   { this.emailAlertSent = sent; }
+    public void setEmailAlertSentAt(LocalDateTime sentAt)         { this.emailAlertSentAt = sentAt; }
 }
