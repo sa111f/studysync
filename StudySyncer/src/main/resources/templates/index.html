@@ -319,18 +319,14 @@
                         <label class="accountability-label" for="accountability-email-input">
                             Accountability email <span class="optional-tag">(optional)</span>
                         </label>
-                        <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
-                            <input type="email" id="accountability-email-input"
-                                   class="field-input accountability-email-input"
-                                   placeholder="Enter email address"
-                                   autocomplete="email" maxlength="255"
-                                   onkeydown="if(event.key==='Enter')setAccountabilityEmail()"
-                                   style="flex:1;min-width:0" />
-                            <button class="apply-btn" onclick="setAccountabilityEmail()"
-                                    style="white-space:nowrap;flex-shrink:0">Set Email</button>
-                        </div>
-                        <p id="set-email-status" class="accountability-hint" style="display:none;margin-top:2px"></p>
-                        <p class="accountability-hint" style="margin-top:4px">
+                        <input type="email" id="accountability-email-input"
+                               class="field-input"
+                               placeholder="Enter email address"
+                               autocomplete="email" maxlength="255"
+                               onkeydown="if(event.key==='Enter')setAccountabilityEmail()" />
+                        <button class="set-email-btn" onclick="setAccountabilityEmail()">Set Email</button>
+                        <p id="set-email-status" class="set-email-status accountability-hint"></p>
+                        <p class="accountability-hint">
                             Leave blank and click Set Email to remove the saved address.
                         </p>
                     </div>
