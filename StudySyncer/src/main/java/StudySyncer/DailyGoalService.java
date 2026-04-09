@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,6 +20,14 @@ import java.util.Optional;
 public class DailyGoalService {
 
     private static final Logger log = LoggerFactory.getLogger(DailyGoalService.class);
+
+    /**
+     * All "today" comparisons use Toronto time, matching the zone used when
+     * sessions are saved in TrackerService. This ensures that a user studying
+     * at 11 PM Toronto time has their session counted on the correct Toronto
+     * calendar day — not bumped to the next UTC day.
+     */
+    private static final ZoneId TORONTO = ZoneId.of("America/Toronto");
 
     private final DailyGoalRepository    repo;
     private final StudySessionRepository sessionRepo;
@@ -37,9 +46,11 @@ public class DailyGoalService {
     /**
      * Returns the total study minutes for today, summed directly from StudySession
      * records — the same figure the Study Tracker's Today view shows.
+     *
+     * Uses Toronto date so "today" means the current calendar day in Toronto.
      */
     public int computeTodayActualMinutes(User user) {
-        return (int) sessionRepo.sumDurationByUserAndDate(user, LocalDate.now());
+        return (int) sessionRepo.sumDurationByUserAndDate(user, LocalDate.now(TORONTO));
     }
 
     // ── Goal minutes ─────────────────────────────────────────────────────────────
@@ -50,7 +61,7 @@ public class DailyGoalService {
      */
     @Transactional
     public DailyGoal setGoal(User user, int goalMinutes) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(TORONTO);
         DailyGoal goal = findOrCreate(user, today);
         goal.setGoalMinutes(goalMinutes);
         return repo.save(goal);
@@ -75,7 +86,7 @@ public class DailyGoalService {
     public DailyGoal addCompletedMinutes(User user, int minutes) {
         if (minutes <= 0) return null;
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(TORONTO);
         DailyGoal goal = findOrCreate(user, today);
 
         // Capture the previous count so the caller can detect the threshold crossing
@@ -170,7 +181,7 @@ public class DailyGoalService {
             if (ok) {
                 // Save in its own transaction — repo.save() has @Transactional via Spring Data proxy.
                 goal.setGoalReachedEmailSent(true);
-                goal.setGoalReachedEmailSentAt(LocalDateTime.now());
+                goal.setGoalReachedEmailSentAt(LocalDateTime.now(TORONTO));
                 repo.save(goal);
                 log.info("[EMAIL] Goal-reached email sent and recorded — goalId={} userId={}",
                         goal.getId(), goal.getUser().getId());
@@ -215,7 +226,7 @@ public class DailyGoalService {
             }
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(TORONTO);
         DailyGoal goal = findOrCreate(user, today);
 
         goal.setGoalMinutes(req.getGoalMinutes());
@@ -256,7 +267,7 @@ public class DailyGoalService {
     @Transactional
     public void markEmailAlertSent(DailyGoal goal) {
         goal.setEmailAlertSent(true);
-        goal.setEmailAlertSentAt(LocalDateTime.now());
+        goal.setEmailAlertSentAt(LocalDateTime.now(TORONTO));
         repo.save(goal);
         log.info("[EMAIL] Marked missed-goal email sent — goalId={} userId={} date={}",
                 goal.getId(), goal.getUser().getId(), goal.getGoalDate());
@@ -266,7 +277,7 @@ public class DailyGoalService {
 
     /** Returns today's DailyGoal for the user, or empty if none exists. */
     public Optional<DailyGoal> getTodayGoal(User user) {
-        return repo.findByUserAndGoalDate(user, LocalDate.now());
+        return repo.findByUserAndGoalDate(user, LocalDate.now(TORONTO));
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ package StudySyncer.entity;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Table(name = "study_sessions")
@@ -42,7 +43,7 @@ public class StudySession {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        createdAt = LocalDateTime.now(ZoneId.of("America/Toronto"));
     }
 
     // ── Getters ───────────────────────────────────────────

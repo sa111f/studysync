@@ -7,6 +7,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 /**
@@ -58,11 +59,14 @@ public class AccountabilityScheduler {
      * We then confirm completedMinutes < goalMinutes before sending (safety net).
      */
     @Scheduled(
-        cron = "${studysyncer.notification.cron:0 59 23 * * *}",
-        zone = "${studysyncer.notification.timezone:America/New_York}"
+        cron     = "${studysyncer.notification.cron:0 59 23 * * *}",
+        zone     = "${studysyncer.notification.timezone:America/Toronto}"
     )
     public void sendDailyAccountabilityNotifications() {
-        LocalDate today = LocalDate.now();
+        // Use Toronto date so the scheduler fires and queries for the correct
+        // local calendar day, not the UTC date (which would be the next day
+        // after 8 PM Toronto time during EDT).
+        LocalDate today = LocalDate.now(ZoneId.of("America/Toronto"));
         log.info("[SCHEDULER] Running missed-goal email check for date={}", today);
 
         // Fetch records that may need a missed-goal email

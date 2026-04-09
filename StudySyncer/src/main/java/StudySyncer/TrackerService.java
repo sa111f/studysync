@@ -16,6 +16,15 @@ import java.util.stream.Collectors;
 @Service
 public class TrackerService {
 
+    /**
+     * All date/time calculations use this zone so that "today", "this week",
+     * chart buckets, and streak logic all match the user's local clock in Toronto.
+     *
+     * LocalDateTime values stored in the DB are written in this zone (see saveSession),
+     * so reading them back with .getHour() / .toLocalDate() is always correct.
+     */
+    static final ZoneId TORONTO = ZoneId.of("America/Toronto");
+
     private final StudySessionRepository sessionRepo;
     private final DailyGoalService       dailyGoalService;
 
@@ -35,10 +44,13 @@ public class TrackerService {
         s.setDurationMinutes(durationMinutes);
         s.setTimerMode(timerMode);
         s.setCompleted(completed);
-        LocalDateTime now = LocalDateTime.now();
+
+        // Use Toronto wall-clock time so studyDate and the hour bucket in the
+        // "Today" chart are always correct for the Toronto user — never UTC-shifted.
+        LocalDateTime now = LocalDateTime.now(TORONTO);
         s.setCompletedAt(now);
         s.setStartedAt(now.minusMinutes(durationMinutes));
-        s.setStudyDate(now.toLocalDate());
+        s.setStudyDate(now.toLocalDate());   // Toronto date, not UTC date
         sessionRepo.save(s);
 
         // Step 1: sync today's goal progress inside its own @Transactional.
@@ -54,9 +66,9 @@ public class TrackerService {
 
     // ── Date range ────────────────────────────────────────
 
-    /** Returns [from, to] inclusive dates for the given range + offset. */
+    /** Returns [from, to] inclusive dates for the given range + offset, in Toronto time. */
     public LocalDate[] getDateRange(String range, int offset) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(TORONTO);   // Toronto "today", not UTC
         LocalDate from, to;
         switch (range) {
             case "today": {
@@ -138,7 +150,11 @@ public class TrackerService {
         return dto;
     }
 
-    /** Consecutive-day streak ending today (or yesterday if user hasn't studied today yet). */
+    /**
+     * Consecutive-day streak ending today (or yesterday if the user hasn't studied
+     * today yet). Uses Toronto date so a session at 11 PM Toronto time counts for
+     * the Toronto calendar day it actually belongs to.
+     */
     private int computeStreak(User user) {
         List<StudySession> all = sessionRepo.findByUserOrderByCompletedAtDesc(user);
         if (all.isEmpty()) return 0;
@@ -147,7 +163,7 @@ public class TrackerService {
                 .map(StudySession::getStudyDate)
                 .collect(Collectors.toSet());
 
-        LocalDate check = LocalDate.now();
+        LocalDate check = LocalDate.now(TORONTO);   // Toronto "today"
         if (!studyDays.contains(check)) {
             check = check.minusDays(1);
         }
@@ -168,7 +184,7 @@ public class TrackerService {
         List<StudySession> sessions = sessionRepo
                 .findByUserAndStudyDateBetweenOrderByCompletedAtDesc(user, r[0], r[1]);
 
-        // Aggregate minutes per calendar date
+        // Aggregate minutes per calendar date (studyDate is stored in Toronto time)
         Map<LocalDate, Integer> byDate = new HashMap<>();
         sessions.forEach(s -> byDate.merge(s.getStudyDate(), s.getDurationMinutes(), Integer::sum));
 
@@ -176,7 +192,9 @@ public class TrackerService {
         List<Integer> values = new ArrayList<>();
 
         if ("today".equals(range)) {
-            // Aggregate minutes by hour of day (0–23) using session completion time
+            // Aggregate minutes by hour of day (0–23).
+            // completedAt is stored in Toronto wall-clock time, so .getHour()
+            // gives the correct Toronto local hour — no conversion needed.
             int[] byHour = new int[24];
             for (StudySession s : sessions) {
                 byHour[s.getCompletedAt().getHour()] += s.getDurationMinutes();
