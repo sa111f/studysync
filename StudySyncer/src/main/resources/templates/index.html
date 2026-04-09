@@ -785,8 +785,14 @@ function handlePdfDrop(e) {
         fetchTodayGoal();
     };
 
+    // Expose globally so auth.js can call it after auth resolves
+    window.fetchTodayGoal = fetchTodayGoal;
+
     // ════════════════════════════════════════════════════
-    // Init
+    // Init — fallback: fire after 800 ms in case auth
+    // resolves before this listener runs (rare).
+    // The definitive call comes from auth.js after /api/auth/me
+    // completes, so there is no race condition.
     // ════════════════════════════════════════════════════
 
     document.addEventListener('DOMContentLoaded', function () {

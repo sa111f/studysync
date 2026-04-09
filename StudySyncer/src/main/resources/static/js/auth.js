@@ -19,6 +19,10 @@ async function initAuth() {
             showLoggedIn(data.username);
             await loadSavedPlan();
             await loadSavedTimer();
+            // Refresh today's goal now that we know the user — fixes the race where
+            // fetchTodayGoal() fired before /api/auth/me resolved (window.currentUser
+            // was still null) and rendered the guest state permanently.
+            if (typeof window.fetchTodayGoal === 'function') window.fetchTodayGoal();
         } else {
             showLoggedOut();
         }
@@ -273,6 +277,7 @@ async function doLogin() {
             closeModal();
             await loadSavedPlan();
             await loadSavedTimer();
+            if (typeof window.fetchTodayGoal === 'function') window.fetchTodayGoal();
             return;
         }
 
