@@ -326,6 +326,7 @@
                                onkeydown="if(event.key==='Enter')setAccountabilityEmail()" />
                         <button class="set-email-btn" onclick="setAccountabilityEmail()">Set Email</button>
                         <p id="set-email-status" class="set-email-status accountability-hint"></p>
+                        <p id="acct-email-destination" class="accountability-hint acct-email-destination"></p>
                         <p class="accountability-hint">
                             Leave blank and click Set Email to remove the saved address.
                         </p>
@@ -582,6 +583,7 @@ function handlePdfDrop(e) {
         const emailEl   = el('accountability-email-input');
         const statusRow = el('accountability-status-row');
         const badge     = el('accountability-status-badge');
+        const destEl    = el('acct-email-destination');
 
         if (!data) return;
 
@@ -593,6 +595,17 @@ function handlePdfDrop(e) {
         if (toggle)  toggle.checked = enabled;
         if (emailEl) emailEl.value  = emailValue;
         if (fields)  fields.style.display = enabled ? '' : 'none';
+
+        // Persistent destination line — always shows the saved email from the server
+        if (destEl) {
+            if (emailValue) {
+                destEl.textContent  = 'Goal notifications will be sent to: ' + emailValue;
+                destEl.style.color  = 'var(--success, #2ecc71)';
+            } else {
+                destEl.textContent  = 'No accountability email set.';
+                destEl.style.color  = '';
+            }
+        }
 
         // Status badge — shows the most relevant state for today
         if (statusRow && badge) {
@@ -755,12 +768,26 @@ function handlePdfDrop(e) {
             const data = await res.json().catch(() => ({}));
 
             if (res.ok) {
+                const savedEmail = data.accountabilityEmail || '';
                 if (statusEl) {
                     statusEl.textContent  = data.message || (email ? 'Accountability email saved.' : 'Accountability email removed.');
                     statusEl.style.color  = 'var(--success, #2ecc71)';
                     statusEl.style.display = '';
                     setTimeout(() => { statusEl.style.display = 'none'; }, 3500);
                 }
+                // Update the persistent destination line immediately without waiting for a refresh
+                const destEl = el('acct-email-destination');
+                if (destEl) {
+                    if (savedEmail) {
+                        destEl.textContent = 'Goal notifications will be sent to: ' + savedEmail;
+                        destEl.style.color = 'var(--success, #2ecc71)';
+                    } else {
+                        destEl.textContent = 'No accountability email set.';
+                        destEl.style.color = '';
+                    }
+                }
+                // Re-fetch goal data so the input is in sync with the server state
+                if (window.fetchTodayGoal) window.fetchTodayGoal();
             } else {
                 if (statusEl) {
                     statusEl.textContent  = data.error || 'Failed to save. Please try again.';

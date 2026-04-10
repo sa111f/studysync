@@ -110,9 +110,9 @@ public class AccountabilityScheduler {
      *   - Otherwise → send missed-goal email.
      *
      * Email recipient priority:
-     *   1. accountabilityEmail stored on the goal
-     *   2. user's registered email address
-     *   3. ALERT_TO_EMAIL fallback (handled inside EmailService)
+     *   1. accountabilityEmail stored on the goal (per-day snapshot)
+     *   2. user's persistent accountability email (set via "Set Email" button)
+     *   If neither is set, the email is skipped — never falls back to login email.
      *
      * @return true if a missed-goal email was dispatched, false if skipped
      */
@@ -148,14 +148,27 @@ public class AccountabilityScheduler {
         // Resolve recipient:
         //   1. Per-day accountability email on the goal
         //   2. User's persistent accountability email (set via "Set Email" button)
-        //   3. User's registered email address
-        //   EmailService handles the final fallback to ALERT_TO_EMAIL.
-        String recipientEmail = goal.getAccountabilityEmail();
+        //   Never fall back to the user's login email — accountability emails must only
+        //   go to an explicitly set accountability address.
+        String loginEmail          = goal.getUser().getEmail();
+        String persistentAcctEmail = goal.getUser().getAccountabilityEmail();
+        String recipientEmail      = goal.getAccountabilityEmail();
         if (recipientEmail == null || recipientEmail.isBlank()) {
-            recipientEmail = goal.getUser().getAccountabilityEmail();
+            recipientEmail = persistentAcctEmail;
         }
+
+        log.info("[SCHEDULER] Missed-goal recipient resolution — goalId={} userId={} " +
+                        "loginEmail={} accountabilityEmail={} finalRecipient={}",
+                goal.getId(), goal.getUser().getId(),
+                loginEmail != null ? loginEmail : "(none)",
+                persistentAcctEmail != null ? persistentAcctEmail : "(not set)",
+                recipientEmail != null ? recipientEmail : "(none — will skip)");
+
         if (recipientEmail == null || recipientEmail.isBlank()) {
-            recipientEmail = goal.getUser().getEmail();
+            log.warn("[SCHEDULER] Missed-goal email skipped — no accountability email set " +
+                            "for goalId={} userId={}",
+                    goal.getId(), goal.getUser().getId());
+            return false;
         }
 
         log.info("[SCHEDULER] Sending missed-goal email — goalId={} userId={} done={}min goal={}min",

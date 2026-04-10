@@ -123,6 +123,7 @@ public class DailyGoalService {
      *   - completedMinutes >= goalMinutes (threshold is crossed)
      *   - notificationEnabled = true (user opted in)
      *   - goalReachedEmailSent = false (idempotency — send at most once per day)
+     *   - an accountability email is set (goal-level or user-level) — never falls back to login email
      *
      * After a successful send, marks goalReachedEmailSent=true in its own small
      * transaction (via repo.save, which has its own @Transactional).
@@ -160,19 +161,28 @@ public class DailyGoalService {
         // Resolve recipient:
         //   1. Per-day accountability email on the goal (snapshot saved when goal was set)
         //   2. User's persistent accountability email (set via "Set Email" button)
-        //   3. User's registered email address
-        //   EmailService handles the final fallback to ALERT_TO_EMAIL.
-        String recipient = goal.getAccountabilityEmail();
+        //   Never fall back to the user's login email — accountability emails must only
+        //   go to an explicitly set accountability address.
+        String loginEmail          = goal.getUser().getEmail();
+        String persistentAcctEmail = goal.getUser().getAccountabilityEmail();
+        String recipient           = goal.getAccountabilityEmail();
         if (recipient == null || recipient.isBlank()) {
-            recipient = goal.getUser().getAccountabilityEmail();
-        }
-        if (recipient == null || recipient.isBlank()) {
-            recipient = goal.getUser().getEmail();
+            recipient = persistentAcctEmail;
         }
 
-        log.info("[EMAIL] Goal-reached trigger — goalId={} userId={} done={}min goal={}min recipient={}",
-                goal.getId(), goal.getUser().getId(), doneMin, goalMin,
-                recipient != null ? recipient : "(fallback to ALERT_TO_EMAIL)");
+        log.info("[EMAIL] Goal-reached recipient resolution — goalId={} userId={} " +
+                        "loginEmail={} accountabilityEmail={} finalRecipient={}",
+                goal.getId(), goal.getUser().getId(),
+                loginEmail != null ? loginEmail : "(none)",
+                persistentAcctEmail != null ? persistentAcctEmail : "(not set)",
+                recipient != null ? recipient : "(none — will skip)");
+
+        if (recipient == null || recipient.isBlank()) {
+            log.warn("[EMAIL] Goal-reached email skipped — no accountability email set " +
+                            "for goalId={} userId={}",
+                    goal.getId(), goal.getUser().getId());
+            return;
+        }
 
         try {
             boolean ok = emailService.sendGoalReachedEmail(
@@ -213,13 +223,14 @@ public class DailyGoalService {
         }
 
         if (req.isNotificationEnabled()) {
-            String enteredEmail   = req.getAccountabilityEmail();
-            boolean hasEntered    = enteredEmail != null && !enteredEmail.isBlank();
-            boolean hasRegistered = user.getEmail() != null && !user.getEmail().isBlank();
+            String enteredEmail      = req.getAccountabilityEmail();
+            boolean hasEntered       = enteredEmail != null && !enteredEmail.isBlank();
+            boolean hasPersistentEmail = user.getAccountabilityEmail() != null
+                                      && !user.getAccountabilityEmail().isBlank();
 
-            if (!hasEntered && !hasRegistered) {
+            if (!hasEntered && !hasPersistentEmail) {
                 throw new IllegalArgumentException(
-                        "Please enter an email address, or register with an email to use accountability emails.");
+                        "Please enter an accountability email address, or use the \"Set Email\" button to save one first.");
             }
             if (hasEntered && !enteredEmail.contains("@")) {
                 throw new IllegalArgumentException("Please enter a valid email address.");
