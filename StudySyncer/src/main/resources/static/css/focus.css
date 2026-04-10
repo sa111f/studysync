@@ -401,3 +401,127 @@ body {
     position: relative;
     z-index: 1;
 }
+
+/* ══════════════════════════════════════════════════════════
+   FULLSCREEN CUP MODE
+   Activated when user clicks the Arabic finjaan.
+   focus.js toggles .is-fullscreen on <html> via the
+   fullscreenchange event — more reliable than :fullscreen.
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Hide all controls — only the cup remains ─────────────── */
+html.is-fullscreen .focus-topbar,
+html.is-fullscreen .focus-phase-tabs,
+html.is-fullscreen .focus-bar-track,
+html.is-fullscreen .focus-session-label,
+html.is-fullscreen .focus-controls,
+html.is-fullscreen .focus-keyboard-hint {
+    display: none !important;
+}
+
+/* ── Deep immersive background ────────────────────────────── */
+html.is-fullscreen body {
+    background: #06031a !important;
+    background-image: none !important;
+    justify-content: center;
+}
+
+/* ── Center the main area ─────────────────────────────────── */
+html.is-fullscreen .focus-main {
+    justify-content: center;
+    padding: 0 !important;
+    gap: 0;
+}
+
+/* ── Remove scene margin ──────────────────────────────────── */
+html.is-fullscreen .finjan-scene {
+    margin-bottom: 0;
+    flex: 0 0 auto;
+}
+
+/* ── Finjaan: much larger, dominant ───────────────────────── */
+html.is-fullscreen #finjan-svg {
+    height: 80vh !important;
+    max-width: 90vw !important;
+    width: auto !important;
+    filter: drop-shadow(0 0 56px rgba(124,92,252,0.45)) !important;
+    transition: filter 0.4s ease;
+}
+
+/* Keep running glow in fullscreen */
+html.is-fullscreen body.is-running #finjan-svg {
+    filter: drop-shadow(0 0 56px rgba(124,92,252,0.55)) !important;
+}
+
+/* ── Timer text: subtle secondary element ─────────────────── */
+html.is-fullscreen .finjan-time-display {
+    font-size: 1.7rem !important;
+    opacity: 0.32 !important;
+    margin-top: 10px !important;
+    margin-bottom: 0 !important;
+    text-shadow: none !important;
+}
+
+/* ── Hint text at bottom ──────────────────────────────────── */
+html.is-fullscreen body::after {
+    content: 'Click cup · Space to pause/resume · Esc to exit';
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.68rem;
+    color: rgba(139, 143, 168, 0.22);
+    letter-spacing: 0.05em;
+    pointer-events: none;
+    white-space: nowrap;
+    font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* ── Fallback: native :fullscreen for browsers that support it */
+html:fullscreen .focus-topbar,
+html:-webkit-full-screen .focus-topbar,
+html:fullscreen .focus-phase-tabs,
+html:-webkit-full-screen .focus-phase-tabs,
+html:fullscreen .focus-bar-track,
+html:-webkit-full-screen .focus-bar-track,
+html:fullscreen .focus-session-label,
+html:-webkit-full-screen .focus-session-label,
+html:fullscreen .focus-controls,
+html:-webkit-full-screen .focus-controls,
+html:fullscreen .focus-keyboard-hint,
+html:-webkit-full-screen .focus-keyboard-hint {
+    display: none !important;
+}
+
+html:fullscreen body,
+html:-webkit-full-screen body {
+    background: #06031a !important;
+    background-image: none !important;
+}
+
+html:fullscreen .focus-main,
+html:-webkit-full-screen .focus-main {
+    justify-content: center;
+    padding: 0 !important;
+}
+
+html:fullscreen .finjan-scene,
+html:-webkit-full-screen .finjan-scene {
+    margin-bottom: 0;
+}
+
+html:fullscreen #finjan-svg,
+html:-webkit-full-screen #finjan-svg {
+    height: 80vh !important;
+    max-width: 90vw !important;
+    width: auto !important;
+}
+
+html:fullscreen .finjan-time-display,
+html:-webkit-full-screen .finjan-time-display {
+    font-size: 1.7rem !important;
+    opacity: 0.32 !important;
+    margin-top: 10px !important;
+    margin-bottom: 0 !important;
+    text-shadow: none !important;
+}

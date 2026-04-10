@@ -17,7 +17,9 @@
       "Bash(mvn compile:*)",
       "Bash(cmd //c \"mvnw.cmd compile\")",
       "Bash(bash mvnw:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(grep -E \"\\\\.\\(java|js|html\\)$\")",
+      "Bash(xargs grep:*)"
     ]
   }
 }

@@ -136,7 +136,9 @@ function _onCoreEvent(event, state) {
     let visState;
     if      (event === 'done')  visState = 'done';
     else if (event === 'pause') visState = 'paused';
-    else                        visState = state.isRunning ? 'running' : '';
+    else if (state.isRunning)   visState = 'running';
+    else if (state.isPaused)    visState = 'paused';
+    else                        visState = '';
 
     // --- Update dashboard DOM for all events except logging-only ---
     if (event !== 'sessionEnd' && event !== 'skip') {
@@ -333,7 +335,8 @@ document.addEventListener('keydown', e => {
 // ── Initial render ────────────────────────────────────────────
 (function () {
     const state = TimerCore.getState();
-    _refreshDisplay(state, state.isRunning ? 'running' : '');
+    const _initVis = state.isRunning ? 'running' : (state.isPaused ? 'paused' : '');
+    _refreshDisplay(state, _initVis);
     _updateTabs(state);
     _updatePomodoroInfo(state);
 

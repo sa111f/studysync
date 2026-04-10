@@ -32,6 +32,7 @@
         totalSeconds:   25 * 60,
         remaining:      25 * 60,
         isRunning:      false,
+        isPaused:       false,       // true when paused mid-session; false when fresh/reset
         runSince:       null,        // Date.now() snapshot when last started
     };
 
@@ -62,7 +63,15 @@
                     clearInterval(_ivl);
                     _ivl = null;
                 }
-                _fire('state');
+                // Fire the semantically correct event so UI subscribers
+                // render the right visual state (pause blink, running glow, etc.)
+                if (_s.isPaused && !_s.isRunning) {
+                    _fire('pause');
+                } else if (_s.isRunning) {
+                    _fire('start');
+                } else {
+                    _fire('phase');
+                }
             }
             _mute = false;
         };
@@ -139,8 +148,9 @@
             if (_s.sessionCount > 4) _s.sessionCount = 1;
             _api.setPhase('pomodoro');
         } else {
-            // countdown — reset to full, stay paused
+            // countdown — reset to full, stay stopped (not paused)
             _s.remaining = _s.totalSeconds;
+            _s.isPaused  = false;
             _save();
             _fire('phase');
         }
@@ -174,6 +184,7 @@
             _s.phase        = phase;
             _s.totalSeconds = _durationFor(phase);
             _s.remaining    = _s.totalSeconds;
+            _s.isPaused     = false;
             _s.runSince     = null;
             _save();
             _broadcast('STATE');
@@ -191,6 +202,7 @@
                 _s.totalSeconds = _durationFor(_s.phase);
                 _s.remaining    = _s.totalSeconds;
             }
+            _s.isPaused = false;
             _save();
             _broadcast('STATE');
             _fire('phase');
@@ -205,6 +217,7 @@
             _s.phase        = 'countdown';
             _s.totalSeconds = mins * 60;
             _s.remaining    = _s.totalSeconds;
+            _s.isPaused     = false;
             _s.runSince     = null;
             _save();
             _broadcast('STATE');
@@ -216,6 +229,7 @@
             if (_ivl) { clearInterval(_ivl); _ivl = null; }
 
             _s.isRunning = true;
+            _s.isPaused  = false;
             _s.runSince  = Date.now();
             _save();
             _broadcast('STATE');
@@ -245,6 +259,7 @@
             clearInterval(_ivl);
             _ivl = null;
             _s.isRunning = false;
+            _s.isPaused  = true;
             _s.runSince  = null;
             _save();
             _broadcast('STATE');
@@ -291,6 +306,7 @@
                 _s.totalSeconds = serverState.totalSeconds;
                 _s.remaining    = _s.totalSeconds;
             }
+            _s.isPaused = false;
             _save();
             _fire('phase');
         },

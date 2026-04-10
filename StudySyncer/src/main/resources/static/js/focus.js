@@ -291,7 +291,9 @@ function _onCoreEvent(event, state) {
     let visState;
     if      (event === 'done')  visState = 'done';
     else if (event === 'pause') visState = 'paused';
-    else                        visState = state.isRunning ? 'running' : '';
+    else if (state.isRunning)   visState = 'running';
+    else if (state.isPaused)    visState = 'paused';
+    else                        visState = '';
 
     if (event !== 'sessionEnd' && event !== 'skip') {
         _updateFinjan(state, visState);
@@ -394,7 +396,8 @@ document.addEventListener('keydown', e => {
     _initPixels();
 
     const state = TimerCore.getState();
-    _updateFinjan(state, state.isRunning ? 'running' : '');
+    const _initVis = state.isRunning ? 'running' : (state.isPaused ? 'paused' : '');
+    _updateFinjan(state, _initVis);
     _updateTabs(state);
     _updateSessionLabel(state);
     if (_toggleBtn) _toggleBtn.textContent = state.isRunning ? 'Pause' : 'Start';
@@ -407,6 +410,15 @@ document.addEventListener('keydown', e => {
             if (e.key === 'Enter') _toggleFullscreen();
         });
     }
+
+    // Toggle CSS class on <html> when fullscreen changes — used by focus.css
+    // to hide controls and enlarge the cup without relying solely on :fullscreen
+    function _onFsChange() {
+        const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        document.documentElement.classList.toggle('is-fullscreen', isFs);
+    }
+    document.addEventListener('fullscreenchange',       _onFsChange);
+    document.addEventListener('webkitfullscreenchange', _onFsChange);
 })();
 
 _initAuth();
