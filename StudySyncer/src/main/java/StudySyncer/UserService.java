@@ -174,6 +174,27 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    // ── Timezone ──────────────────────────────────────────
+
+    /**
+     * Updates the stored IANA timezone for a user if it differs from the current value.
+     * Called automatically on dashboard load and goal/session saves when the browser
+     * sends its detected timezone. No-ops if the value hasn't changed to avoid
+     * unnecessary DB writes.
+     *
+     * @param user     the user entity (already loaded by the caller)
+     * @param timezone IANA timezone string from the browser, e.g. "America/Toronto"
+     */
+    @Transactional
+    public void updateTimezoneIfChanged(User user, String timezone) {
+        if (timezone == null || timezone.isBlank()) return;
+        String trimmed = timezone.strip();
+        if (trimmed.equals(user.getTimezone())) return; // already stored — skip DB write
+        user.setTimezone(trimmed);
+        userRepository.save(user);
+        log.debug("[TZ] Updated timezone for userId={} to '{}'", user.getId(), trimmed);
+    }
+
     // ── Lookup ────────────────────────────────────────────
 
     public Optional<User> findById(Long id) {

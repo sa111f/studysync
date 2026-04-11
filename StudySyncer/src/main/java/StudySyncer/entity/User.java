@@ -55,6 +55,15 @@ public class User {
     @Column(name = "accountability_email", length = 255)
     private String accountabilityEmail;
 
+    /**
+     * IANA timezone string detected from the user's browser (e.g. "America/Toronto").
+     * Updated automatically on dashboard load, goal save, and session save.
+     * Used by DailyGoalRolloverService to determine when midnight has passed for this user.
+     * Defaults to "America/Toronto" when null.
+     */
+    @Column(name = "timezone", length = 50)
+    private String timezone;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -82,6 +91,7 @@ public class User {
     public String        getOauthProvider()         { return oauthProvider; }
     public boolean       isEmailVerified()          { return emailVerified; }
     public String        getAccountabilityEmail()   { return accountabilityEmail; }
+    public String        getTimezone()              { return timezone; }
     public LocalDateTime getCreatedAt()             { return createdAt; }
     public LocalDateTime getUpdatedAt()             { return updatedAt; }
 
@@ -93,4 +103,5 @@ public class User {
     public void setOauthProvider(String oauthProvider)          { this.oauthProvider = oauthProvider; }
     public void setEmailVerified(boolean verified)              { this.emailVerified = verified; }
     public void setAccountabilityEmail(String email)            { this.accountabilityEmail = email; }
+    public void setTimezone(String timezone)                    { this.timezone = timezone; }
 }

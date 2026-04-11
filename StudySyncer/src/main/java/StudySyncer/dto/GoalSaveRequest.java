@@ -21,15 +21,25 @@ public class GoalSaveRequest {
      */
     private String accountabilityEmail;
 
+    /**
+     * IANA timezone string detected by the browser (e.g. "America/Toronto").
+     * Sent by the frontend alongside goal saves so the backend can update the
+     * user's stored timezone and use it for rollover calculations.
+     * Optional — if absent, the backend uses the user's stored timezone.
+     */
+    private String timezone;
+
     // ── Getters ───────────────────────────────────────────
 
     public int     getGoalMinutes()          { return goalMinutes; }
     public boolean isNotificationEnabled()   { return notificationEnabled; }
     public String  getAccountabilityEmail()  { return accountabilityEmail; }
+    public String  getTimezone()             { return timezone; }
 
     // ── Setters ───────────────────────────────────────────
 
     public void setGoalMinutes(int m)                { this.goalMinutes = m; }
     public void setNotificationEnabled(boolean e)    { this.notificationEnabled = e; }
     public void setAccountabilityEmail(String email) { this.accountabilityEmail = email; }
+    public void setTimezone(String timezone)          { this.timezone = timezone; }
 }

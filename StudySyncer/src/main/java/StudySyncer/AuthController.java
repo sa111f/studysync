@@ -26,10 +26,12 @@ public class AuthController {
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
     private static final String SESSION_USER_ID = "userId";
 
-    private final UserService userService;
+    private final UserService             userService;
+    private final DailyGoalRolloverService rolloverService;
 
-    public AuthController(UserService userService) {
-        this.userService = userService;
+    public AuthController(UserService userService, DailyGoalRolloverService rolloverService) {
+        this.userService    = userService;
+        this.rolloverService = rolloverService;
     }
 
     // ── Register ──────────────────────────────────────────
@@ -156,8 +158,11 @@ public class AuthController {
 
     /**
      * Saves a persistent accountability email on the user's account.
-     * Body: { "email": "someone@example.com" }
-     * Send an empty string or omit to remove the saved email.
+     * Body: { "email": "someone@example.com", "timezone": "America/Toronto" }
+     * Send an empty string or omit email to remove the saved address.
+     *
+     * Also triggers a rollover check so that any missed-goal emails for past days
+     * are sent when the user updates their accountability settings.
      */
     @PostMapping("/accountability-email")
     public ResponseEntity<?> setAccountabilityEmail(
@@ -187,6 +192,20 @@ public class AuthController {
             userService.updateAccountabilityEmail(userId, email);
             String msg = (email == null) ? "Accountability email removed." : "Accountability email saved.";
             log.info("[ACCT-EMAIL] userId={} email={}", userId, email != null ? email : "(removed)");
+
+            // Update stored timezone if the frontend sent one
+            String tz = body.get("timezone");
+            if (tz != null && !tz.isBlank()) {
+                userService.findById(userId).ifPresent(u -> userService.updateTimezoneIfChanged(u, tz));
+            }
+
+            // Rollover check: now that an accountability email is set, evaluate any past
+            // missed goals that previously had no recipient and could not be sent.
+            userService.findById(userId).ifPresent(u -> {
+                java.time.ZoneId zone = rolloverService.resolveUserZone(u);
+                rolloverService.processRolloverForUser(u, zone);
+            });
+
             Map<String, Object> resp = new HashMap<>();
             resp.put("message",             msg);
             resp.put("accountabilityEmail", email != null ? email : "");

@@ -310,7 +310,7 @@
                            onchange="onEmailToggle()" />
                     <span class="accountability-toggle-text">Enable accountability email</span>
                 </label>
-                <p class="accountability-hint">When you reach your goal, StudySyncer emails you instantly. If you miss it by end of day, you'll get a reminder.</p>
+                <p class="accountability-hint">When you reach your goal, StudySyncer emails you instantly. If you miss it by 11:59 PM in your local time, you'll get a reminder.</p>
             </div>
 
             <div class="accountability-fields" id="accountability-fields" style="display:none">
@@ -327,6 +327,9 @@
                         <button class="set-email-btn" onclick="setAccountabilityEmail()">Set Email</button>
                         <p id="set-email-status" class="set-email-status accountability-hint"></p>
                         <p id="acct-email-destination" class="accountability-hint acct-email-destination"></p>
+                        <p id="acct-email-schedule-hint" class="accountability-hint" style="display:none">
+                            <!-- Populated by JS: "If today's goal is not reached by 11:59 PM [timezone], an email will be sent to [email]." -->
+                        </p>
                         <p class="accountability-hint">
                             Leave blank and click Set Email to remove the saved address.
                         </p>
@@ -338,6 +341,9 @@
             <div class="accountability-status-row" id="accountability-status-row" style="display:none">
                 <span class="accountability-status-badge" id="accountability-status-badge"></span>
             </div>
+
+            <!-- Timezone debug line — always visible when accountability section is shown -->
+            <p class="accountability-hint" id="acct-timezone-display" style="font-size:11px;opacity:0.55;margin-top:6px;display:none"></p>
         </div><!-- /accountability-section -->
 
         <p class="goal-save-status" id="goal-save-status" style="display:none"></p>
@@ -510,6 +516,23 @@ function handlePdfDrop(e) {
     let lastGoalData = null;
 
     // ════════════════════════════════════════════════════
+    // Timezone detection (browser IANA string)
+    // ════════════════════════════════════════════════════
+
+    // Detected once at page load. Used for:
+    //   - Appending ?tz=... to GET /api/daily-goal/today
+    //   - Including in POST /api/daily-goal body
+    //   - Including in POST /api/auth/accountability-email body
+    // This is the canonical IANA timezone string, e.g. "America/Toronto".
+    const USER_TIMEZONE = (function () {
+        try {
+            return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Toronto';
+        } catch (_) {
+            return 'America/Toronto';
+        }
+    })();
+
+    // ════════════════════════════════════════════════════
     // Render: goal progress
     // ════════════════════════════════════════════════════
 
@@ -578,12 +601,14 @@ function handlePdfDrop(e) {
     // ════════════════════════════════════════════════════
 
     function renderAccountability(data) {
-        const toggle    = el('email-enabled-toggle');
-        const fields    = el('accountability-fields');
-        const emailEl   = el('accountability-email-input');
-        const statusRow = el('accountability-status-row');
-        const badge     = el('accountability-status-badge');
-        const destEl    = el('acct-email-destination');
+        const toggle       = el('email-enabled-toggle');
+        const fields       = el('accountability-fields');
+        const emailEl      = el('accountability-email-input');
+        const statusRow    = el('accountability-status-row');
+        const badge        = el('accountability-status-badge');
+        const destEl       = el('acct-email-destination');
+        const scheduleHint = el('acct-email-schedule-hint');
+        const tzDisplay    = el('acct-timezone-display');
 
         if (!data) return;
 
@@ -591,6 +616,8 @@ function handlePdfDrop(e) {
         const emailValue       = data.accountabilityEmail || '';
         const goalReachedSent  = !!data.goalReachedEmailSent;   // success email
         const missedAlertSent  = !!data.emailAlertSent;         // missed-goal email
+        // Timezone: use what the server echoes back, or our locally detected value
+        const timezone         = data.timezone || USER_TIMEZONE;
 
         if (toggle)  toggle.checked = enabled;
         if (emailEl) emailEl.value  = emailValue;
@@ -605,6 +632,22 @@ function handlePdfDrop(e) {
                 destEl.textContent  = 'No accountability email set.';
                 destEl.style.color  = '';
             }
+        }
+
+        // Schedule hint: "If today's goal is not reached by 11:59 PM [timezone], an email will be sent to [email]."
+        if (scheduleHint) {
+            if (enabled && emailValue) {
+                scheduleHint.textContent = 'If today\u2019s goal is not reached by 11:59\u202FPM (' + timezone + '), an email will be sent to ' + emailValue + '.';
+                scheduleHint.style.display = '';
+            } else {
+                scheduleHint.style.display = 'none';
+            }
+        }
+
+        // Timezone debug line
+        if (tzDisplay) {
+            tzDisplay.textContent  = 'Timezone: ' + timezone;
+            tzDisplay.style.display = enabled ? '' : 'none';
         }
 
         // Status badge — shows the most relevant state for today
@@ -660,7 +703,11 @@ function handlePdfDrop(e) {
     async function fetchTodayGoal() {
         if (!window.currentUser) { renderGoal(null); return; }
         try {
-            const res = await fetch('/api/daily-goal/today');
+            // Send browser timezone so the backend can:
+            //   1. Store it on the user record
+            //   2. Run a rollover check using the correct local day boundary
+            const tzParam = encodeURIComponent(USER_TIMEZONE);
+            const res = await fetch('/api/daily-goal/today?tz=' + tzParam);
             if (res.ok) renderGoal(await res.json());
         } catch (_) { renderGoal(null); }
     }
@@ -704,6 +751,7 @@ function handlePdfDrop(e) {
                     goalMinutes:         val,
                     notificationEnabled: emailEnabled,
                     accountabilityEmail: emailAddr,
+                    timezone:            USER_TIMEZONE,
                 }),
             });
             const data = await res.json().catch(() => ({}));
@@ -763,7 +811,7 @@ function handlePdfDrop(e) {
             const res  = await fetch('/api/auth/accountability-email', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ email }),
+                body:    JSON.stringify({ email, timezone: USER_TIMEZONE }),
             });
             const data = await res.json().catch(() => ({}));
 

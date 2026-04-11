@@ -11,68 +11,87 @@ import java.time.ZoneId;
 import java.util.List;
 
 /**
- * End-of-day scheduler that sends missed-goal accountability emails.
+ * Scheduled accountability email dispatcher.
  *
- * Runs once per day at the configured time (default: 23:59 in the configured timezone).
+ * TWO scheduled jobs run here:
  *
- * A record is processed only if ALL of the following are true:
- *   - the user enabled email accountability (notificationEnabled = true)
- *   - the missed-goal email has not been sent yet (emailAlertSent = false)
- *   - the goal-reached email has not been sent (goalReachedEmailSent = false)
- *     → goal was NOT reached during the day, so a missed-goal email may be appropriate
- *   - a real goal was set (goalMinutes > 0)
+ * 1. rollingRolloverCheck (every 15 minutes)
+ *    Calls DailyGoalRolloverService.processRolloverForAllUsers(), which:
+ *      - Finds all past DailyGoal records that still need missed-goal evaluation
+ *      - Respects each user's stored IANA timezone to determine when midnight passed
+ *      - Sends at most one missed-goal email per user per day (emailAlertSent flag)
+ *    This is the PRIMARY check and handles:
+ *      - Users who were offline at midnight
+ *      - Users who refresh the page after midnight
+ *      - Server restarts at midnight
+ *      - Users in different timezones from the server
  *
- * The scheduler also performs a safety check on completedMinutes vs goalMinutes
- * before sending, in case a record slips through with the goal actually met.
+ * 2. sendDailyAccountabilityNotifications (daily at 23:59 in America/Toronto)
+ *    Legacy end-of-day check. Fires near the end of the Toronto day and processes
+ *    any records where goalDate = today (before the rollover service would catch them
+ *    after midnight). Kept as a belt-and-suspenders safety net.
  *
- * Override the schedule via environment variables:
- *   NOTIFICATION_CRON      — Spring cron expression (6-part: s m h d M W)
- *   NOTIFICATION_TIMEZONE  — Java timezone ID (e.g. "America/New_York", "UTC")
+ * Both jobs are fully idempotent: the emailAlertSent and goalReachedEmailSent
+ * flags prevent duplicate sends regardless of how many times either job runs.
  *
- * Every run is idempotent: emailAlertSent and goalReachedEmailSent flags prevent
- * duplicate sends even if the scheduler fires more than once for a given day.
+ * Override the daily schedule via environment variables:
+ *   NOTIFICATION_CRON     — Spring cron expression (6-part: s m h d M W)
+ *   NOTIFICATION_TIMEZONE — Java timezone ID (e.g. "America/Toronto")
  */
 @Component
 public class AccountabilityScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(AccountabilityScheduler.class);
 
-    private final DailyGoalService dailyGoalService;
-    private final EmailService     emailService;
+    private final DailyGoalService        dailyGoalService;
+    private final DailyGoalRolloverService rolloverService;
+    private final EmailService            emailService;
 
-    // Constructor injection — preferred over @Autowired field injection
     public AccountabilityScheduler(DailyGoalService dailyGoalService,
+                                   DailyGoalRolloverService rolloverService,
                                    EmailService emailService) {
         this.dailyGoalService = dailyGoalService;
+        this.rolloverService  = rolloverService;
         this.emailService     = emailService;
     }
 
+    // ── Job 1: Every 15 minutes — timezone-aware rollover for all users ─────────
+
     /**
-     * Runs once a day at the time defined by studysyncer.notification.cron
-     * in the zone defined by studysyncer.notification.timezone.
+     * Runs every 15 minutes and checks all users for missed goals after midnight
+     * in their respective local timezones.
      *
-     * At this point, any record still in the pending list means:
-     *   - the user opted in to email accountability
-     *   - the goal-reached email was NOT sent (goal was never crossed during the day)
-     *   - the missed-goal email has not been sent yet
+     * This is the main mechanism for ensuring missed-goal emails are sent even
+     * when the user was offline at midnight, or the server was in a different timezone.
+     */
+    @Scheduled(cron = "0 */15 * * * *")
+    public void rollingRolloverCheck() {
+        log.info("[SCHEDULER] 15-min rollover check — processing all users");
+        rolloverService.processRolloverForAllUsers();
+    }
+
+    // ── Job 2: Daily at 23:59 (legacy belt-and-suspenders) ──────────────────────
+
+    /**
+     * Runs once a day at 23:59 in the configured timezone.
+     * Catches any records for TODAY that the rollover service hasn't processed yet
+     * (e.g. users who miss their goal right at the end of the day).
      *
-     * We then confirm completedMinutes < goalMinutes before sending (safety net).
+     * This job uses the original per-date query logic and marks records so that
+     * the rollover service won't double-send when it next runs.
+     *
+     * Override schedule via NOTIFICATION_CRON and NOTIFICATION_TIMEZONE env vars.
      */
     @Scheduled(
-        cron     = "${studysyncer.notification.cron:0 59 23 * * *}",
-        zone     = "${studysyncer.notification.timezone:America/Toronto}"
+        cron = "${studysyncer.notification.cron:0 59 23 * * *}",
+        zone = "${studysyncer.notification.timezone:America/Toronto}"
     )
     public void sendDailyAccountabilityNotifications() {
-        // Use Toronto date so the scheduler fires and queries for the correct
-        // local calendar day, not the UTC date (which would be the next day
-        // after 8 PM Toronto time during EDT).
         LocalDate today = LocalDate.now(ZoneId.of("America/Toronto"));
-        log.info("[SCHEDULER] Running missed-goal email check for date={}", today);
+        log.info("[SCHEDULER] Daily 23:59 check for date={}", today);
 
-        // Fetch records that may need a missed-goal email
-        // (accountability enabled, no goal-reached email sent, no missed-goal email sent yet)
         List<DailyGoal> pending = dailyGoalService.findPendingEmailAlerts(today);
-        log.info("[SCHEDULER] Missed-goal batch: {} pending for {}", pending.size(), today);
+        log.info("[SCHEDULER] Daily 23:59 batch: {} pending for {}", pending.size(), today);
 
         int sent = 0, skipped = 0, failed = 0;
         for (DailyGoal goal : pending) {
@@ -80,93 +99,64 @@ public class AccountabilityScheduler {
                 boolean emailSent = processEmailGoal(goal);
                 if (emailSent) sent++; else skipped++;
             } catch (Exception e) {
-                // Never let one failure stop the rest of the batch
                 log.error("[SCHEDULER] Unexpected error for goalId={}: {}",
                         goal.getId(), e.getMessage(), e);
                 failed++;
             }
         }
-        log.info("[SCHEDULER] Missed-goal batch done for {} — sent={} skipped={} failed={}",
+        log.info("[SCHEDULER] Daily 23:59 batch done for {} — sent={} skipped={} failed={}",
                 today, sent, skipped, failed);
     }
 
+    // ── Manual trigger (dev/testing) ─────────────────────────────────────────────
+
     /**
-     * Allows triggering the scheduler manually for testing without waiting for 23:59.
-     * Called by POST /api/daily-goal/trigger-notifications.
+     * Allows triggering both checks manually for testing without waiting for their
+     * scheduled times. Called by POST /api/daily-goal/trigger-notifications.
      */
     public void runNow() {
+        log.info("[SCHEDULER] Manual trigger: running both rollover and daily checks");
+        rolloverService.processRolloverForAllUsers();
         sendDailyAccountabilityNotifications();
     }
 
-    // ── Private logic ──────────────────────────────────────────────────────────
+    // ── Private logic for the 23:59 daily job ────────────────────────────────────
 
     /**
-     * Handles the missed-goal email for a single DailyGoal record.
-     *
-     * Logic:
-     *   - If goalReachedEmailSent = true → goal was reached during the day → skip.
-     *     (This shouldn't appear in the query results, but we check as a safety net.)
-     *   - If completedMinutes >= goalMinutes → goal was met → skip without sending.
-     *   - Otherwise → send missed-goal email.
-     *
-     * Email recipient priority:
-     *   1. accountabilityEmail stored on the goal (per-day snapshot)
-     *   2. user's persistent accountability email (set via "Set Email" button)
-     *   If neither is set, the email is skipped — never falls back to login email.
+     * Handles the missed-goal email for a single DailyGoal record (23:59 job only).
+     * The rollover service handles its own sending logic independently.
      *
      * @return true if a missed-goal email was dispatched, false if skipped
      */
     private boolean processEmailGoal(DailyGoal goal) {
-        // Safety net: if the goal was reached (success email sent), do not send missed-goal email
         if (goal.isGoalReachedEmailSent()) {
-            log.info("[SCHEDULER] Skipping goalId={} — goal was reached earlier today",
-                    goal.getId());
+            log.info("[SCHEDULER] Skipping goalId={} — goal was reached earlier today", goal.getId());
             return false;
         }
-
-        // Idempotency guard (query already filtered, but be safe)
         if (goal.isEmailAlertSent()) {
-            log.info("[SCHEDULER] Skipping goalId={} — missed-goal email already sent",
-                    goal.getId());
+            log.info("[SCHEDULER] Skipping goalId={} — missed-goal email already sent", goal.getId());
             return false;
         }
 
         int goalMin = goal.getGoalMinutes();
         int doneMin = goal.getCompletedMinutes();
 
-        // Safety check: if the goal was actually met by end of day, skip without sending
         if (doneMin >= goalMin) {
             log.info("[SCHEDULER] Skipping goalId={} — goal met at end of day (done={}min goal={}min)",
                     goal.getId(), doneMin, goalMin);
-            // Mark to avoid re-checking this record in future scheduler runs
             dailyGoalService.markEmailAlertSent(goal);
             return false;
         }
 
-        String userName = goal.getUser().getUsername();
-
-        // Resolve recipient:
-        //   1. Per-day accountability email on the goal
-        //   2. User's persistent accountability email (set via "Set Email" button)
-        //   Never fall back to the user's login email — accountability emails must only
-        //   go to an explicitly set accountability address.
-        String loginEmail          = goal.getUser().getEmail();
+        // Resolve recipient: goal-level email → persistent user email → skip
         String persistentAcctEmail = goal.getUser().getAccountabilityEmail();
         String recipientEmail      = goal.getAccountabilityEmail();
         if (recipientEmail == null || recipientEmail.isBlank()) {
             recipientEmail = persistentAcctEmail;
         }
 
-        log.info("[SCHEDULER] Missed-goal recipient resolution — goalId={} userId={} " +
-                        "loginEmail={} accountabilityEmail={} finalRecipient={}",
-                goal.getId(), goal.getUser().getId(),
-                loginEmail != null ? loginEmail : "(none)",
-                persistentAcctEmail != null ? persistentAcctEmail : "(not set)",
-                recipientEmail != null ? recipientEmail : "(none — will skip)");
-
         if (recipientEmail == null || recipientEmail.isBlank()) {
-            log.warn("[SCHEDULER] Missed-goal email skipped — no accountability email set " +
-                            "for goalId={} userId={}",
+            log.warn("[SCHEDULER] No accountability email for goalId={} userId={} — skipping",
                     goal.getId(), goal.getUser().getId());
             return false;
         }
@@ -175,14 +165,13 @@ public class AccountabilityScheduler {
                 goal.getId(), goal.getUser().getId(), doneMin, goalMin);
 
         boolean ok = emailService.sendMissedGoalEmail(
-                recipientEmail, userName, goalMin, doneMin, goal.getGoalDate());
+                recipientEmail, goal.getUser().getUsername(), goalMin, doneMin, goal.getGoalDate());
 
         if (ok) {
             dailyGoalService.markEmailAlertSent(goal);
             return true;
         } else {
-            log.error("[SCHEDULER] Email failed for goalId={} userId={} — will retry on next run",
-                    goal.getId(), goal.getUser().getId());
+            log.error("[SCHEDULER] Email failed for goalId={} — will retry on next run", goal.getId());
             return false;
         }
     }

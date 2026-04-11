@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -20,24 +21,53 @@ public class DailyGoalController {
     private static final Logger log = LoggerFactory.getLogger(DailyGoalController.class);
 
     private final DailyGoalService        dailyGoalService;
+    private final DailyGoalRolloverService rolloverService;
     private final UserService             userService;
     private final AccountabilityScheduler scheduler;
 
     public DailyGoalController(DailyGoalService dailyGoalService,
+                                DailyGoalRolloverService rolloverService,
                                 UserService userService,
                                 AccountabilityScheduler scheduler) {
         this.dailyGoalService = dailyGoalService;
+        this.rolloverService  = rolloverService;
         this.userService      = userService;
         this.scheduler        = scheduler;
     }
 
-    // ── GET /api/daily-goal/today ──────────────────────────────────────────────
+    // ── GET /api/daily-goal/today?tz=America/Toronto ──────────────────────────
 
-    /** Returns current goal, progress, and email accountability settings for today. */
+    /**
+     * Returns current goal, progress, and email accountability settings for today.
+     *
+     * The optional `tz` query parameter accepts an IANA timezone string from the
+     * browser (e.g. "America/Toronto"). When provided:
+     *   - The user's stored timezone is updated (if different)
+     *   - A rollover check is performed: if midnight passed in the user's timezone
+     *     since their last goal day, any missed goal email is sent now
+     *
+     * This ensures rollover is caught even when the user was offline at midnight.
+     */
     @GetMapping("/today")
-    public ResponseEntity<?> getToday(HttpSession session) {
+    public ResponseEntity<?> getToday(
+            @RequestParam(required = false) String tz,
+            HttpSession session) {
+
         User user = resolveUser(session);
         if (user == null) return ResponseEntity.status(401).body(Map.of("error", "Not logged in."));
+
+        // Resolve and persist timezone from browser
+        ZoneId zoneId = DailyGoalRolloverService.parseTimezone(tz);
+        if (tz != null && !tz.isBlank()) {
+            userService.updateTimezoneIfChanged(user, tz);
+            // Reload user so the rollover service sees the fresh timezone
+            user = userService.findById(user.getId()).orElse(user);
+        }
+
+        // Catch-up rollover: send any missed-goal emails for days that ended while
+        // the user was offline or the server was restarting.
+        rolloverService.processRolloverForUser(user, zoneId);
+
         Optional<DailyGoal> opt = dailyGoalService.getTodayGoal(user);
         return ResponseEntity.ok(toMap(opt.orElse(null), user));
     }
@@ -46,11 +76,28 @@ public class DailyGoalController {
 
     /**
      * Saves today's goal minutes + email accountability settings in one call.
+     * Also triggers a rollover check in case midnight passed since the last load.
+     *
+     * Request body includes an optional `timezone` field (IANA string) so the
+     * frontend's detected timezone is persisted alongside the goal.
      */
     @PostMapping
     public ResponseEntity<?> saveGoal(@RequestBody GoalSaveRequest req, HttpSession session) {
         User user = resolveUser(session);
         if (user == null) return ResponseEntity.status(401).body(Map.of("error", "Not logged in."));
+
+        // Persist timezone if provided
+        ZoneId zoneId = DailyGoalRolloverService.parseTimezone(null); // default
+        String tz = req.getTimezone();
+        if (tz != null && !tz.isBlank()) {
+            zoneId = DailyGoalRolloverService.parseTimezone(tz);
+            userService.updateTimezoneIfChanged(user, tz);
+            user = userService.findById(user.getId()).orElse(user);
+        }
+
+        // Catch-up rollover before saving settings so past days are evaluated first
+        rolloverService.processRolloverForUser(user, zoneId);
+
         try {
             DailyGoal goal = dailyGoalService.saveGoalAndSettings(user, req);
             log.info("[GOAL] Saved — userId={} goalMinutes={} emailEnabled={}",
@@ -64,8 +111,8 @@ public class DailyGoalController {
     // ── POST /api/daily-goal/trigger-notifications (testing only) ─────────────
 
     /**
-     * Manually triggers the end-of-day scheduler right now.
-     * Useful during development/testing so you don't have to wait until 23:59.
+     * Manually triggers both the rollover check and the daily scheduler right now.
+     * Useful during development/testing so you don't have to wait for scheduled times.
      */
     @PostMapping("/trigger-notifications")
     public ResponseEntity<?> triggerNow(HttpSession session) {
@@ -84,15 +131,18 @@ public class DailyGoalController {
      * completedMinutes is always derived from the live session total via
      * DailyGoalService.computeTodayActualMinutes, NOT from the stored counter.
      * This guarantees the goal card and the Study Tracker always show the same number.
+     *
+     * Also includes the user's stored timezone so the frontend can display it.
      */
     private Map<String, Object> toMap(DailyGoal g, User user) {
-        // Always compute from session records — same source as the Study Tracker.
         int actualMinutes = (user != null) ? dailyGoalService.computeTodayActualMinutes(user) : 0;
 
-        // Persistent email saved on the user's account (set via "Set Email" button).
-        // This is the value shown in the email input for preloading.
         String userAccountabilityEmail = (user != null && user.getAccountabilityEmail() != null)
                 ? user.getAccountabilityEmail() : "";
+
+        // Timezone: stored on user, or fallback to Toronto
+        String timezone = (user != null && user.getTimezone() != null && !user.getTimezone().isBlank())
+                ? user.getTimezone() : "America/Toronto";
 
         Map<String, Object> m = new HashMap<>();
         if (g == null) {
@@ -104,6 +154,7 @@ public class DailyGoalController {
             m.put("goalReachedEmailSent",    false);
             m.put("emailAlertSent",          false);
             m.put("username",                user != null ? user.getUsername() : "");
+            m.put("timezone",                timezone);
             return m;
         }
 
@@ -114,12 +165,11 @@ public class DailyGoalController {
         m.put("completedMinutes",        actualMinutes);
         m.put("status",                  status);
         m.put("notificationEnabled",     g.isNotificationEnabled());
-        // Always show the user's persistent email in the input (not the per-day snapshot).
-        // The per-day DailyGoal.accountabilityEmail is used internally for email sending only.
         m.put("accountabilityEmail",     userAccountabilityEmail);
         m.put("goalReachedEmailSent",    g.isGoalReachedEmailSent());
         m.put("emailAlertSent",          g.isEmailAlertSent());
         m.put("username",                g.getUser().getUsername());
+        m.put("timezone",                timezone);
         return m;
     }
 

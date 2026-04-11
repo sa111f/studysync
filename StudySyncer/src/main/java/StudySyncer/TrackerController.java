@@ -16,12 +16,16 @@ public class TrackerController {
 
     private static final Logger log = LoggerFactory.getLogger(TrackerController.class);
 
-    private final TrackerService trackerService;
-    private final UserService   userService;
+    private final TrackerService          trackerService;
+    private final UserService             userService;
+    private final DailyGoalRolloverService rolloverService;
 
-    public TrackerController(TrackerService trackerService, UserService userService) {
-        this.trackerService = trackerService;
-        this.userService    = userService;
+    public TrackerController(TrackerService trackerService,
+                             UserService userService,
+                             DailyGoalRolloverService rolloverService) {
+        this.trackerService  = trackerService;
+        this.userService     = userService;
+        this.rolloverService = rolloverService;
     }
 
     // ── Page ──────────────────────────────────────────────
@@ -45,6 +49,13 @@ public class TrackerController {
     public ResponseEntity<?> saveSession(@RequestBody SaveSessionDto dto, HttpSession session) {
         User user = resolveUser(session);
         if (user == null) return ResponseEntity.status(401).body(Map.of("error", "Not logged in."));
+
+        // Rollover check: if the user was studying past midnight, ensure any missed-goal
+        // email for the previous day is sent before we credit the session to today's goal.
+        // Uses the user's stored timezone for the day-boundary calculation.
+        java.time.ZoneId zone = rolloverService.resolveUserZone(user);
+        rolloverService.processRolloverForUser(user, zone);
+
         trackerService.saveSession(user,
                 dto.getMaterialName(), dto.getDurationMinutes(),
                 dto.getTimerMode(), dto.isCompleted());
