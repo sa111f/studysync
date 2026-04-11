@@ -723,14 +723,31 @@ function handlePdfDrop(e) {
 
     async function fetchTodayGoal() {
         if (!window.currentUser) { renderGoal(null); return; }
+        renderGoalError(null); // clear any previous error before each fetch
         try {
             // Send browser timezone so the backend can:
             //   1. Store it on the user record
             //   2. Run a rollover check using the correct local day boundary
             const tzParam = encodeURIComponent(USER_TIMEZONE);
             const res = await fetch('/api/daily-goal/today?tz=' + tzParam);
-            if (res.ok) renderGoal(await res.json());
-        } catch (_) { renderGoal(null); }
+            if (res.ok) {
+                renderGoal(await res.json());
+            } else {
+                // Server returned a non-2xx status.
+                // Try to read the structured JSON error payload; fall back gracefully if
+                // the body is HTML (e.g. a Tomcat 500 page) or is not parseable.
+                let msg = "Couldn\u2019t load accountability status. Please refresh or try again.";
+                try {
+                    const err = await res.json();
+                    if (err && typeof err.error === 'string' && err.error.length > 0) {
+                        msg = err.error;
+                    }
+                } catch (_) { /* non-JSON body — use default message */ }
+                renderGoalError(msg);
+            }
+        } catch (_) {
+            renderGoalError("Couldn\u2019t load accountability status. Please refresh or try again.");
+        }
     }
 
     // ════════════════════════════════════════════════════

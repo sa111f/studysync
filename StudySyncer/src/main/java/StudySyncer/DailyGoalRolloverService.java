@@ -81,9 +81,16 @@ public class DailyGoalRolloverService {
 
         // Find all past goals for this user that still need evaluation.
         // "Before today" means midnight has passed in the user's timezone for those days.
-        List<DailyGoal> pastGoals =
-            repo.findAllByUserAndGoalDateBeforeAndNotificationEnabledTrueAndEmailAlertSentFalseAndGoalReachedEmailSentFalseAndGoalMinutesGreaterThan(
-                user, today, 0);
+        // Wrapped in try-catch so a transient DB issue (e.g. column not yet added on a
+        // fresh deployment) never propagates to the caller and breaks page load.
+        List<DailyGoal> pastGoals;
+        try {
+            pastGoals = repo.findAllByUserAndGoalDateBeforeAndNotificationEnabledTrueAndEmailAlertSentFalseAndGoalReachedEmailSentFalseAndGoalMinutesGreaterThan(
+                    user, today, 0);
+        } catch (Exception e) {
+            log.error("[ROLLOVER] Failed to query past goals for userId={}: {}", user.getId(), e.getMessage(), e);
+            return;
+        }
 
         if (pastGoals.isEmpty()) return;
 
@@ -102,8 +109,8 @@ public class DailyGoalRolloverService {
                                 "(already processed by another thread)",
                         goal.getId(), user.getId());
             } catch (Exception e) {
-                log.error("[ROLLOVER] Error processing goalId={} for userId={}: {}",
-                        goal.getId(), user.getId(), e.getMessage(), e);
+                log.error("[ROLLOVER] Error processing goalId={} userId={} zone={}: {}",
+                        goal.getId(), user.getId(), zone.getId(), e.getMessage(), e);
             }
         }
     }

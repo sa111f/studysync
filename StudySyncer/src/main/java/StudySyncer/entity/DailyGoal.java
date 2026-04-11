@@ -127,8 +127,15 @@ public class DailyGoal {
      * Hibernate auto-adds the column (ddl-auto=update) on first restart after
      * this field is introduced.  Existing rows receive version=0.
      */
+    /**
+     * Explicit columnDefinition so that both CREATE TABLE (fresh schema) and the
+     * DatabaseInitializer migration (existing schema) leave this column as
+     * BIGINT NOT NULL DEFAULT 0.  Hibernate's ddl-auto=update only adds missing
+     * columns; it never alters existing column definitions, so the migration is
+     * still required for databases that already have the column as nullable.
+     */
     @Version
-    @Column(name = "version")
+    @Column(name = "version", columnDefinition = "BIGINT NOT NULL DEFAULT 0")
     private long version;
 
     // ── Audit ─────────────────────────────────────────────────────────────────

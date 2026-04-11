@@ -54,22 +54,47 @@ public class DailyGoalController {
             HttpSession session) {
 
         User user = resolveUser(session);
-        if (user == null) return ResponseEntity.status(401).body(Map.of("error", "Not logged in."));
-
-        // Resolve and persist timezone from browser
-        ZoneId zoneId = DailyGoalRolloverService.parseTimezone(tz);
-        if (tz != null && !tz.isBlank()) {
-            userService.updateTimezoneIfChanged(user, tz);
-            // Reload user so the rollover service sees the fresh timezone
-            user = userService.findById(user.getId()).orElse(user);
+        if (user == null) {
+            return ResponseEntity.status(401).body(Map.of(
+                    "error", "Not logged in.",
+                    "code",  "UNAUTHORIZED"));
         }
 
-        // Catch-up rollover: send any missed-goal emails for days that ended while
-        // the user was offline or the server was restarting.
-        rolloverService.processRolloverForUser(user, zoneId);
+        // Resolve timezone from browser (safe — returns DEFAULT_ZONE on null / invalid input)
+        ZoneId zoneId = DailyGoalRolloverService.parseTimezone(tz);
 
-        Optional<DailyGoal> opt = dailyGoalService.getTodayGoal(user);
-        return ResponseEntity.ok(toMap(opt.orElse(null), user));
+        // Persist timezone — wrapped so a transient DB issue here never breaks the whole load
+        if (tz != null && !tz.isBlank()) {
+            try {
+                userService.updateTimezoneIfChanged(user, tz);
+                // Reload so the rollover service sees the fresh timezone value
+                user = userService.findById(user.getId()).orElse(user);
+            } catch (Exception e) {
+                log.warn("[GOAL] Could not update timezone for userId={} tz='{}': {}",
+                        user.getId(), tz, e.getMessage(), e);
+            }
+        }
+
+        // Catch-up rollover: send any missed-goal emails for days that ended while the user
+        // was offline or the server was restarting. Wrapped so a rollover failure never
+        // prevents the goal card from loading.
+        try {
+            rolloverService.processRolloverForUser(user, zoneId);
+        } catch (Exception e) {
+            log.error("[ROLLOVER] Uncaught error in processRolloverForUser for userId={}: {}",
+                    user.getId(), e.getMessage(), e);
+            // Non-fatal — continue to return goal data
+        }
+
+        try {
+            Optional<DailyGoal> opt = dailyGoalService.getTodayGoal(user);
+            return ResponseEntity.ok(toMap(opt.orElse(null), user));
+        } catch (Exception e) {
+            log.error("[GOAL] Failed to load today's goal for userId={}: {}", user.getId(), e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of(
+                    "error", "Failed to load goal. Please try again.",
+                    "code",  "LOAD_FAILED"));
+        }
     }
 
     // ── POST /api/daily-goal ───────────────────────────────────────────────────
@@ -84,19 +109,33 @@ public class DailyGoalController {
     @PostMapping
     public ResponseEntity<?> saveGoal(@RequestBody GoalSaveRequest req, HttpSession session) {
         User user = resolveUser(session);
-        if (user == null) return ResponseEntity.status(401).body(Map.of("error", "Not logged in."));
+        if (user == null) {
+            return ResponseEntity.status(401).body(Map.of(
+                    "error", "Not logged in.",
+                    "code",  "UNAUTHORIZED"));
+        }
 
         // Persist timezone if provided
         ZoneId zoneId = DailyGoalRolloverService.parseTimezone(null); // default
         String tz = req.getTimezone();
         if (tz != null && !tz.isBlank()) {
             zoneId = DailyGoalRolloverService.parseTimezone(tz);
-            userService.updateTimezoneIfChanged(user, tz);
-            user = userService.findById(user.getId()).orElse(user);
+            try {
+                userService.updateTimezoneIfChanged(user, tz);
+                user = userService.findById(user.getId()).orElse(user);
+            } catch (Exception e) {
+                log.warn("[GOAL] Could not update timezone on save for userId={} tz='{}': {}",
+                        user.getId(), tz, e.getMessage(), e);
+            }
         }
 
         // Catch-up rollover before saving settings so past days are evaluated first
-        rolloverService.processRolloverForUser(user, zoneId);
+        try {
+            rolloverService.processRolloverForUser(user, zoneId);
+        } catch (Exception e) {
+            log.error("[ROLLOVER] Uncaught error during goal save for userId={}: {}",
+                    user.getId(), e.getMessage(), e);
+        }
 
         try {
             DailyGoal goal = dailyGoalService.saveGoalAndSettings(user, req);
@@ -104,7 +143,15 @@ public class DailyGoalController {
                     user.getId(), goal.getGoalMinutes(), goal.isNotificationEnabled());
             return ResponseEntity.ok(toMap(goal, user));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage(),
+                    "code",  "VALIDATION_ERROR"));
+        } catch (Exception e) {
+            log.error("[GOAL] Unexpected error saving goal for userId={} goalMinutes={}: {}",
+                    user.getId(), req.getGoalMinutes(), e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of(
+                    "error", "Failed to save goal. Please try again.",
+                    "code",  "SAVE_FAILED"));
         }
     }
 
@@ -117,7 +164,11 @@ public class DailyGoalController {
     @PostMapping("/trigger-notifications")
     public ResponseEntity<?> triggerNow(HttpSession session) {
         User user = resolveUser(session);
-        if (user == null) return ResponseEntity.status(401).body(Map.of("error", "Not logged in."));
+        if (user == null) {
+            return ResponseEntity.status(401).body(Map.of(
+                    "error", "Not logged in.",
+                    "code",  "UNAUTHORIZED"));
+        }
         log.info("[TRIGGER] Manual notification trigger by userId={}", user.getId());
         scheduler.runNow();
         return ResponseEntity.ok(Map.of("message", "Scheduler triggered. Check server logs for results."));
