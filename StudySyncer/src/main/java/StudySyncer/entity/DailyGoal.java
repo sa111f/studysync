@@ -111,6 +111,26 @@ public class DailyGoal {
     @Column(name = "email_alert_sent_at")
     private LocalDateTime emailAlertSentAt;
 
+    /**
+     * JPA optimistic-lock version counter.
+     *
+     * Prevents a race condition where two concurrent threads (e.g. the 15-minute
+     * scheduler and a simultaneous dashboard load) both read emailAlertSent=false,
+     * both decide to send the missed-goal email, and both succeed — sending two
+     * emails to the user.
+     *
+     * With @Version: the first thread to commit increments the version.  The second
+     * thread tries to UPDATE with the old version number, the DB rejects it, and
+     * Spring throws ObjectOptimisticLockingFailureException, which the rollover
+     * service catches and logs.  Only one email is ever sent per goal per day.
+     *
+     * Hibernate auto-adds the column (ddl-auto=update) on first restart after
+     * this field is introduced.  Existing rows receive version=0.
+     */
+    @Version
+    @Column(name = "version")
+    private long version;
+
     // ── Audit ─────────────────────────────────────────────────────────────────
 
     @Column(name = "created_at", updatable = false)
@@ -151,6 +171,7 @@ public class DailyGoal {
     public LocalDateTime getGoalReachedEmailSentAt()   { return goalReachedEmailSentAt; }
     public boolean       isEmailAlertSent()            { return emailAlertSent; }
     public LocalDateTime getEmailAlertSentAt()         { return emailAlertSentAt; }
+    public long          getVersion()                  { return version; }
     public LocalDateTime getCreatedAt()           { return createdAt; }
     public LocalDateTime getUpdatedAt()           { return updatedAt; }
 

@@ -7,6 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -92,6 +94,13 @@ public class DailyGoalRolloverService {
         for (DailyGoal goal : pastGoals) {
             try {
                 evaluateAndProcess(goal, today, cutoff);
+            } catch (ObjectOptimisticLockingFailureException e) {
+                // Another thread (scheduler or a concurrent request) already processed
+                // this goal and committed the emailAlertSent flag first.  Our version
+                // is now stale — skip silently; the email was already sent once.
+                log.info("[ROLLOVER] Concurrent update for goalId={} userId={} — skipping " +
+                                "(already processed by another thread)",
+                        goal.getId(), user.getId());
             } catch (Exception e) {
                 log.error("[ROLLOVER] Error processing goalId={} for userId={}: {}",
                         goal.getId(), user.getId(), e.getMessage(), e);
@@ -148,6 +157,12 @@ public class DailyGoalRolloverService {
                 boolean emailSent = evaluateAndProcess(goal, today, cutoff);
                 if (emailSent) sent++; else silenced++;
 
+            } catch (ObjectOptimisticLockingFailureException e) {
+                // Another thread already processed and committed this goal.
+                // Our in-memory copy is stale — no duplicate email will be sent.
+                log.info("[ROLLOVER] Scheduler: concurrent update for goalId={} — skipping " +
+                                "(already processed by another thread)", goal.getId());
+                skipped++;
             } catch (Exception e) {
                 log.error("[ROLLOVER] Scheduler error for goalId={}: {}", goal.getId(), e.getMessage(), e);
                 errors++;

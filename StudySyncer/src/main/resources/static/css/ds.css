@@ -906,3 +906,117 @@ textarea.subject-notes:focus,
 
 /* remove .site-footer if it slips in anywhere */
 .site-footer { display: none !important; }
+
+
+/* ════════════════════════════════════════════════════════════════
+   19. ACCOUNTABILITY STATE BANNERS
+   Prominent, colour-coded inline banners inside the goal card.
+   ════════════════════════════════════════════════════════════════ */
+
+/* Email input + button side-by-side */
+.acct-email-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.acct-email-input {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+/* "Leave blank to remove" hint */
+.acct-remove-hint {
+    font-size: 0.75rem !important;
+    opacity: 0.58;
+    margin-top: 4px !important;
+}
+
+/* Base banner */
+.acct-state-banner {
+    margin-top: 14px;
+    padding: 13px 15px;
+    border-radius: 10px;
+    font-size: 0.875rem;
+    line-height: 1.55;
+    word-break: break-word;
+}
+
+/* Info state — goal = 0 (purple-tinted) */
+.acct-banner-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    background: rgba(124, 92, 252, 0.08);
+    border: 1px solid rgba(124, 92, 252, 0.26);
+    color: #c4b5fd;
+}
+
+/* Warning state — no email saved (amber) */
+.acct-banner-warn {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.30);
+    color: #fbbf24;
+}
+
+/* Active state — all conditions met (green) */
+.acct-banner-active {
+    display: block;
+    background: rgba(34, 197, 94, 0.07);
+    border: 1px solid rgba(34, 197, 94, 0.28);
+}
+
+/* Icon inside info / warn banners */
+.acct-banner-icon {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+/* Active banner typography */
+.acct-confirm-primary {
+    font-size: 0.915rem;
+    font-weight: 500;
+    color: var(--text);
+    margin: 0 0 9px;
+    line-height: 1.6;
+}
+.acct-email-display {
+    color: #4ade80;
+    font-weight: 700;
+    word-break: break-all;
+}
+.acct-confirm-secondary {
+    font-size: 0.815rem;
+    color: #86efac;
+    margin: 0 0 7px;
+}
+.acct-confirm-tz {
+    font-size: 0.795rem;
+    color: var(--muted);
+    margin: 0 0 6px;
+}
+.acct-confirm-status {
+    font-size: 0.815rem;
+    color: #86efac;
+    margin: 0;
+}
+.acct-confirm-status strong {
+    color: #4ade80;
+}
+
+/* Status badge tweaks — bump readability */
+.accountability-status-badge {
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+.badge-success {
+    color: #4ade80;
+}
+.badge-failure {
+    color: #fbbf24;
+}

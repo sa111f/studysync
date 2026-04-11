@@ -310,40 +310,36 @@
                            onchange="onEmailToggle()" />
                     <span class="accountability-toggle-text">Enable accountability email</span>
                 </label>
-                <p class="accountability-hint">When you reach your goal, StudySyncer emails you instantly. If you miss it by 11:59 PM in your local time, you'll get a reminder.</p>
+                <p class="accountability-hint">StudySyncer emails you immediately when you hit your goal. If you miss it by 11:59&nbsp;PM in your local time, you'll get a reminder.</p>
             </div>
 
             <div class="accountability-fields" id="accountability-fields" style="display:none">
                 <div class="accountability-field-row">
                     <div class="accountability-email-group">
                         <label class="accountability-label" for="accountability-email-input">
-                            Accountability email <span class="optional-tag">(optional)</span>
+                            Accountability email
                         </label>
-                        <input type="email" id="accountability-email-input"
-                               class="field-input"
-                               placeholder="Enter email address"
-                               autocomplete="email" maxlength="255"
-                               onkeydown="if(event.key==='Enter')setAccountabilityEmail()" />
-                        <button class="set-email-btn" onclick="setAccountabilityEmail()">Set Email</button>
+                        <div class="acct-email-input-row">
+                            <input type="email" id="accountability-email-input"
+                                   class="field-input acct-email-input"
+                                   placeholder="Enter email address"
+                                   autocomplete="email" maxlength="255"
+                                   onkeydown="if(event.key==='Enter')setAccountabilityEmail()" />
+                            <button class="set-email-btn" onclick="setAccountabilityEmail()">Set Email</button>
+                        </div>
                         <p id="set-email-status" class="set-email-status accountability-hint"></p>
-                        <p id="acct-email-destination" class="accountability-hint acct-email-destination"></p>
-                        <p id="acct-email-schedule-hint" class="accountability-hint" style="display:none">
-                            <!-- Populated by JS: "If today's goal is not reached by 11:59 PM [timezone], an email will be sent to [email]." -->
-                        </p>
-                        <p class="accountability-hint">
-                            Leave blank and click Set Email to remove the saved address.
-                        </p>
+                        <p class="accountability-hint acct-remove-hint">Leave blank and click Set Email to remove the saved address.</p>
                     </div>
                 </div>
+
+                <!-- State banner — updated by renderAccountability() to reflect current conditions -->
+                <div id="acct-state-banner" class="acct-state-banner" style="display:none"></div>
             </div>
 
-            <!-- Email alert status badge (populated by JS after load) -->
+            <!-- Status badge — shown after an email has actually been sent today -->
             <div class="accountability-status-row" id="accountability-status-row" style="display:none">
                 <span class="accountability-status-badge" id="accountability-status-badge"></span>
             </div>
-
-            <!-- Timezone debug line — always visible when accountability section is shown -->
-            <p class="accountability-hint" id="acct-timezone-display" style="font-size:11px;opacity:0.55;margin-top:6px;display:none"></p>
         </div><!-- /accountability-section -->
 
         <p class="goal-save-status" id="goal-save-status" style="display:none"></p>
@@ -600,78 +596,103 @@ function handlePdfDrop(e) {
     // Render: email accountability section
     // ════════════════════════════════════════════════════
 
+    function escapeHtml(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
     function renderAccountability(data) {
-        const toggle       = el('email-enabled-toggle');
-        const fields       = el('accountability-fields');
-        const emailEl      = el('accountability-email-input');
-        const statusRow    = el('accountability-status-row');
-        const badge        = el('accountability-status-badge');
-        const destEl       = el('acct-email-destination');
-        const scheduleHint = el('acct-email-schedule-hint');
-        const tzDisplay    = el('acct-timezone-display');
+        const toggle    = el('email-enabled-toggle');
+        const fields    = el('accountability-fields');
+        const emailEl   = el('accountability-email-input');
+        const statusRow = el('accountability-status-row');
+        const badge     = el('accountability-status-badge');
+        const banner    = el('acct-state-banner');
 
         if (!data) return;
 
-        const enabled          = !!data.notificationEnabled;
-        const emailValue       = data.accountabilityEmail || '';
-        const goalReachedSent  = !!data.goalReachedEmailSent;   // success email
-        const missedAlertSent  = !!data.emailAlertSent;         // missed-goal email
+        const enabled         = !!data.notificationEnabled;
+        const emailValue      = (data.accountabilityEmail || '').trim();
+        const goalMinutes     = data.goalMinutes || 0;
+        const goalReachedSent = !!data.goalReachedEmailSent;
+        const missedAlertSent = !!data.emailAlertSent;
         // Timezone: use what the server echoes back, or our locally detected value
-        const timezone         = data.timezone || USER_TIMEZONE;
+        const timezone        = data.timezone || USER_TIMEZONE;
 
         if (toggle)  toggle.checked = enabled;
         if (emailEl) emailEl.value  = emailValue;
         if (fields)  fields.style.display = enabled ? '' : 'none';
 
-        // Persistent destination line — always shows the saved email from the server
-        if (destEl) {
-            if (emailValue) {
-                destEl.textContent  = 'Goal notifications will be sent to: ' + emailValue;
-                destEl.style.color  = 'var(--success, #2ecc71)';
-            } else {
-                destEl.textContent  = 'No accountability email set.';
-                destEl.style.color  = '';
-            }
-        }
-
-        // Schedule hint: "If today's goal is not reached by 11:59 PM [timezone], an email will be sent to [email]."
-        if (scheduleHint) {
-            if (enabled && emailValue) {
-                scheduleHint.textContent = 'If today\u2019s goal is not reached by 11:59\u202FPM (' + timezone + '), an email will be sent to ' + emailValue + '.';
-                scheduleHint.style.display = '';
-            } else {
-                scheduleHint.style.display = 'none';
-            }
-        }
-
-        // Timezone debug line
-        if (tzDisplay) {
-            tzDisplay.textContent  = 'Timezone: ' + timezone;
-            tzDisplay.style.display = enabled ? '' : 'none';
-        }
-
-        // Status badge — shows the most relevant state for today
-        if (statusRow && badge) {
+        // ── State banner ─────────────────────────────────────
+        // Shows one of four states when accountability is enabled.
+        // Hidden when disabled or after an email is sent (badge takes over).
+        if (banner) {
             if (!enabled) {
-                // Accountability is off — hide badge entirely
+                banner.style.display = 'none';
+                banner.innerHTML = '';
+            } else if (goalMinutes === 0) {
+                // No goal set — accountability cannot fire
+                banner.className = 'acct-state-banner acct-banner-info';
+                banner.style.display = '';
+                banner.innerHTML =
+                    '<svg class="acct-banner-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">' +
+                        '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>' +
+                    '</svg>' +
+                    '<span>Set a daily goal above 0\u202Fminutes to enable accountability reminders.</span>';
+            } else if (!emailValue) {
+                // Goal is set but no accountability email saved
+                banner.className = 'acct-state-banner acct-banner-warn';
+                banner.style.display = '';
+                banner.innerHTML =
+                    '<svg class="acct-banner-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">' +
+                        '<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>' +
+                    '</svg>' +
+                    '<span>Add an accountability email to receive goal reminders.</span>';
+            } else if (!goalReachedSent && !missedAlertSent) {
+                // All conditions met — show the active confirmation
+                banner.className = 'acct-state-banner acct-banner-active';
+                banner.style.display = '';
+                banner.innerHTML =
+                    '<p class="acct-confirm-primary">' +
+                        'If today\u2019s goal is not reached by <strong>11:59\u202FPM</strong> in your local time, ' +
+                        'a reminder email will be sent to:<br>' +
+                        '<strong class="acct-email-display">' + escapeHtml(emailValue) + '</strong>' +
+                    '</p>' +
+                    '<p class="acct-confirm-secondary">\u2713\u00A0Success email is sent immediately when the daily goal is reached.</p>' +
+                    '<p class="acct-confirm-tz">Local timezone:\u00A0' + escapeHtml(timezone) + '</p>' +
+                    '<p class="acct-confirm-status">Accountability status: <strong>Active</strong></p>';
+            } else {
+                // An email was sent today — banner hidden, badge takes over below
+                banner.style.display = 'none';
+                banner.innerHTML = '';
+            }
+        }
+
+        // ── Status badge ──────────────────────────────────────
+        // Shown AFTER an email was actually sent for today, replacing the banner.
+        if (statusRow && badge) {
+            const fullyActive = enabled && !!emailValue && goalMinutes > 0;
+
+            if (!fullyActive) {
                 statusRow.style.display = 'none';
                 badge.textContent = '';
                 badge.className   = 'accountability-status-badge';
             } else if (goalReachedSent) {
-                // Goal was reached today — success email already sent
                 statusRow.style.display = '';
-                badge.textContent = '✓ Goal reached email sent for today!';
+                badge.textContent = '\u2713 Daily goal reached \u2014 success email sent!';
                 badge.className   = 'accountability-status-badge badge-sent badge-success';
             } else if (missedAlertSent) {
-                // End-of-day passed and goal was missed — missed-goal email sent
                 statusRow.style.display = '';
-                badge.textContent = 'Missed-goal reminder sent for today.';
+                badge.textContent = 'Goal missed \u2014 reminder email sent for today.';
                 badge.className   = 'accountability-status-badge badge-sent badge-failure';
             } else {
-                // Accountability is active, nothing sent yet today
-                statusRow.style.display = '';
-                badge.textContent = 'Email accountability on — you\'ll hear from us when you hit your goal or at end of day if you miss it.';
-                badge.className   = 'accountability-status-badge badge-pending';
+                // Nothing sent yet — badge is not needed (banner shows the promise)
+                statusRow.style.display = 'none';
+                badge.textContent = '';
+                badge.className   = 'accountability-status-badge';
             }
         }
     }
