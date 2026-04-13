@@ -42,25 +42,30 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════════════
-         FINJAN — Arabic qahwa cup, symmetric pixel-art.
+         BATTERY — vertical pixel-art centerpiece.
 
-         All pixels (both white silhouette border and purple fill) are
-         procedurally generated in focus.js from a symmetric grid.  The
-         half-width function in _bodyHalfAt() guarantees pixel-perfect
-         left/right symmetry — no hand-drawn path, no snap artefacts.
+         Both the white silhouette + terminal cap and the purple interior
+         fill are procedurally generated in focus.js from a symmetric
+         cell grid.  Because _inBody() uses the symmetric column index
+         min(c, BODY_COLS-1-c), the silhouette is pixel-perfect mirrored.
 
-         Grid:    42 cols × 45 rows, 5-unit cells
-         ViewBox: 0 0 300 300 (square — cup with flared foot fits cleanly)
+         Grid:    36 cols × 58 rows body, 12 × 4 terminal cap, 5-unit cells
+         ViewBox: 0 0 260 360 (portrait — AA-battery aspect)
+         Drain:   topmost body row empties first — "water level drops"
          Click  → fullscreen toggle (wired in focus.js)
+
+         NOTE: SVG + inner group IDs are kept as #finjan-svg / #fj-pixels /
+         #fj-border-pixels / .finjan-scene / #finjan-time so Section 20
+         animations, fullscreen rules and halo keep working unchanged.
          ══════════════════════════════════════════════════════════════ -->
     <div class="finjan-scene" id="finjan-scene">
 
         <svg id="finjan-svg"
-             viewBox="0 0 300 300"
+             viewBox="0 0 260 360"
              xmlns="http://www.w3.org/2000/svg"
              role="button"
              tabindex="0"
-             aria-label="Focus timer — click to toggle fullscreen">
+             aria-label="Focus battery — click to toggle fullscreen">
 
             <defs>
                 <!-- Soft purple bloom on the interior fill pixels only -->
@@ -75,10 +80,10 @@
                 </filter>
             </defs>
 
-            <!-- Purple interior pixels — built and drained by focus.js -->
+            <!-- Interior fill pixels — built and drained by focus.js -->
             <g id="fj-pixels" filter="url(#fj-px-glow)"></g>
 
-            <!-- White silhouette + solid foot pixels -->
+            <!-- White silhouette + solid terminal-cap pixels -->
             <g id="fj-border-pixels"></g>
 
         </svg>

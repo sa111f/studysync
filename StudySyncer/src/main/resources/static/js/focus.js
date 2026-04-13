@@ -6,116 +6,114 @@
  * in TimerCore (timer-core.js, loaded before this file).
  *
  * Responsibilities:
- *   - Procedurally generate a symmetric pixel-art Arabic finjan
+ *   - Procedurally generate a symmetric pixel-art vertical battery
  *   - Drain fill pixels top-row-first as timer progresses
+ *     (visual "water level drops" effect)
+ *   - Swap fill colour via body classes at mid / low charge tiers
  *   - Update phase tabs, progress bar, session label, toggle button
  *   - POST completed sessions to /api/tracker/sessions
- *   - Handle fullscreen toggle on finjan click
+ *   - Handle fullscreen toggle on battery click
  *
- * FINJAN PIXEL-ART ARCHITECTURE
- * ─────────────────────────────
- * The cup is a grid of square cells.  For each body row r we compute a
- * half-width hw(r); a cell (c,r) is "inside" iff |c+0.5 − CENTER| < hw(r).
- * Because the half-width is computed from the same function on both sides,
- * the resulting shape is pixel-perfect symmetric about the central column.
+ * PIXEL-ART BATTERY ARCHITECTURE
+ * ──────────────────────────────
+ * The battery is a fixed cell grid.  _inBody(c,r) decides whether a cell
+ * is inside the rounded-rectangle silhouette.  Because the function uses
+ * the symmetric column index  min(c, BODY_COLS-1-c),  the resulting shape
+ * is pixel-perfect left/right symmetric.
  *
- * Classification of each inside cell:
- *   BORDER → inside, and at least one 4-neighbor is outside the combined shape
- *   FILL   → inside, fully surrounded by other inside cells (body rows only)
- * The foot section is rendered as solid white — pure saucer, no interior.
+ * Classification:
+ *   BORDER cells → inside cells that have at least one outside 4-neighbor
+ *                  (plus every cell of the positive terminal cap, which
+ *                  is rendered as a solid white block).
+ *   FILL   cells → inside body cells completely surrounded by inside cells.
  *
- * Drain order: fill cells are sorted by ascending row, so the topmost row
- * vanishes first as time runs out, giving the "cup emptying" illusion.
+ * Drain order: fills are sorted by ascending row (then column) so the
+ * topmost row empties first — the energy level literally drops.
+ *
+ * Geometry (SVG-unit cells, stride = CELL):
+ *   Body     36 cols × 58 rows   → 180 × 290 units
+ *   Terminal 12 cols ×  4 rows   →  60 ×  20 units (centered on top edge)
+ *   Total visual footprint       → 180 × 310 units
+ *   ViewBox                      → 260 × 360 (40 side / 30 top / 30 bottom pad)
  */
 
 // ── Grid geometry ─────────────────────────────────────────────
-const GRID_COLS       = 42;
-const GRID_ROWS_BODY  = 42;
-const GRID_ROWS_FOOT  = 3;
-const GRID_ROWS       = GRID_ROWS_BODY + GRID_ROWS_FOOT;
-const CELL            = 5;                 // grid stride (SVG units)
-const VIS_CELL        = 4.2;               // visible square side (0.8 gap)
-const PIXEL_R         = 0.55;              // tiny rounding on corners
-const ORIGIN_X        = 45;
-const ORIGIN_Y        = 38;
-const CENTER_COL      = GRID_COLS / 2;     // 21 — vertical axis of symmetry
+const BODY_COLS     = 36;
+const BODY_ROWS     = 58;
+const TERMINAL_COLS = 12;
+const TERMINAL_ROWS = 4;
+const CELL          = 5;                // grid stride (SVG units)
+const VIS_CELL      = 4.25;             // visible square side (0.75 gap)
+const PIXEL_R       = 0.55;             // tiny rounding on each cell
+const ORIGIN_X      = 40;               // body grid origin X
+const TERM_ORIGIN_Y = 30;               // terminal cap top Y
+const BODY_ORIGIN_Y = TERM_ORIGIN_Y + TERMINAL_ROWS * CELL;   // 50
 
-// ── Cup silhouette — body half-width in cells at body row r ──
-function _bodyHalfAt(r) {
-    const N = GRID_ROWS_BODY - 1;
-    const t = r / N;                       // 0 at rim, 1 at bottom of body
-
-    const rimHalf  = 18.5;                 // wide stout Arabic rim
-    const baseHalf = 4.5;                  // narrow pedestal base
-
-    // Cosine smoothstep — gentle taper from rim to base
-    const eased = 0.5 - 0.5 * Math.cos(Math.PI * t);
-    let hw = rimHalf - (rimHalf - baseHalf) * Math.pow(eased, 1.25);
-
-    // Traditional Arabic shoulder — slight outward bulge just below rim
-    if (t > 0.03 && t < 0.30) {
-        const u = (t - 0.03) / 0.27;
-        hw += Math.sin(Math.PI * u) * 0.9;
-    }
-    return hw;
-}
-
-// ── Foot profile — flared saucer beneath body ────────────────
-const FOOT_PROFILE = [6.0, 7.2, 7.2];
-function _footHalfAt(fr) { return FOOT_PROFILE[fr]; }
-
-// ── Inside tests ─────────────────────────────────────────────
+// ── Body silhouette — rounded-rectangle with pixel-art bevels ──
+// · 2-cell diagonal bevel on BOTTOM corners  (recognisable battery foot)
+// · 1-cell round        on TOP    corners    (visually covered by cap)
 function _inBody(c, r) {
-    if (r < 0 || r >= GRID_ROWS_BODY) return false;
-    return Math.abs(c + 0.5 - CENTER_COL) < _bodyHalfAt(r);
-}
-function _inFoot(c, r) {
-    const fr = r - GRID_ROWS_BODY;
-    if (fr < 0 || fr >= GRID_ROWS_FOOT) return false;
-    return Math.abs(c + 0.5 - CENTER_COL) < _footHalfAt(fr);
-}
-function _inside(c, r) { return _inBody(c, r) || _inFoot(c, r); }
+    if (c < 0 || c >= BODY_COLS || r < 0 || r >= BODY_ROWS) return false;
 
-// ── Classify every cell into border / fill buckets ───────────
-function _buildGrid() {
+    const xe      = Math.min(c, BODY_COLS - 1 - c);   // distance from vertical edge
+    const yBottom = BODY_ROWS - 1 - r;                 // distance from bottom
+
+    // Bottom bevel — remove three corner cells per side
+    if (xe === 0 && yBottom <= 1) return false;
+    if (yBottom === 0 && xe <= 1) return false;
+
+    // Top round — remove one corner cell per side
+    if (xe === 0 && r === 0) return false;
+
+    return true;
+}
+
+// ── Build border + fill buckets ───────────────────────────────
+function _buildBattery() {
     const borders = [];
     const fills   = [];
 
-    for (let r = 0; r < GRID_ROWS; r++) {
-        for (let c = 0; c < GRID_COLS; c++) {
-            if (!_inside(c, r)) continue;
+    // Body cells
+    for (let r = 0; r < BODY_ROWS; r++) {
+        for (let c = 0; c < BODY_COLS; c++) {
+            if (!_inBody(c, r)) continue;
 
-            const x = ORIGIN_X + c * CELL;
-            const y = ORIGIN_Y + r * CELL;
-
-            // Foot: solid white saucer — no interior fill
-            if (r >= GRID_ROWS_BODY) {
-                borders.push({ x, y });
-                continue;
-            }
+            const x = ORIGIN_X      + c * CELL;
+            const y = BODY_ORIGIN_Y + r * CELL;
 
             const isBorder =
-                !_inside(c - 1, r) ||
-                !_inside(c + 1, r) ||
-                !_inside(c,     r - 1) ||
-                !_inside(c,     r + 1);
+                !_inBody(c - 1, r) ||
+                !_inBody(c + 1, r) ||
+                !_inBody(c,     r - 1) ||
+                !_inBody(c,     r + 1);
 
             if (isBorder) borders.push({ x, y });
-            else          fills.push({ x, y, r });
+            else          fills.push({ x, y, row: r, col: c });
         }
     }
 
-    // Drain order: topmost row empties first
-    fills.sort((a, b) => a.r - b.r || a.x - b.x);
+    // Positive terminal cap — solid white block centred above the body
+    const termColOffset = (BODY_COLS - TERMINAL_COLS) / 2;
+    for (let r = 0; r < TERMINAL_ROWS; r++) {
+        for (let c = 0; c < TERMINAL_COLS; c++) {
+            const x = ORIGIN_X      + (termColOffset + c) * CELL;
+            const y = TERM_ORIGIN_Y + r * CELL;
+            borders.push({ x, y });
+        }
+    }
+
+    // Drain order — topmost row empties first, left→right within a row.
+    // This produces the "water level drops" effect as cells fade out.
+    fills.sort((a, b) => a.row - b.row || a.col - b.col);
     return { borders, fills };
 }
 
-// ── DOM refs ─────────────────────────────────────────────────
+// ── DOM refs ──────────────────────────────────────────────────
 const _barFill    = document.getElementById('focus-bar-fill');
 const _sessionLbl = document.getElementById('focus-session-label');
 const _toggleBtn  = document.getElementById('focus-toggle-btn');
 
-// ── Pixel state ──────────────────────────────────────────────
+// ── Pixel state ───────────────────────────────────────────────
 let _allPixels   = [];
 let _lastVisible = -1;
 
@@ -136,22 +134,25 @@ function _makeRect(px, py, fill) {
     r.setAttribute('height', String(VIS_CELL));
     r.setAttribute('rx',     String(PIXEL_R));
     r.setAttribute('ry',     String(PIXEL_R));
-    r.setAttribute('fill',   fill);
+    if (fill) r.setAttribute('fill', fill);
     return r;
 }
 
 // ── Build and render both pixel groups ───────────────────────
-function _initFinjan() {
+function _initBattery() {
     const borderGroup = document.getElementById('fj-border-pixels');
     const fillGroup   = document.getElementById('fj-pixels');
     if (!borderGroup || !fillGroup) return;
 
-    const { borders, fills } = _buildGrid();
+    const { borders, fills } = _buildBattery();
 
+    // Border + terminal are solid white — set via attribute
     borders.forEach(p => borderGroup.appendChild(_makeRect(p.x, p.y, '#ffffff')));
 
+    // Fills have NO fill attribute — CSS drives colour so the
+    // body.battery-mid / body.battery-low tiers can swap hues smoothly.
     _allPixels = fills.map(p => {
-        const rect = _makeRect(p.x, p.y, '#9f7dff');
+        const rect = _makeRect(p.x, p.y, null);
         fillGroup.appendChild(rect);
         return { x: p.x, y: p.y, el: rect };
     });
@@ -165,6 +166,7 @@ function _updatePixels(progress) {
     if (visible === _lastVisible) return;
     _lastVisible = visible;
 
+    // fills sorted top→bottom; hide the topmost (total − visible) cells
     const showFrom = total - visible;
     _allPixels.forEach((px, i) => {
         if (!px.el) return;
@@ -172,8 +174,8 @@ function _updatePixels(progress) {
     });
 }
 
-// ── Update all finjan visuals from a state snapshot ──────────
-function _updateFinjan(state, visState) {
+// ── Update all battery visuals from a state snapshot ─────────
+function _renderBattery(state, visState) {
     const progress = state.totalSeconds > 0
         ? state.remaining / state.totalSeconds
         : 0;
@@ -185,9 +187,14 @@ function _updateFinjan(state, visState) {
 
     if (_barFill) _barFill.style.width = (progress * 100) + '%';
 
-    document.body.classList.toggle('is-running', visState === 'running');
-    document.body.classList.toggle('is-paused',  visState === 'paused');
-    document.body.classList.toggle('is-done',    visState === 'done');
+    const body = document.body;
+    body.classList.toggle('is-running', visState === 'running');
+    body.classList.toggle('is-paused',  visState === 'paused');
+    body.classList.toggle('is-done',    visState === 'done');
+
+    // Charge tiers — drive the CSS colour swap on #fj-pixels rect.
+    body.classList.toggle('battery-low', progress > 0   && progress <= 0.20);
+    body.classList.toggle('battery-mid', progress > 0.20 && progress <= 0.50);
 }
 
 // ── Phase tabs ───────────────────────────────────────────────
@@ -227,7 +234,7 @@ function _onCoreEvent(event, state) {
     else                        visState = '';
 
     if (event !== 'sessionEnd' && event !== 'skip') {
-        _updateFinjan(state, visState);
+        _renderBattery(state, visState);
         _updateTabs(state);
         _updateSessionLabel(state);
         if (_toggleBtn) _toggleBtn.textContent = state.isRunning ? 'Pause' : 'Start';
@@ -331,11 +338,11 @@ document.addEventListener('keydown', e => {
 
 // ── Init ─────────────────────────────────────────────────────
 (function () {
-    _initFinjan();
+    _initBattery();
 
     const state = TimerCore.getState();
     const initVis = state.isRunning ? 'running' : (state.isPaused ? 'paused' : '');
-    _updateFinjan(state, initVis);
+    _renderBattery(state, initVis);
     _updateTabs(state);
     _updateSessionLabel(state);
     if (_toggleBtn) _toggleBtn.textContent = state.isRunning ? 'Pause' : 'Start';

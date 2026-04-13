@@ -129,18 +129,19 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 18px;
+    margin-bottom: 10px;    /* tight gap so timer reads as the battery label */
     flex-shrink: 0;
 }
 
 /*
    SVG hero element.
-   440 px CSS height + viewBox 0 0 300 300 (square)
-   → visual cup 440 × 440, with transparent margin around the pixels.
+   Battery viewBox 260 × 360  →  portrait aspect 13:18.
+   480 px CSS height → rendered 347 × 480 (comfortable in the focus page).
 */
 #finjan-svg {
-    height: 440px;
+    height: 480px;
     width: auto;
+    max-width: 96vw;
     overflow: visible;
     display: block;
     cursor: pointer;
@@ -172,9 +173,37 @@ body {
 
 /* ── Body state classes ───────────────────────────────────── */
 
-/* ── Pixel transitions ────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════
+   BATTERY FILL COLOR TIERS
+   JS leaves <rect> elements without a `fill` attribute so CSS
+   drives the colour.  body.battery-mid / battery-low toggle
+   warm / warning hues as the remaining time runs down.
+   ══════════════════════════════════════════════════════════ */
 #fj-pixels rect {
-    transition: opacity 0.65s ease;
+    fill: #9f7dff;                    /* full charge — accent purple  */
+    transition:
+        opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+        fill    1.2s ease;
+}
+body.battery-mid #fj-pixels rect {
+    fill: #ffc266;                    /* ≤50% — warm amber            */
+}
+body.battery-low #fj-pixels rect {
+    fill: #ff7a8f;                    /* ≤20% — warning pink          */
+}
+
+/* Halo picks up the same tier colour so everything stays cohesive */
+body.battery-mid .finjan-scene::before {
+    background: radial-gradient(ellipse 50% 56% at 50% 50%,
+        rgba(255, 194, 102, 0.22) 0%,
+        rgba(255, 160,  72, 0.08) 38%,
+        transparent 64%) !important;
+}
+body.battery-low .finjan-scene::before {
+    background: radial-gradient(ellipse 50% 56% at 50% 50%,
+        rgba(255, 122, 143, 0.28) 0%,
+        rgba(255,  90, 112, 0.10) 38%,
+        transparent 64%) !important;
 }
 
 /* ·· RUNNING — pixels + border breathe, time turns violet */
@@ -438,32 +467,46 @@ html.is-fullscreen .finjan-scene {
     flex: 0 0 auto;
 }
 
-/* ── Finjaan: much larger, dominant ───────────────────────── */
+/* ── Battery: much larger, dominant in fullscreen ─────────── */
 html.is-fullscreen #finjan-svg {
-    height: 82vh !important;
-    max-width: 82vh !important;     /* square viewBox — keep aspect 1:1 */
+    height: 88vh !important;
+    max-width: 70vw !important;     /* let tall viewBox breathe          */
     width: auto !important;
     filter:
-        drop-shadow(0 20px 60px rgba(0, 0, 0, 0.70))
-        drop-shadow(0 0 72px rgba(124, 92, 252, 0.32)) !important;
+        drop-shadow(0 24px 68px rgba(0, 0, 0, 0.72))
+        drop-shadow(0 0 90px rgba(124, 92, 252, 0.36)) !important;
     transition: filter 0.5s ease;
 }
 
 /* Keep running glow in fullscreen */
 html.is-fullscreen body.is-running #finjan-svg {
     filter:
-        drop-shadow(0 20px 60px rgba(0, 0, 0, 0.70))
-        drop-shadow(0 0 90px rgba(159, 125, 255, 0.48)) !important;
+        drop-shadow(0 24px 68px rgba(0, 0, 0, 0.72))
+        drop-shadow(0 0 110px rgba(159, 125, 255, 0.52)) !important;
 }
 
-/* Enlarged, drifting halo behind the fullscreen cup */
+/* Enlarged, drifting halo behind the fullscreen battery */
 html.is-fullscreen .finjan-scene::before {
-    inset: -16vh -18vh -12vh -18vh !important;
-    background: radial-gradient(ellipse 55% 48% at 50% 46%,
-        rgba(159, 125, 255, 0.28) 0%,
-        rgba(124, 92, 252, 0.08) 38%,
-        transparent 64%) !important;
-    filter: blur(10px) !important;
+    inset: -10vh -22vh -10vh -22vh !important;
+    background: radial-gradient(ellipse 46% 60% at 50% 50%,
+        rgba(159, 125, 255, 0.30) 0%,
+        rgba(124, 92, 252, 0.08) 40%,
+        transparent 66%) !important;
+    filter: blur(12px) !important;
+}
+
+/* Keep fullscreen halo tiers in sync with the in-page tiers */
+html.is-fullscreen body.battery-mid .finjan-scene::before {
+    background: radial-gradient(ellipse 46% 60% at 50% 50%,
+        rgba(255, 194, 102, 0.32) 0%,
+        rgba(255, 160,  72, 0.10) 40%,
+        transparent 66%) !important;
+}
+html.is-fullscreen body.battery-low .finjan-scene::before {
+    background: radial-gradient(ellipse 46% 60% at 50% 50%,
+        rgba(255, 122, 143, 0.36) 0%,
+        rgba(255,  90, 112, 0.12) 40%,
+        transparent 66%) !important;
 }
 
 /* ── Timer text: subtle secondary element ─────────────────── */
@@ -525,8 +568,8 @@ html:-webkit-full-screen .finjan-scene {
 
 html:fullscreen #finjan-svg,
 html:-webkit-full-screen #finjan-svg {
-    height: 82vh !important;
-    max-width: 82vh !important;
+    height: 88vh !important;
+    max-width: 70vw !important;
     width: auto !important;
 }
 
@@ -609,25 +652,27 @@ body::before {
         0 3px 16px rgba(124, 92, 252, 0.42);
 }
 
-/* Finjan — larger, more commanding, ambient halo */
+/* Battery — larger, more commanding, ambient halo */
 #finjan-svg {
-    height: 460px;
-    filter: drop-shadow(0 28px 64px rgba(0, 0, 0, 0.58));
+    height: 500px;
+    filter: drop-shadow(0 30px 72px rgba(0, 0, 0, 0.62));
 }
 .finjan-scene {
     position: relative;
 }
+/* Elliptical halo tuned to the vertical battery aspect */
 .finjan-scene::before {
     content: '';
     position: absolute;
-    inset: -90px -110px -70px -110px;
-    background: radial-gradient(ellipse 52% 46% at 50% 44%,
-        rgba(159, 125, 255, 0.20) 0%,
-        rgba(124, 92, 252, 0.06) 36%,
-        transparent 62%);
+    inset: -90px -140px -90px -140px;
+    background: radial-gradient(ellipse 48% 58% at 50% 50%,
+        rgba(159, 125, 255, 0.22) 0%,
+        rgba(124, 92, 252, 0.06) 38%,
+        transparent 64%);
     pointer-events: none;
     z-index: -1;
-    filter: blur(6px);
+    filter: blur(8px);
+    transition: background 1.0s ease;
 }
 .is-running .finjan-scene::before {
     animation: fj-halo 4.6s ease-in-out infinite;
@@ -637,10 +682,7 @@ body::before {
     50%      { opacity: 0.78; transform: scale(1.045); }
 }
 
-/* Crisper pixel drain — snappier fade on individual cells */
-#fj-pixels rect {
-    transition: opacity 0.45s cubic-bezier(0.3, 0.0, 0.2, 1);
-}
+/* Crisper border-pixel fade — white silhouette reacts instantly */
 #fj-border-pixels rect {
     transition: opacity 0.25s ease;
 }
@@ -722,16 +764,22 @@ body::before {
 
 /* Responsive adjustments — keep hero feel on narrower screens */
 @media (max-width: 480px) {
-    #finjan-svg         { height: 300px; }
+    #finjan-svg         { height: 340px; }
     .finjan-time-display{ font-size: 3.0rem; }
 }
-@media (max-height: 820px) {
+@media (max-height: 900px) {
+    #finjan-svg         { height: 440px; }
+    .finjan-time-display{ font-size: 3.6rem; }
+}
+@media (max-height: 780px) {
     #finjan-svg         { height: 380px; }
-    .finjan-time-display{ font-size: 3.4rem; }
+    .finjan-time-display{ font-size: 3.2rem; }
 }
 @media (max-height: 680px) {
+    .focus-main         { padding-top: 12px; }
     #finjan-svg         { height: 320px; }
-    .finjan-time-display{ font-size: 3.0rem; margin-bottom: 14px; }
-    .focus-phase-tabs   { margin-bottom: 18px; }
-    .focus-session-label{ margin-bottom: 20px; }
+    .finjan-time-display{ font-size: 2.8rem; margin-bottom: 12px; }
+    .focus-phase-tabs   { margin-bottom: 14px; }
+    .focus-session-label{ margin-bottom: 18px; }
+    .focus-controls     { margin-bottom: 14px; }
 }
