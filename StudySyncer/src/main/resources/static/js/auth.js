@@ -360,12 +360,13 @@ async function loadSavedPlan() {
 async function loadSavedTimer() {
     if (!window.currentUser) return;
     try {
-        const res = await fetch('/api/timer/load');
+        // The new /state endpoint returns the FULL authoritative timer state,
+        // including phase, durations, running, runEndAtMs, etc.  Hand it to
+        // TimerCore which computes local clock skew and adopts it.
+        const res = await fetch('/api/timer/state');
         if (res.ok) {
             const state = await res.json();
-            if (state && state.mode) {
-                restoreTimerState(state);  // defined in timer.js
-            }
+            if (state) restoreTimerState(state);   // defined in timer.js
         }
     } catch (e) { /* silent */ }
 }

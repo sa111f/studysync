@@ -53,6 +53,13 @@ public class TrackerService {
         s.setStudyDate(now.toLocalDate());   // Toronto date, not UTC date
         sessionRepo.save(s);
 
+        // Break phases must NEVER credit the daily study goal.  Defensive server-side
+        // guard — the frontend already filters these out, but a second layer here
+        // ensures that even a buggy or stale client can't inflate goal progress.
+        if (isBreakMode(timerMode)) {
+            return;
+        }
+
         // Step 1: sync today's goal progress inside its own @Transactional.
         // addCompletedMinutes commits before returning, so the DB is up-to-date.
         DailyGoal updatedGoal = dailyGoalService.addCompletedMinutes(user, durationMinutes);
@@ -62,6 +69,17 @@ public class TrackerService {
         // so the email fires outside the DB transaction — no open connection during
         // the Resend HTTP call, and no rollback risk on email failure.
         dailyGoalService.triggerGoalReachedEmailIfNeeded(updatedGoal);
+    }
+
+    /**
+     * True if the timerMode label describes a break phase, case-insensitively.
+     * Matches both the client's display strings ("Short Break", "Long Break")
+     * and any legacy all-lowercase variants.
+     */
+    private boolean isBreakMode(String timerMode) {
+        if (timerMode == null) return false;
+        String m = timerMode.toLowerCase();
+        return m.contains("break");
     }
 
     // ── Date range ────────────────────────────────────────

@@ -13,45 +13,147 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 /**
- * STUD-34 — Save timer mode + session count for logged-in users.
- * STUD-35 — Load saved timer state on return.
- * Guests are unaffected: endpoints return 401 silently when not logged in.
+ * Full-state timer REST API.
+ *
+ * Endpoints
+ * ─────────
+ *   GET  /api/timer/state                 — read current state
+ *   POST /api/timer/start                 — start / resume current phase
+ *   POST /api/timer/pause                 — pause current phase
+ *   POST /api/timer/skip                  — skip to next phase (no auto-start)
+ *   POST /api/timer/complete              — natural phase-end (idempotent)
+ *     body: { phase: string, runEndAtMs: long }
+ *   POST /api/timer/phase                 — switch phase
+ *     body: { phase: string }
+ *   POST /api/timer/durations             — update pomodoro / break durations
+ *     body: { pomodoroMinutes, shortBreakMinutes, longBreakMinutes }
+ *   POST /api/timer/countdown             — apply custom countdown duration
+ *     body: { minutes: int }
+ *
+ * Legacy endpoints (kept for backward compat with older clients / tests)
+ *   POST /api/timer/save                  — write mode + totalSeconds + sessionCount
+ *   GET  /api/timer/load                  — read same three fields
+ *
+ * Guests get 401 silently; the client swallows it and runs in localStorage mode.
  */
 @RestController
 @RequestMapping("/api/timer")
 public class TimerSaveController {
 
     private final TimerProgressRepository timerRepo;
-    private final UserService userService;
+    private final TimerStateService       timerStateService;
+    private final UserService             userService;
 
-    public TimerSaveController(TimerProgressRepository timerRepo, UserService userService) {
-        this.timerRepo   = timerRepo;
-        this.userService = userService;
+    public TimerSaveController(TimerProgressRepository timerRepo,
+                               TimerStateService timerStateService,
+                               UserService userService) {
+        this.timerRepo         = timerRepo;
+        this.timerStateService = timerStateService;
+        this.userService       = userService;
     }
 
-    /** POST /api/timer/save */
+    // ── Full state REST API ───────────────────────────────────────────
+
+    @GetMapping("/state")
+    public ResponseEntity<?> getState(HttpSession session) {
+        User user = resolveUser(session);
+        if (user == null) return unauthorized();
+        return ResponseEntity.ok(timerStateService.getState(user));
+    }
+
+    @PostMapping("/start")
+    public ResponseEntity<?> start(HttpSession session) {
+        User user = resolveUser(session);
+        if (user == null) return unauthorized();
+        return ResponseEntity.ok(timerStateService.start(user));
+    }
+
+    @PostMapping("/pause")
+    public ResponseEntity<?> pause(HttpSession session) {
+        User user = resolveUser(session);
+        if (user == null) return unauthorized();
+        return ResponseEntity.ok(timerStateService.pause(user));
+    }
+
+    @PostMapping("/skip")
+    public ResponseEntity<?> skip(HttpSession session) {
+        User user = resolveUser(session);
+        if (user == null) return unauthorized();
+        return ResponseEntity.ok(timerStateService.skip(user));
+    }
+
+    @PostMapping("/complete")
+    public ResponseEntity<?> complete(@RequestBody Map<String, Object> body,
+                                      HttpSession session) {
+        User user = resolveUser(session);
+        if (user == null) return unauthorized();
+
+        String phase = (String) body.get("phase");
+        Long runEndAtMs = null;
+        Object raw = body.get("runEndAtMs");
+        if (raw instanceof Number) {
+            runEndAtMs = ((Number) raw).longValue();
+        } else if (raw instanceof String && !((String) raw).isEmpty()) {
+            try { runEndAtMs = Long.parseLong((String) raw); } catch (NumberFormatException ignored) {}
+        }
+        return ResponseEntity.ok(timerStateService.completePhase(user, phase, runEndAtMs));
+    }
+
+    @PostMapping("/phase")
+    public ResponseEntity<?> phase(@RequestBody Map<String, String> body,
+                                   HttpSession session) {
+        User user = resolveUser(session);
+        if (user == null) return unauthorized();
+        return ResponseEntity.ok(timerStateService.setPhase(user, body.get("phase")));
+    }
+
+    @PostMapping("/durations")
+    public ResponseEntity<?> durations(@RequestBody Map<String, Integer> body,
+                                       HttpSession session) {
+        User user = resolveUser(session);
+        if (user == null) return unauthorized();
+        return ResponseEntity.ok(timerStateService.setDurations(
+                user,
+                body.get("pomodoroMinutes"),
+                body.get("shortBreakMinutes"),
+                body.get("longBreakMinutes")));
+    }
+
+    @PostMapping("/countdown")
+    public ResponseEntity<?> countdown(@RequestBody Map<String, Integer> body,
+                                       HttpSession session) {
+        User user = resolveUser(session);
+        if (user == null) return unauthorized();
+        Integer m = body.get("minutes");
+        if (m == null) m = 25;
+        return ResponseEntity.ok(timerStateService.applyCountdown(user, m));
+    }
+
+    // ── Legacy endpoints ──────────────────────────────────────────────
+
+    /** POST /api/timer/save — legacy, writes three scalar fields. */
     @PostMapping("/save")
     @Transactional
     public ResponseEntity<?> save(@RequestBody TimerStateDto dto, HttpSession session) {
         User user = resolveUser(session);
-        if (user == null) return ResponseEntity.status(401).body(Map.of("error", "Not logged in."));
+        if (user == null) return unauthorized();
 
         TimerProgress p = timerRepo.findByUser(user).orElse(new TimerProgress());
         p.setUser(user);
-        p.setMode(dto.getMode());
-        p.setTotalSeconds(dto.getTotalSeconds());
-        p.setSessionCount(dto.getSessionCount());
+        if (dto.getMode() != null)        p.setMode(dto.getMode());
+        if (dto.getTotalSeconds() > 0)    p.setTotalSeconds(dto.getTotalSeconds());
+        if (dto.getSessionCount() > 0)    p.setSessionCount(dto.getSessionCount());
         p.setUpdatedAt(LocalDateTime.now());
         timerRepo.save(p);
 
         return ResponseEntity.ok(Map.of("message", "Timer saved."));
     }
 
-    /** GET /api/timer/load */
+    /** GET /api/timer/load — legacy, reads three scalar fields. */
     @GetMapping("/load")
     public ResponseEntity<?> load(HttpSession session) {
         User user = resolveUser(session);
-        if (user == null) return ResponseEntity.status(401).body(Map.of("error", "Not logged in."));
+        if (user == null) return unauthorized();
 
         return timerRepo.findByUser(user)
                 .<ResponseEntity<?>>map(p -> {
@@ -62,6 +164,12 @@ public class TimerSaveController {
                     return ResponseEntity.ok(dto);
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────
+
+    private ResponseEntity<?> unauthorized() {
+        return ResponseEntity.status(401).body(Map.of("error", "Not logged in."));
     }
 
     private User resolveUser(HttpSession session) {

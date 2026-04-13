@@ -4,82 +4,89 @@
  *
  * SINGLE SOURCE OF TRUTH for all timer state. Both the dashboard
  * (timer.js) and Focus Mode (focus.js) subscribe to this module.
- * Neither page owns an interval; all interval logic lives here.
+ * Neither page owns an interval; all display refresh logic lives here.
+ *
+ * Model
+ * ─────
+ *   The authoritative live state is just:
+ *     runEndAtMs (epoch ms)   — when the current phase's timer will hit 0
+ *     isRunning (bool)        — whether we're currently counting down
+ *     remainingSeconds (int)  — ONLY meaningful when NOT running
+ *
+ *   While running, `remaining` is a PURE FUNCTION of
+ *     max(0, round((runEndAtMs - Date.now()) / 1000))
+ *
+ *   Nothing in this file decrements a stored counter while running.
+ *   The setInterval ticks every 250 ms purely to refresh displays.
+ *
+ * Why the rewrite
+ * ───────────────
+ *   The previous version stored a `remaining` counter and decremented
+ *   it on every interval tick.  On page navigation, init() would read
+ *   the already-decremented counter AND subtract wall-clock elapsed time
+ *   AGAIN, double-counting and losing ~15 minutes per navigation cycle.
+ *   It also triggered a spurious auto-start() after landing remaining at
+ *   zero, which produced a hidden auto-started break.
  *
  * Persistence
- *   localStorage  — cross-page navigation in the same browser
- *   BroadcastChannel — best-effort cross-tab display sync
- *   Backend /api/timer/save — cross-device (triggered by UI layers)
+ *   localStorage           — cross-page navigation in the same browser
+ *   BroadcastChannel       — cross-tab live sync of state transitions
+ *   Backend /api/timer/*   — cross-device truth for logged-in users
  *
- * Auto-resume
- *   If the timer was running when the user navigated away, the
- *   elapsed real time is calculated from the saved timestamp and
- *   the timer resumes automatically on the new page after a 50 ms
- *   grace period (enough for subscribers to register).
+ * Idempotency
+ *   Phase-end firing is guarded by _endedMarker = `${phase}:${runEndAtMs}`.
+ *   Two tabs racing to finalize the same phase-instance will only advance
+ *   the state once; the second call becomes a no-op.
  */
 (function (global) {
 
-    var LS_KEY  = 'ss_timer_v2';
-    var BC_NAME = 'ss_timer_bc';
+    var LS_KEY  = 'ss_timer_v3';   // bump: v3 invalidates the old decrement-based format
+    var BC_NAME = 'ss_timer_bc_v3';
 
     // ── Default state ──────────────────────────────────────────
     var DEFAULTS = {
-        pomodoroMins:   25,
-        shortBreakMins: 5,
-        longBreakMins:  15,
-        phase:          'pomodoro',  // 'pomodoro'|'shortbreak'|'longbreak'|'countdown'
-        sessionCount:   1,
-        totalSeconds:   25 * 60,
-        remaining:      25 * 60,
-        isRunning:      false,
-        isPaused:       false,       // true when paused mid-session; false when fresh/reset
-        runSince:       null,        // Date.now() snapshot when last started
+        pomodoroMins:     25,
+        shortBreakMins:   5,
+        longBreakMins:    15,
+        phase:            'pomodoro',  // 'pomodoro'|'shortbreak'|'longbreak'|'countdown'
+        sessionCount:     1,
+        totalSeconds:     25 * 60,
+        remainingSeconds: 25 * 60,     // authoritative only when !isRunning
+        isRunning:        false,
+        isPaused:         false,
+        runEndAtMs:       null,        // epoch ms when the running phase will hit 0
     };
 
-    var _s    = Object.assign({}, DEFAULTS);
-    var _ivl  = null;     // the one setInterval
-    var _subs = [];       // subscriber callbacks
-    var _bc   = null;     // BroadcastChannel
-    var _mute = false;    // suppress re-broadcast while handling incoming msg
-    var _pendingResume = false; // auto-resume scheduled
-
-    // ── BroadcastChannel (cross-tab display sync) ──────────────
-    try {
-        _bc = new BroadcastChannel(BC_NAME);
-        _bc.onmessage = function (ev) {
-            var d = ev.data;
-            _mute = true;
-            if (d.type === 'TICK') {
-                // Another tab ticked — update display if we have no local interval
-                if (!_ivl) {
-                    _s.remaining = d.remaining;
-                    _s.isRunning = true;
-                    _fire('tick');
-                }
-            } else if (d.type === 'STATE') {
-                // Another tab changed phase / paused / etc.
-                Object.assign(_s, d.state);
-                if (_ivl && !_s.isRunning) {
-                    clearInterval(_ivl);
-                    _ivl = null;
-                }
-                // Fire the semantically correct event so UI subscribers
-                // render the right visual state (pause blink, running glow, etc.)
-                if (_s.isPaused && !_s.isRunning) {
-                    _fire('pause');
-                } else if (_s.isRunning) {
-                    _fire('start');
-                } else {
-                    _fire('phase');
-                }
-            }
-            _mute = false;
-        };
-    } catch (_) { /* BroadcastChannel unavailable — graceful fallback */ }
+    var _s              = Object.assign({}, DEFAULTS);
+    var _ivl            = null;
+    var _subs           = [];
+    var _bc             = null;
+    var _mute           = false;
+    var _endedMarker    = null;  // prevents double-firing sessionEnd across tabs/reloads
 
     // ── Helpers ────────────────────────────────────────────────
+    function _computeRemaining() {
+        if (_s.isRunning && _s.runEndAtMs) {
+            return Math.max(0, Math.round((_s.runEndAtMs - Date.now()) / 1000));
+        }
+        return Math.max(0, _s.remainingSeconds | 0);
+    }
+
     function _snap() {
-        return Object.assign({}, _s);
+        var remaining = _computeRemaining();
+        return {
+            phase:            _s.phase,
+            pomodoroMins:     _s.pomodoroMins,
+            shortBreakMins:   _s.shortBreakMins,
+            longBreakMins:    _s.longBreakMins,
+            sessionCount:     _s.sessionCount,
+            totalSeconds:     _s.totalSeconds,
+            remaining:        remaining,        // canonical live value for UIs
+            remainingSeconds: _s.remainingSeconds,
+            isRunning:        _s.isRunning,
+            isPaused:         _s.isPaused,
+            runEndAtMs:       _s.runEndAtMs,
+        };
     }
 
     function _fire(event, overrideState) {
@@ -92,68 +99,226 @@
     function _broadcast(type, extra) {
         if (_mute || !_bc) return;
         try {
-            _bc.postMessage(Object.assign({ type: type, state: _snap() }, extra || {}));
+            _bc.postMessage(Object.assign({ type: type, state: _persistable() }, extra || {}));
         } catch (_) {}
     }
 
+    /** Persistable form: raw state fields only, no computed values. */
+    function _persistable() {
+        return {
+            phase:            _s.phase,
+            pomodoroMins:     _s.pomodoroMins,
+            shortBreakMins:   _s.shortBreakMins,
+            longBreakMins:    _s.longBreakMins,
+            sessionCount:     _s.sessionCount,
+            totalSeconds:     _s.totalSeconds,
+            remainingSeconds: _s.remainingSeconds,
+            isRunning:        _s.isRunning,
+            isPaused:         _s.isPaused,
+            runEndAtMs:       _s.runEndAtMs,
+            endedMarker:      _endedMarker,
+        };
+    }
+
     function _save() {
-        try { localStorage.setItem(LS_KEY, JSON.stringify(_s)); } catch (_) {}
+        try { localStorage.setItem(LS_KEY, JSON.stringify(_persistable())); } catch (_) {}
     }
 
     function _durationFor(phase) {
         if (phase === 'shortbreak') return _s.shortBreakMins * 60;
         if (phase === 'longbreak')  return _s.longBreakMins  * 60;
-        return _s.pomodoroMins * 60;  // 'pomodoro' and 'countdown'
+        if (phase === 'countdown')  return _s.totalSeconds || (_s.pomodoroMins * 60);
+        return _s.pomodoroMins * 60;  // 'pomodoro'
     }
 
-    // ── Init: restore from localStorage + schedule auto-resume ─
+    function _markerFor(phase, runEndAtMs) {
+        return phase + ':' + (runEndAtMs || 0);
+    }
+
+    // ── BroadcastChannel (cross-tab live sync) ─────────────────
+    try {
+        _bc = new BroadcastChannel(BC_NAME);
+        _bc.onmessage = function (ev) {
+            var d = ev.data;
+            if (!d || d.type !== 'STATE' || !d.state) return;
+            _mute = true;
+            Object.assign(_s, d.state);
+            if (d.state.endedMarker != null) _endedMarker = d.state.endedMarker;
+            _save();
+            _fire(_s.isRunning ? 'start' : (_s.isPaused ? 'pause' : 'phase'));
+            _mute = false;
+        };
+    } catch (_) { /* BroadcastChannel unavailable — graceful fallback */ }
+
+    // ── Init: restore from localStorage ────────────────────────
     (function _init() {
         try {
             var raw = localStorage.getItem(LS_KEY);
-            if (!raw) return;
-            var saved = JSON.parse(raw);
-            Object.assign(_s, saved);
-
-            if (_s.isRunning && _s.runSince) {
-                var elapsed = Math.floor((Date.now() - _s.runSince) / 1000);
-                _s.remaining = Math.max(0, (_s.remaining || 0) - elapsed);
-                _s.isRunning = false;
-                _s.runSince  = null;
-
-                if (_s.remaining > 0) {
-                    // Schedule auto-resume — 50 ms gives subscribers time to register
-                    _pendingResume = true;
-                    setTimeout(function () {
-                        _pendingResume = false;
-                        _api.start();
-                    }, 50);
-                }
+            if (raw) {
+                var saved = JSON.parse(raw);
+                Object.assign(_s, saved);
+                if (saved.endedMarker) _endedMarker = saved.endedMarker;
             }
         } catch (_) {}
+
+        // If the saved state says "running" but runEndAtMs has already passed,
+        // we'll handle it naturally in the first _tick() below.  No destructive
+        // rewrite of remaining here — that was the old bug.
+        _startDisplayInterval();
     })();
 
-    // ── Internal: handle natural session end ───────────────────
-    function _onSessionEnd() {
-        var preState = _snap();   // captures the phase that just completed
+    // ── Display interval ───────────────────────────────────────
+    function _startDisplayInterval() {
+        if (_ivl) return;
+        _ivl = setInterval(_tick, 250);
+    }
 
-        // Fire 'sessionEnd' — UI layers handle /api/tracker/sessions
-        _fire('sessionEnd', preState);
+    function _stopDisplayInterval() {
+        if (_ivl) { clearInterval(_ivl); _ivl = null; }
+    }
 
-        if (_s.phase === 'pomodoro') {
-            var next = (_s.sessionCount % 4 === 0) ? 'longbreak' : 'shortbreak';
-            _s.sessionCount++;
-            _api.setPhase(next);
-            setTimeout(function () { _api.start(); }, 1100);
-        } else if (_s.phase === 'shortbreak' || _s.phase === 'longbreak') {
-            if (_s.sessionCount > 4) _s.sessionCount = 1;
-            _api.setPhase('pomodoro');
-        } else {
-            // countdown — reset to full, stay stopped (not paused)
-            _s.remaining = _s.totalSeconds;
-            _s.isPaused  = false;
+    function _tick() {
+        if (_s.isRunning && _s.runEndAtMs) {
+            var rem = _computeRemaining();
+            if (rem <= 0) {
+                _onSessionEnd();
+                return;
+            }
+            _fire('tick');
+        } else if (_s.isRunning && !_s.runEndAtMs) {
+            // Shouldn't happen, but heal gracefully
+            _s.isRunning = false;
             _save();
             _fire('phase');
         }
+    }
+
+    // ── Phase end (idempotent, guarded by _endedMarker) ────────
+    function _onSessionEnd() {
+        var endedPhase     = _s.phase;
+        var endedRunEndAt  = _s.runEndAtMs;
+        var marker         = _markerFor(endedPhase, endedRunEndAt);
+
+        if (_endedMarker === marker) {
+            // Another tab or this tab's earlier tick already handled it.
+            return;
+        }
+        _endedMarker = marker;
+
+        // Freeze the "just finished" snapshot so subscribers can log it.
+        var preState = {
+            phase:            endedPhase,
+            pomodoroMins:     _s.pomodoroMins,
+            shortBreakMins:   _s.shortBreakMins,
+            longBreakMins:    _s.longBreakMins,
+            sessionCount:     _s.sessionCount,
+            totalSeconds:     _s.totalSeconds,
+            remaining:        0,
+            remainingSeconds: 0,
+            isRunning:        false,
+            isPaused:         false,
+            runEndAtMs:       null,
+        };
+
+        // Stop the running clock locally.
+        _s.isRunning  = false;
+        _s.isPaused   = false;
+        _s.runEndAtMs = null;
+        _s.remainingSeconds = 0;
+
+        _fire('done', preState);
+        _fire('sessionEnd', preState);
+        _save();
+        _broadcast('STATE');
+
+        // Advance to the next phase locally (frontend optimistic update).
+        if (endedPhase === 'pomodoro') {
+            var nextBreak = (_s.sessionCount % 4 === 0) ? 'longbreak' : 'shortbreak';
+            _s.sessionCount++;
+            _setPhaseLocal(nextBreak);
+            // Auto-start the break after a short grace period so subscribers
+            // can finish rendering their "done" flash.
+            setTimeout(function () { _api.start(); }, 1100);
+        } else if (endedPhase === 'shortbreak' || endedPhase === 'longbreak') {
+            if (_s.sessionCount > 4) _s.sessionCount = 1;
+            _setPhaseLocal('pomodoro');
+        } else {
+            // Countdown — reset to full, stay stopped.
+            _s.remainingSeconds = _s.totalSeconds;
+            _save();
+            _fire('phase');
+            _broadcast('STATE');
+        }
+
+        // Backend reconciliation — fire-and-forget.  The idempotency guard
+        // on the server means multiple tabs racing here all resolve safely.
+        if (global.currentUser) {
+            fetch('/api/timer/complete', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                keepalive: true,
+                body: JSON.stringify({ phase: endedPhase, runEndAtMs: endedRunEndAt })
+            }).catch(function () {});
+        }
+    }
+
+    // Internal: switch phase locally without firing a backend call
+    // (used during auto-advance after session end).
+    function _setPhaseLocal(phase) {
+        _s.phase            = phase;
+        _s.totalSeconds     = _durationFor(phase);
+        _s.remainingSeconds = _s.totalSeconds;
+        _s.isRunning        = false;
+        _s.isPaused         = false;
+        _s.runEndAtMs       = null;
+        _endedMarker        = null;
+        _save();
+        _broadcast('STATE');
+        _fire('phase');
+    }
+
+    // ── Backend sync helpers ───────────────────────────────────
+    function _postBackend(path, body) {
+        if (!global.currentUser) return Promise.resolve(null);
+        return fetch(path, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    body ? JSON.stringify(body) : '{}',
+        }).then(function (r) { return r.ok ? r.json() : null; })
+          .catch(function () { return null; });
+    }
+
+    /**
+     * Adopt an authoritative state from the backend.  Used when:
+     *   - another device started the timer and this tab just logged in
+     *   - the server's /start response arrived with a refined runEndAtMs
+     */
+    function _adoptServerState(serverDto) {
+        if (!serverDto || typeof serverDto !== 'object') return;
+        _mute = true;
+        if (serverDto.phase)             _s.phase            = serverDto.phase;
+        if (serverDto.pomodoroMinutes)   _s.pomodoroMins     = serverDto.pomodoroMinutes;
+        if (serverDto.shortBreakMinutes) _s.shortBreakMins   = serverDto.shortBreakMinutes;
+        if (serverDto.longBreakMinutes)  _s.longBreakMins    = serverDto.longBreakMinutes;
+        if (serverDto.sessionCount)      _s.sessionCount     = serverDto.sessionCount;
+        if (serverDto.totalSeconds)      _s.totalSeconds     = serverDto.totalSeconds;
+        if (typeof serverDto.remainingSeconds === 'number') _s.remainingSeconds = serverDto.remainingSeconds;
+        _s.isRunning  = !!serverDto.running;
+        _s.isPaused   = !!serverDto.paused;
+
+        // Correct for clock skew between the server and this client.
+        if (_s.isRunning && serverDto.runEndAtMs) {
+            var skew = Date.now() - (serverDto.serverNowMs || Date.now());
+            _s.runEndAtMs = serverDto.runEndAtMs + skew;
+        } else {
+            _s.runEndAtMs = null;
+        }
+
+        _endedMarker = null;
+        _save();
+        _broadcast('STATE');
+        _fire(_s.isRunning ? 'start' : (_s.isPaused ? 'pause' : 'phase'));
+        _mute = false;
     }
 
     // ── Public API ─────────────────────────────────────────────
@@ -167,103 +332,53 @@
             _subs = _subs.filter(function (f) { return f !== fn; });
         },
 
-        /** Full state snapshot (safe copy) */
+        /** Full live snapshot. `.remaining` is the canonical display value. */
         getState: function () { return _snap(); },
 
-        /** Computed progress 0 → 1 */
         getProgress: function () {
-            return _s.totalSeconds > 0 ? _s.remaining / _s.totalSeconds : 0;
-        },
-
-        /**
-         * Switch phase. Resets remaining to the new duration.
-         * Pauses any running timer first.
-         */
-        setPhase: function (phase) {
-            if (_s.isRunning) _api.pause();
-            _s.phase        = phase;
-            _s.totalSeconds = _durationFor(phase);
-            _s.remaining    = _s.totalSeconds;
-            _s.isPaused     = false;
-            _s.runSince     = null;
-            _save();
-            _broadcast('STATE');
-            _fire('phase');
-        },
-
-        /**
-         * Update editable durations and refresh current phase duration.
-         */
-        setDurations: function (pomodoro, shortBreak, longBreak) {
-            if (!isNaN(pomodoro)   && pomodoro   >= 1 && pomodoro   <= 999) _s.pomodoroMins   = pomodoro;
-            if (!isNaN(shortBreak) && shortBreak >= 1 && shortBreak <= 999) _s.shortBreakMins = shortBreak;
-            if (!isNaN(longBreak)  && longBreak  >= 1 && longBreak  <= 999) _s.longBreakMins  = longBreak;
-            if (_s.phase !== 'countdown') {
-                _s.totalSeconds = _durationFor(_s.phase);
-                _s.remaining    = _s.totalSeconds;
-            }
-            _s.isPaused = false;
-            _save();
-            _broadcast('STATE');
-            _fire('phase');
-        },
-
-        /**
-         * Apply a custom countdown duration.
-         * Called by subjects.js via applyTimerDuration() shim in timer.js.
-         */
-        applyCountdownDuration: function (mins) {
-            if (_s.isRunning) _api.pause();
-            _s.phase        = 'countdown';
-            _s.totalSeconds = mins * 60;
-            _s.remaining    = _s.totalSeconds;
-            _s.isPaused     = false;
-            _s.runSince     = null;
-            _save();
-            _broadcast('STATE');
-            _fire('phase');
+            var rem = _computeRemaining();
+            return _s.totalSeconds > 0 ? rem / _s.totalSeconds : 0;
         },
 
         start: function () {
             if (_s.isRunning) return;
-            if (_ivl) { clearInterval(_ivl); _ivl = null; }
 
-            _s.isRunning = true;
-            _s.isPaused  = false;
-            _s.runSince  = Date.now();
+            // If remaining has drained to zero or below, reset to full phase
+            // duration so the user can actually begin again.  This also
+            // handles the "phase just ended and we're about to auto-start"
+            // flow from _onSessionEnd.
+            if (_s.remainingSeconds <= 0) {
+                _s.remainingSeconds = _durationFor(_s.phase);
+                _s.totalSeconds     = _s.remainingSeconds;
+            }
+
+            _s.isRunning  = true;
+            _s.isPaused   = false;
+            _s.runEndAtMs = Date.now() + _s.remainingSeconds * 1000;
+            _endedMarker  = null;
             _save();
             _broadcast('STATE');
             _fire('start');
 
-            _ivl = setInterval(function () {
-                if (_s.remaining <= 0) {
-                    clearInterval(_ivl);
-                    _ivl = null;
-                    _s.isRunning = false;
-                    _s.runSince  = null;
-                    _save();
-                    _broadcast('STATE');
-                    _fire('done');
-                    _onSessionEnd();
-                    return;
-                }
-                _s.remaining--;
-                _save();
-                _broadcast('TICK', { remaining: _s.remaining });
-                _fire('tick');
-            }, 1000);
+            _postBackend('/api/timer/start').then(function (dto) {
+                if (dto) _adoptServerState(dto);
+            });
         },
 
         pause: function () {
             if (!_s.isRunning) return;
-            clearInterval(_ivl);
-            _ivl = null;
-            _s.isRunning = false;
-            _s.isPaused  = true;
-            _s.runSince  = null;
+
+            _s.remainingSeconds = _computeRemaining();
+            _s.isRunning        = false;
+            _s.isPaused         = true;
+            _s.runEndAtMs       = null;
             _save();
             _broadcast('STATE');
             _fire('pause');
+
+            _postBackend('/api/timer/pause').then(function (dto) {
+                if (dto) _adoptServerState(dto);
+            });
         },
 
         toggle: function () {
@@ -271,45 +386,98 @@
         },
 
         /**
-         * Skip current phase.
-         * Fires 'skip' with pre-skip snapshot so UI can log partial session.
-         * Then advances to the next phase and auto-starts it.
+         * Skip the current phase.  Fires 'skip' with the pre-skip snapshot
+         * so the UI can log a partial session, then advances.
          */
         skip: function () {
-            var preSkip = _snap();               // capture BEFORE any mutation
-            if (_s.isRunning) _api.pause();      // fires 'pause'
+            var pre = _snap();
+            pre.remaining = _computeRemaining();
 
-            _fire('skip', preSkip);              // UI logs partial minutes from preSkip
+            _fire('skip', pre);
 
-            if (_s.phase === 'pomodoro' || _s.phase === 'countdown') {
-                var next = (_s.sessionCount % 4 === 0) ? 'longbreak' : 'shortbreak';
-                if (_s.phase === 'pomodoro') _s.sessionCount++;
-                _api.setPhase(next);
+            if (pre.phase === 'pomodoro' || pre.phase === 'countdown') {
+                var nextBreak = (_s.sessionCount % 4 === 0) ? 'longbreak' : 'shortbreak';
+                if (pre.phase === 'pomodoro') _s.sessionCount++;
+                _setPhaseLocal(nextBreak);
                 setTimeout(function () { _api.start(); }, 700);
             } else {
                 if (_s.sessionCount > 4) _s.sessionCount = 1;
-                _api.setPhase('pomodoro');
+                _setPhaseLocal('pomodoro');
             }
+
+            _postBackend('/api/timer/skip').then(function (dto) {
+                if (dto) _adoptServerState(dto);
+            });
         },
 
         /**
-         * Restore state from backend after login.
-         * Only updates sessionCount and countdown duration — does NOT
-         * override locally-tracked remaining time or running state,
-         * which localStorage already handles correctly.
+         * Switch phase.  Pauses first if running.  Resets remaining to full.
+         */
+        setPhase: function (phase) {
+            if (_s.isRunning) _api.pause();
+            _setPhaseLocal(phase);
+            _postBackend('/api/timer/phase', { phase: phase }).then(function (dto) {
+                if (dto) _adoptServerState(dto);
+            });
+        },
+
+        setDurations: function (pomodoro, shortBreak, longBreak) {
+            if (!isNaN(pomodoro)   && pomodoro   >= 1 && pomodoro   <= 999) _s.pomodoroMins   = pomodoro;
+            if (!isNaN(shortBreak) && shortBreak >= 1 && shortBreak <= 999) _s.shortBreakMins = shortBreak;
+            if (!isNaN(longBreak)  && longBreak  >= 1 && longBreak  <= 999) _s.longBreakMins  = longBreak;
+
+            if (_s.phase !== 'countdown') {
+                _s.totalSeconds     = _durationFor(_s.phase);
+                _s.remainingSeconds = _s.totalSeconds;
+                _s.isRunning        = false;
+                _s.isPaused         = false;
+                _s.runEndAtMs       = null;
+            }
+            _save();
+            _broadcast('STATE');
+            _fire('phase');
+
+            _postBackend('/api/timer/durations', {
+                pomodoroMinutes:   _s.pomodoroMins,
+                shortBreakMinutes: _s.shortBreakMins,
+                longBreakMinutes:  _s.longBreakMins,
+            }).then(function (dto) {
+                if (dto) _adoptServerState(dto);
+            });
+        },
+
+        applyCountdownDuration: function (mins) {
+            var m = Math.max(1, Math.min(999, mins | 0 || 25));
+            if (_s.isRunning) _api.pause();
+            _s.phase            = 'countdown';
+            _s.totalSeconds     = m * 60;
+            _s.remainingSeconds = _s.totalSeconds;
+            _s.isRunning        = false;
+            _s.isPaused         = false;
+            _s.runEndAtMs       = null;
+            _endedMarker        = null;
+            _save();
+            _broadcast('STATE');
+            _fire('phase');
+
+            _postBackend('/api/timer/countdown', { minutes: m }).then(function (dto) {
+                if (dto) _adoptServerState(dto);
+            });
+        },
+
+        /**
+         * Called by auth.js after login with the authoritative backend state.
+         * Always overrides local state when present — the server wins on cross-
+         * device sync.
          */
         restoreFromServer: function (serverState) {
-            if (!serverState || _s.isRunning) return;
-            if (serverState.sessionCount) _s.sessionCount = serverState.sessionCount;
-            if (serverState.mode === 'countdown' && serverState.totalSeconds) {
-                _s.phase        = 'countdown';
-                _s.totalSeconds = serverState.totalSeconds;
-                _s.remaining    = _s.totalSeconds;
-            }
-            _s.isPaused = false;
-            _save();
-            _fire('phase');
+            if (!serverState) return;
+            _adoptServerState(serverState);
         },
+
+        /** Legacy no-op kept for callers in focus.js.  Backend sync is now
+         *  gated purely on window.currentUser. */
+        enableBackendSync: function () { /* no-op */ },
     };
 
     global.TimerCore = _api;

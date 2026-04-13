@@ -302,28 +302,31 @@ function _onCoreEvent(event, state) {
         if (_toggleBtn) _toggleBtn.textContent = state.isRunning ? 'Pause' : 'Start';
     }
 
-    // Session logging
+    // Session logging — study phases only.  Break phases MUST NOT be
+    // POSTed to /api/tracker/sessions or they would credit the daily goal.
     if (event === 'sessionEnd') {
-        if (window.currentUser) {
+        if (window.currentUser
+            && (state.phase === 'pomodoro' || state.phase === 'countdown')) {
             const mins = Math.round(state.totalSeconds / 60);
-            fetch('/api/tracker/sessions', {
-                method:    'POST',
-                headers:   { 'Content-Type': 'application/json' },
-                keepalive: true,   // survives page navigation
-                body: JSON.stringify({
-                    materialName:    'Focus Session',
-                    durationMinutes: mins,
-                    timerMode:       _phaseLabel(state.phase),
-                    completed:       true,
-                }),
-            })
-            .then(() => {
-                // Session saved — notify the dashboard so it can refresh goal progress
-                if (typeof window.onSessionCompleted === 'function') {
-                    window.onSessionCompleted('Focus Session', mins, new Date().toISOString().split('T')[0]);
-                }
-            })
-            .catch(() => {});
+            if (mins > 0) {
+                fetch('/api/tracker/sessions', {
+                    method:    'POST',
+                    headers:   { 'Content-Type': 'application/json' },
+                    keepalive: true,   // survives page navigation
+                    body: JSON.stringify({
+                        materialName:    'Focus Session',
+                        durationMinutes: mins,
+                        timerMode:       _phaseLabel(state.phase),
+                        completed:       true,
+                    }),
+                })
+                .then(() => {
+                    if (typeof window.onSessionCompleted === 'function') {
+                        window.onSessionCompleted('Focus Session', mins, new Date().toISOString().split('T')[0]);
+                    }
+                })
+                .catch(() => {});
+            }
         }
     } else if (event === 'skip') {
         if (state.phase === 'pomodoro' || state.phase === 'countdown') {
@@ -369,7 +372,10 @@ function _toggleFullscreen() {
     }
 }
 
-// ── Silent auth check ─────────────────────────────────────────────────────────
+// ── Silent auth check + hydrate timer from server ─────────────────────────────
+// Focus Mode is often entered directly via URL, so it must also fetch the
+// authoritative timer state from the backend — otherwise a timer started on
+// the dashboard would be invisible here until the next transition.
 window.currentUser = null;
 async function _initAuth() {
     try {
@@ -377,6 +383,13 @@ async function _initAuth() {
         if (res.ok) {
             const data = await res.json();
             window.currentUser = data.username;
+            TimerCore.enableBackendSync();
+
+            // Adopt the server's authoritative state — wins over stale localStorage.
+            try {
+                const s = await fetch('/api/timer/state');
+                if (s.ok) TimerCore.restoreFromServer(await s.json());
+            } catch (_) {}
         }
     } catch (_) { /* guest mode — silent */ }
 }

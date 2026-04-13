@@ -21,7 +21,8 @@
       "Bash(grep -E \"\\\\.\\(java|js|html\\)$\")",
       "Bash(xargs grep:*)",
       "Bash(grep -r \"timezone\\\\|ZoneId\\\\|LocalDateTime\" /c/Users/Saif0/OneDrive/Desktop/StudySyncer/StudySyncer/src/main/java/StudySyncer/*.java)",
-      "Bash(./mvnw.cmd clean:*)"
+      "Bash(./mvnw.cmd clean:*)",
+      "Skill(update-config)"
     ]
   }
 }

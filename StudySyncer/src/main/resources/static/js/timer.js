@@ -10,8 +10,10 @@
  *   - Manage the in-page session log (results table)
  *   - Expose global shims that HTML onclick attributes and
  *     subjects.js / auth.js call (same API as the old timer.js)
- *   - POST completed sessions to /api/tracker/sessions
- *   - POST timer state to /api/timer/save on significant events
+ *   - POST completed study sessions to /api/tracker/sessions
+ *
+ * Backend timer-state persistence (/api/timer/start, /pause, /phase, etc.)
+ * is owned entirely by TimerCore — this layer does not write timer state.
  */
 
 // ── DOM refs ──────────────────────────────────────────────────
@@ -116,21 +118,12 @@ function _updatePomodoroInfo(state) {
     }
 }
 
-// ── Backend timer-state save ──────────────────────────────────
-function _saveToBackend(state) {
-    if (!window.currentUser) return;
-    fetch('/api/timer/save', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            mode:         state.phase === 'countdown' ? 'countdown' : 'pomodoro',
-            totalSeconds: state.totalSeconds,
-            sessionCount: state.sessionCount,
-        }),
-    }).catch(() => {});
-}
-
 // ── TimerCore event subscriber ────────────────────────────────
+//
+// Timer state persistence (start/pause/phase/countdown) is now handled
+// inside TimerCore via its own REST calls to /api/timer/*, so this layer
+// is purely UI + session logging.  We also MUST NOT POST break phases
+// to /api/tracker/sessions — those must never credit the study goal.
 function _onCoreEvent(event, state) {
     // --- Compute visual state ---
     let visState;
@@ -147,12 +140,13 @@ function _onCoreEvent(event, state) {
         _updatePomodoroInfo(state);
     }
 
-    // --- Session logging ---
+    // --- Session logging — study phases only ---
     if (event === 'sessionEnd') {
         // state is the pre-completion snapshot (phase that just finished)
-        const mins = Math.round(state.totalSeconds / 60);
-        logSession(_activeSubject(), _phaseLabel(state.phase), mins, true);
-        _saveToBackend(state);
+        if (state.phase === 'pomodoro' || state.phase === 'countdown') {
+            const mins = Math.round(state.totalSeconds / 60);
+            if (mins > 0) logSession(_activeSubject(), _phaseLabel(state.phase), mins, true);
+        }
     } else if (event === 'skip') {
         // state is the pre-skip snapshot
         if (state.phase === 'pomodoro' || state.phase === 'countdown') {
@@ -160,11 +154,6 @@ function _onCoreEvent(event, state) {
             const mins    = Math.round(elapsed / 60);
             if (mins > 0) logSession(_activeSubject(), _phaseLabel(state.phase), mins, false);
         }
-    }
-
-    // --- Backend save on significant events (not every tick) ---
-    if (event === 'pause' || event === 'phase' || event === 'done') {
-        _saveToBackend(state);
     }
 }
 
@@ -286,10 +275,8 @@ function restoreTimerState(state) {
     TimerCore.restoreFromServer(state);
 }
 
-/** Called occasionally by auth.js / legacy code */
-function saveTimerState() {
-    _saveToBackend(TimerCore.getState());
-}
+/** Legacy no-op — TimerCore now persists transitions itself. */
+function saveTimerState() { /* intentionally empty */ }
 
 // ── Settings panel ────────────────────────────────────────────
 function toggleTimerSettings() {
