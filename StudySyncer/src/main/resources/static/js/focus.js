@@ -6,222 +6,158 @@
  * in TimerCore (timer-core.js, loaded before this file).
  *
  * Responsibilities:
- *   - Generate white pixel border squares tracing the finjan silhouette
- *   - Generate small purple pixel squares filling the cup interior
- *   - Drive visible pixel count from timer progress (top pixels drain first)
+ *   - Procedurally generate a symmetric pixel-art Arabic finjan
+ *   - Drain fill pixels top-row-first as timer progresses
  *   - Update phase tabs, progress bar, session label, toggle button
  *   - POST completed sessions to /api/tracker/sessions
  *   - Handle fullscreen toggle on finjan click
  *
- * Cup geometry (must match focus.html SVG, viewBox 0 0 300 270):
+ * FINJAN PIXEL-ART ARCHITECTURE
+ * ─────────────────────────────
+ * The cup is a grid of square cells.  For each body row r we compute a
+ * half-width hw(r); a cell (c,r) is "inside" iff |c+0.5 − CENTER| < hw(r).
+ * Because the half-width is computed from the same function on both sides,
+ * the resulting shape is pixel-perfect symmetric about the central column.
  *
- *   Outer body:
- *     M 48,48 L 252,48
- *     C 268,70  242,162  176,205   ← right side, strong outward shoulder
- *     Q 150,220  124,205            ← rounded base
- *     C  58,162   32, 70   48, 48  ← left (mirror)
+ * Classification of each inside cell:
+ *   BORDER → inside, and at least one 4-neighbor is outside the combined shape
+ *   FILL   → inside, fully surrounded by other inside cells (body rows only)
+ * The foot section is rendered as solid white — pure saucer, no interior.
  *
- *   Inner clip (purple pixels masked here):
- *     M 62,62 L 238,62
- *     C 252,88  228,162  166,198
- *     Q 150,212  134,198
- *     C  72,162   48, 88   62, 62
+ * Drain order: fill cells are sorted by ascending row, so the topmost row
+ * vanishes first as time runs out, giving the "cup emptying" illusion.
  */
 
-// ── Inner clip path — must exactly match <clipPath id="fj-clip"> in HTML ──────
-// Uses the SAME path as the outer body so purple pixels fill right up to the
-// white border pixels with no dark wall gap in between.
-const FJ_INNER_CLIP_D =
-    'M 48,48 L 252,48 C 268,70 242,162 176,205 Q 150,220 124,205 C 58,162 32,70 48,48 Z';
+// ── Grid geometry ─────────────────────────────────────────────
+const GRID_COLS       = 42;
+const GRID_ROWS_BODY  = 42;
+const GRID_ROWS_FOOT  = 3;
+const GRID_ROWS       = GRID_ROWS_BODY + GRID_ROWS_FOOT;
+const CELL            = 5;                 // grid stride (SVG units)
+const VIS_CELL        = 4.2;               // visible square side (0.8 gap)
+const PIXEL_R         = 0.55;              // tiny rounding on corners
+const ORIGIN_X        = 45;
+const ORIGIN_Y        = 38;
+const CENTER_COL      = GRID_COLS / 2;     // 21 — vertical axis of symmetry
 
-// ── Outer body segments used for border pixel sampling ────────────────────────
-// Each cubic: [P0, CP1, CP2, P3]   Quad: [P0, CP, P1]
-const FJ_RIGHT_CUBIC = [[252, 48], [268, 70], [242, 162], [176, 205]];
-const FJ_BOTTOM_QUAD = [[176, 205], [150, 220], [124, 205]];
-const FJ_LEFT_CUBIC  = [[124, 205], [58, 162],  [32,  70],  [48,  48]];
+// ── Cup silhouette — body half-width in cells at body row r ──
+function _bodyHalfAt(r) {
+    const N = GRID_ROWS_BODY - 1;
+    const t = r / N;                       // 0 at rim, 1 at bottom of body
 
-// ── Pixel config ──────────────────────────────────────────────────────────────
-const FJ_PX_SIZE     = 4;   // inner pixel side length (SVG units)
-const FJ_PX_STEP     = 6;   // inner pixel grid step (size + gap)
-const FJ_BORDER_SNAP = 4;   // border grid snap interval
-const FJ_BORDER_SIZE = 5;   // border pixel side length
+    const rimHalf  = 18.5;                 // wide stout Arabic rim
+    const baseHalf = 4.5;                  // narrow pedestal base
 
-// ── DOM refs ──────────────────────────────────────────────────────────────────
+    // Cosine smoothstep — gentle taper from rim to base
+    const eased = 0.5 - 0.5 * Math.cos(Math.PI * t);
+    let hw = rimHalf - (rimHalf - baseHalf) * Math.pow(eased, 1.25);
+
+    // Traditional Arabic shoulder — slight outward bulge just below rim
+    if (t > 0.03 && t < 0.30) {
+        const u = (t - 0.03) / 0.27;
+        hw += Math.sin(Math.PI * u) * 0.9;
+    }
+    return hw;
+}
+
+// ── Foot profile — flared saucer beneath body ────────────────
+const FOOT_PROFILE = [6.0, 7.2, 7.2];
+function _footHalfAt(fr) { return FOOT_PROFILE[fr]; }
+
+// ── Inside tests ─────────────────────────────────────────────
+function _inBody(c, r) {
+    if (r < 0 || r >= GRID_ROWS_BODY) return false;
+    return Math.abs(c + 0.5 - CENTER_COL) < _bodyHalfAt(r);
+}
+function _inFoot(c, r) {
+    const fr = r - GRID_ROWS_BODY;
+    if (fr < 0 || fr >= GRID_ROWS_FOOT) return false;
+    return Math.abs(c + 0.5 - CENTER_COL) < _footHalfAt(fr);
+}
+function _inside(c, r) { return _inBody(c, r) || _inFoot(c, r); }
+
+// ── Classify every cell into border / fill buckets ───────────
+function _buildGrid() {
+    const borders = [];
+    const fills   = [];
+
+    for (let r = 0; r < GRID_ROWS; r++) {
+        for (let c = 0; c < GRID_COLS; c++) {
+            if (!_inside(c, r)) continue;
+
+            const x = ORIGIN_X + c * CELL;
+            const y = ORIGIN_Y + r * CELL;
+
+            // Foot: solid white saucer — no interior fill
+            if (r >= GRID_ROWS_BODY) {
+                borders.push({ x, y });
+                continue;
+            }
+
+            const isBorder =
+                !_inside(c - 1, r) ||
+                !_inside(c + 1, r) ||
+                !_inside(c,     r - 1) ||
+                !_inside(c,     r + 1);
+
+            if (isBorder) borders.push({ x, y });
+            else          fills.push({ x, y, r });
+        }
+    }
+
+    // Drain order: topmost row empties first
+    fills.sort((a, b) => a.r - b.r || a.x - b.x);
+    return { borders, fills };
+}
+
+// ── DOM refs ─────────────────────────────────────────────────
 const _barFill    = document.getElementById('focus-bar-fill');
 const _sessionLbl = document.getElementById('focus-session-label');
 const _toggleBtn  = document.getElementById('focus-toggle-btn');
 
-// ── Pixel state ───────────────────────────────────────────────────────────────
-let _allPixels   = [];   // sorted top→bottom; each: {x, y, el}
+// ── Pixel state ──────────────────────────────────────────────
+let _allPixels   = [];
 let _lastVisible = -1;
 
-// ── Time formatter ────────────────────────────────────────────────────────────
+// ── Time formatter ───────────────────────────────────────────
 function _fmt(secs) {
     const m = String(Math.floor(secs / 60)).padStart(2, '0');
     const s = String(secs % 60).padStart(2, '0');
     return `${m}:${s}`;
 }
 
-// ── Bezier helpers ────────────────────────────────────────────────────────────
-function _cubic(pts, n) {
-    const out = [];
-    for (let i = 0; i <= n; i++) {
-        const t = i / n, mt = 1 - t;
-        out.push({
-            x: mt*mt*mt*pts[0][0] + 3*mt*mt*t*pts[1][0] + 3*mt*t*t*pts[2][0] + t*t*t*pts[3][0],
-            y: mt*mt*mt*pts[0][1] + 3*mt*mt*t*pts[1][1] + 3*mt*t*t*pts[2][1] + t*t*t*pts[3][1]
-        });
-    }
-    return out;
+// ── SVG rect factory ─────────────────────────────────────────
+const _NS = 'http://www.w3.org/2000/svg';
+function _makeRect(px, py, fill) {
+    const r = document.createElementNS(_NS, 'rect');
+    r.setAttribute('x',      String(px));
+    r.setAttribute('y',      String(py));
+    r.setAttribute('width',  String(VIS_CELL));
+    r.setAttribute('height', String(VIS_CELL));
+    r.setAttribute('rx',     String(PIXEL_R));
+    r.setAttribute('ry',     String(PIXEL_R));
+    r.setAttribute('fill',   fill);
+    return r;
 }
 
-function _quad(p0, cp, p1, n) {
-    const out = [];
-    for (let i = 0; i <= n; i++) {
-        const t = i / n, mt = 1 - t;
-        out.push({
-            x: mt*mt*p0[0] + 2*mt*t*cp[0] + t*t*p1[0],
-            y: mt*mt*p0[1] + 2*mt*t*cp[1] + t*t*p1[1]
-        });
-    }
-    return out;
-}
+// ── Build and render both pixel groups ───────────────────────
+function _initFinjan() {
+    const borderGroup = document.getElementById('fj-border-pixels');
+    const fillGroup   = document.getElementById('fj-pixels');
+    if (!borderGroup || !fillGroup) return;
 
-// ── Build and render white pixel border ───────────────────────────────────────
-/**
- * Samples the outer cup silhouette and inner rim line at fine intervals,
- * snaps each sample point to a 4 px grid, deduplicates, and renders a
- * 3×3 white square at each unique grid position.
- *
- * Traced segments:
- *   · Top rim line       y=48, x=48–252
- *   · Right outer cubic  (252,48) → (176,205)
- *   · Bottom base arc    (176,205) → (124,205)
- *   · Left outer cubic   (124,205) → (48,48)
- *
- * The inner rim line is intentionally omitted — no dark separator line.
- */
-function _initBorderPixels() {
-    const group = document.getElementById('fj-border-pixels');
-    if (!group) return;
+    const { borders, fills } = _buildGrid();
 
-    const pts = [];
+    borders.forEach(p => borderGroup.appendChild(_makeRect(p.x, p.y, '#ffffff')));
 
-    // Top rim line
-    const RIM_STEPS = 200;
-    for (let i = 0; i <= RIM_STEPS; i++) {
-        pts.push({ x: 48 + i * (204 / RIM_STEPS), y: 48 });
-    }
-
-    // Right outer cubic (fine sampling for smooth coverage)
-    _cubic(FJ_RIGHT_CUBIC, 400).forEach(p => pts.push(p));
-
-    // Bottom base quadratic
-    _quad(FJ_BOTTOM_QUAD[0], FJ_BOTTOM_QUAD[1], FJ_BOTTOM_QUAD[2], 130).forEach(p => pts.push(p));
-
-    // Left outer cubic
-    _cubic(FJ_LEFT_CUBIC, 400).forEach(p => pts.push(p));
-
-    // Snap to pixel grid and deduplicate
-    const SNAP = FJ_BORDER_SNAP;
-    const SZ   = FJ_BORDER_SIZE;
-    const seen = new Set();
-    const NS   = 'http://www.w3.org/2000/svg';
-
-    pts.forEach(pt => {
-        const gx  = Math.round(pt.x / SNAP) * SNAP;
-        const gy  = Math.round(pt.y / SNAP) * SNAP;
-        const key = gx + ',' + gy;
-        if (seen.has(key)) return;
-        seen.add(key);
-
-        const r = document.createElementNS(NS, 'rect');
-        r.setAttribute('x',       String(gx));
-        r.setAttribute('y',       String(gy));
-        r.setAttribute('width',   String(SZ));
-        r.setAttribute('height',  String(SZ));
-        r.setAttribute('rx',      '0.5');
-        r.setAttribute('ry',      '0.5');
-        r.setAttribute('fill',    '#ffffff');
-        r.setAttribute('opacity', '0.90');
-        group.appendChild(r);
+    _allPixels = fills.map(p => {
+        const rect = _makeRect(p.x, p.y, '#9f7dff');
+        fillGroup.appendChild(rect);
+        return { x: p.x, y: p.y, el: rect };
     });
 }
 
-// ── Build inner pixel grid ────────────────────────────────────────────────────
-/**
- * Uses isPointInFill (SVGGeometryElement) with a hidden probe path for
- * accurate point-in-shape testing.  Falls back to a bounding-box heuristic.
- * Returns pixel array sorted top → bottom (ascending y, then ascending x).
- */
-function _buildPixelGrid() {
-    const svg = document.getElementById('finjan-svg');
-    if (!svg) return [];
-
-    const NS    = 'http://www.w3.org/2000/svg';
-    const probe = document.createElementNS(NS, 'path');
-    probe.setAttribute('d',    FJ_INNER_CLIP_D);
-    probe.setAttribute('fill', 'black');
-    probe.style.cssText = 'opacity:0;pointer-events:none;';
-    svg.appendChild(probe);
-
-    const useAPI = typeof probe.isPointInFill === 'function';
-    const pixels = [];
-    const SZ     = FJ_PX_SIZE;
-    const STEP   = FJ_PX_STEP;
-
-    for (let py = 50; py < 222; py += STEP) {
-        for (let px = 44; px < 258; px += STEP) {
-            let inside = false;
-            if (useAPI) {
-                const pt = svg.createSVGPoint();
-                pt.x = px + SZ / 2;
-                pt.y = py + SZ / 2;
-                try { inside = probe.isPointInFill(pt); }
-                catch (_) {
-                    // Fallback: linear approximation of cup interior (trapezoid)
-                    const halfW = 102 - (py + SZ / 2 - 48) * 0.49;
-                    inside = Math.abs(px + SZ / 2 - 150) < halfW && py >= 48 && py <= 215;
-                }
-            } else {
-                const halfW = 102 - (py + SZ / 2 - 48) * 0.49;
-                inside = Math.abs(px + SZ / 2 - 150) < halfW && py >= 48 && py <= 215;
-            }
-            if (inside) pixels.push({ x: px, y: py, el: null });
-        }
-    }
-
-    svg.removeChild(probe);
-    pixels.sort((a, b) => a.y !== b.y ? a.y - b.y : a.x - b.x);
-    return pixels;
-}
-
-// ── Create purple pixel SVG elements ─────────────────────────────────────────
-function _initPixels() {
-    const group = document.getElementById('fj-pixels');
-    if (!group) return;
-
-    _allPixels = _buildPixelGrid();
-
-    const NS = 'http://www.w3.org/2000/svg';
-    // Single unified purple — no gradient, no multi-tone, just one consistent color
-    const FILL = '#7c5cfc';
-
-    _allPixels.forEach(px => {
-        const r = document.createElementNS(NS, 'rect');
-        r.setAttribute('x',      String(px.x));
-        r.setAttribute('y',      String(px.y));
-        r.setAttribute('width',  String(FJ_PX_SIZE));
-        r.setAttribute('height', String(FJ_PX_SIZE));
-        r.setAttribute('rx',     '0.8');
-        r.setAttribute('ry',     '0.8');
-        r.setAttribute('fill',   FILL);
-        group.appendChild(r);
-        px.el = r;
-    });
-}
-
-// ── Update pixel visibility from timer progress ───────────────────────────────
+// ── Update pixel visibility from timer progress ──────────────
 function _updatePixels(progress) {
     if (!_allPixels.length) return;
     const total   = _allPixels.length;
@@ -229,7 +165,6 @@ function _updatePixels(progress) {
     if (visible === _lastVisible) return;
     _lastVisible = visible;
 
-    // Keep the bottom `visible` pixels; hide the topmost ones first
     const showFrom = total - visible;
     _allPixels.forEach((px, i) => {
         if (!px.el) return;
@@ -237,29 +172,25 @@ function _updatePixels(progress) {
     });
 }
 
-// ── Update all finjan visuals from a state snapshot ───────────────────────────
+// ── Update all finjan visuals from a state snapshot ──────────
 function _updateFinjan(state, visState) {
     const progress = state.totalSeconds > 0
         ? state.remaining / state.totalSeconds
         : 0;
 
-    // Timer text
     const timeEl = document.getElementById('finjan-time');
     if (timeEl) timeEl.textContent = _fmt(state.remaining);
 
-    // Pixel fill level
     _updatePixels(progress);
 
-    // Progress bar
     if (_barFill) _barFill.style.width = (progress * 100) + '%';
 
-    // Body state classes → CSS animations
     document.body.classList.toggle('is-running', visState === 'running');
     document.body.classList.toggle('is-paused',  visState === 'paused');
     document.body.classList.toggle('is-done',    visState === 'done');
 }
 
-// ── Update phase tabs ─────────────────────────────────────────────────────────
+// ── Phase tabs ───────────────────────────────────────────────
 function _updateTabs(state) {
     ['pomodoro', 'shortbreak', 'longbreak'].forEach(p => {
         const tab = document.getElementById('ftab-' + p);
@@ -271,7 +202,7 @@ function _updateTabs(state) {
     });
 }
 
-// ── Update session / phase label ──────────────────────────────────────────────
+// ── Session / phase label ────────────────────────────────────
 function _updateSessionLabel(state) {
     if (!_sessionLbl) return;
     switch (state.phase) {
@@ -286,7 +217,7 @@ function _updateSessionLabel(state) {
     }
 }
 
-// ── TimerCore event subscriber ────────────────────────────────────────────────
+// ── TimerCore event subscriber ───────────────────────────────
 function _onCoreEvent(event, state) {
     let visState;
     if      (event === 'done')  visState = 'done';
@@ -312,7 +243,7 @@ function _onCoreEvent(event, state) {
                 fetch('/api/tracker/sessions', {
                     method:    'POST',
                     headers:   { 'Content-Type': 'application/json' },
-                    keepalive: true,   // survives page navigation
+                    keepalive: true,
                     body: JSON.stringify({
                         materialName:    'Focus Session',
                         durationMinutes: mins,
@@ -358,12 +289,12 @@ function _phaseLabel(phase) {
 
 TimerCore.subscribe(_onCoreEvent);
 
-// ── Public controls — called from HTML onclick ─────────────────────────────────
-function setPhase(phase)  { TimerCore.setPhase(phase);  }
-function toggleTimer()    { TimerCore.toggle();          }
-function skipPhase()      { TimerCore.skip();            }
+// ── Public controls — called from HTML onclick ───────────────
+function setPhase(phase)  { TimerCore.setPhase(phase); }
+function toggleTimer()    { TimerCore.toggle();        }
+function skipPhase()      { TimerCore.skip();          }
 
-// ── Fullscreen toggle ─────────────────────────────────────────────────────────
+// ── Fullscreen toggle ────────────────────────────────────────
 function _toggleFullscreen() {
     if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(() => {});
@@ -372,10 +303,7 @@ function _toggleFullscreen() {
     }
 }
 
-// ── Silent auth check + hydrate timer from server ─────────────────────────────
-// Focus Mode is often entered directly via URL, so it must also fetch the
-// authoritative timer state from the backend — otherwise a timer started on
-// the dashboard would be invisible here until the next transition.
+// ── Silent auth check + hydrate timer from server ────────────
 window.currentUser = null;
 async function _initAuth() {
     try {
@@ -385,7 +313,6 @@ async function _initAuth() {
             window.currentUser = data.username;
             TimerCore.enableBackendSync();
 
-            // Adopt the server's authoritative state — wins over stale localStorage.
             try {
                 const s = await fetch('/api/timer/state');
                 if (s.ok) TimerCore.restoreFromServer(await s.json());
@@ -394,7 +321,7 @@ async function _initAuth() {
     } catch (_) { /* guest mode — silent */ }
 }
 
-// ── Keyboard shortcut ─────────────────────────────────────────────────────────
+// ── Keyboard shortcut ────────────────────────────────────────
 document.addEventListener('keydown', e => {
     if (e.key === ' ' && e.target === document.body) {
         e.preventDefault();
@@ -402,30 +329,25 @@ document.addEventListener('keydown', e => {
     }
 });
 
-// ── Init ──────────────────────────────────────────────────────────────────────
+// ── Init ─────────────────────────────────────────────────────
 (function () {
-    // Build pixel border (white outlines) then inner pixel grid
-    _initBorderPixels();
-    _initPixels();
+    _initFinjan();
 
     const state = TimerCore.getState();
-    const _initVis = state.isRunning ? 'running' : (state.isPaused ? 'paused' : '');
-    _updateFinjan(state, _initVis);
+    const initVis = state.isRunning ? 'running' : (state.isPaused ? 'paused' : '');
+    _updateFinjan(state, initVis);
     _updateTabs(state);
     _updateSessionLabel(state);
     if (_toggleBtn) _toggleBtn.textContent = state.isRunning ? 'Pause' : 'Start';
 
-    // Wire finjan click → fullscreen
-    const finjanSvg = document.getElementById('finjan-svg');
-    if (finjanSvg) {
-        finjanSvg.addEventListener('click', _toggleFullscreen);
-        finjanSvg.addEventListener('keydown', e => {
+    const svg = document.getElementById('finjan-svg');
+    if (svg) {
+        svg.addEventListener('click', _toggleFullscreen);
+        svg.addEventListener('keydown', e => {
             if (e.key === 'Enter') _toggleFullscreen();
         });
     }
 
-    // Toggle CSS class on <html> when fullscreen changes — used by focus.css
-    // to hide controls and enlarge the cup without relying solely on :fullscreen
     function _onFsChange() {
         const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
         document.documentElement.classList.toggle('is-fullscreen', isFs);

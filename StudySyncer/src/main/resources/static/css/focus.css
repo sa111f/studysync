@@ -135,12 +135,11 @@ body {
 
 /*
    SVG hero element.
-   420 px CSS height + viewBox 0 0 300 270
-   → scale 1.556 → visual cup ~264 px wide × 271 px tall (near-square)
-   No external filters by default — the glow lives inside the gradient.
+   440 px CSS height + viewBox 0 0 300 300 (square)
+   → visual cup 440 × 440, with transparent margin around the pixels.
 */
 #finjan-svg {
-    height: 420px;
+    height: 440px;
     width: auto;
     overflow: visible;
     display: block;
@@ -441,16 +440,30 @@ html.is-fullscreen .finjan-scene {
 
 /* ── Finjaan: much larger, dominant ───────────────────────── */
 html.is-fullscreen #finjan-svg {
-    height: 80vh !important;
-    max-width: 90vw !important;
+    height: 82vh !important;
+    max-width: 82vh !important;     /* square viewBox — keep aspect 1:1 */
     width: auto !important;
-    filter: drop-shadow(0 0 56px rgba(124,92,252,0.45)) !important;
-    transition: filter 0.4s ease;
+    filter:
+        drop-shadow(0 20px 60px rgba(0, 0, 0, 0.70))
+        drop-shadow(0 0 72px rgba(124, 92, 252, 0.32)) !important;
+    transition: filter 0.5s ease;
 }
 
 /* Keep running glow in fullscreen */
 html.is-fullscreen body.is-running #finjan-svg {
-    filter: drop-shadow(0 0 56px rgba(124,92,252,0.55)) !important;
+    filter:
+        drop-shadow(0 20px 60px rgba(0, 0, 0, 0.70))
+        drop-shadow(0 0 90px rgba(159, 125, 255, 0.48)) !important;
+}
+
+/* Enlarged, drifting halo behind the fullscreen cup */
+html.is-fullscreen .finjan-scene::before {
+    inset: -16vh -18vh -12vh -18vh !important;
+    background: radial-gradient(ellipse 55% 48% at 50% 46%,
+        rgba(159, 125, 255, 0.28) 0%,
+        rgba(124, 92, 252, 0.08) 38%,
+        transparent 64%) !important;
+    filter: blur(10px) !important;
 }
 
 /* ── Timer text: subtle secondary element ─────────────────── */
@@ -512,8 +525,8 @@ html:-webkit-full-screen .finjan-scene {
 
 html:fullscreen #finjan-svg,
 html:-webkit-full-screen #finjan-svg {
-    height: 80vh !important;
-    max-width: 90vw !important;
+    height: 82vh !important;
+    max-width: 82vh !important;
     width: auto !important;
 }
 
@@ -599,7 +612,7 @@ body::before {
 /* Finjan — larger, more commanding, ambient halo */
 #finjan-svg {
     height: 460px;
-    filter: drop-shadow(0 24px 60px rgba(0, 0, 0, 0.55));
+    filter: drop-shadow(0 28px 64px rgba(0, 0, 0, 0.58));
 }
 .finjan-scene {
     position: relative;
@@ -607,20 +620,29 @@ body::before {
 .finjan-scene::before {
     content: '';
     position: absolute;
-    inset: -60px -80px -40px -80px;
-    background: radial-gradient(ellipse 55% 50% at 50% 45%,
-        rgba(124, 92, 252, 0.16) 0%,
-        rgba(124, 92, 252, 0.04) 35%,
-        transparent 60%);
+    inset: -90px -110px -70px -110px;
+    background: radial-gradient(ellipse 52% 46% at 50% 44%,
+        rgba(159, 125, 255, 0.20) 0%,
+        rgba(124, 92, 252, 0.06) 36%,
+        transparent 62%);
     pointer-events: none;
     z-index: -1;
+    filter: blur(6px);
 }
 .is-running .finjan-scene::before {
-    animation: fj-halo 4.2s ease-in-out infinite;
+    animation: fj-halo 4.6s ease-in-out infinite;
 }
 @keyframes fj-halo {
     0%, 100% { opacity: 1;    transform: scale(1);    }
-    50%      { opacity: 0.75; transform: scale(1.04); }
+    50%      { opacity: 0.78; transform: scale(1.045); }
+}
+
+/* Crisper pixel drain — snappier fade on individual cells */
+#fj-pixels rect {
+    transition: opacity 0.45s cubic-bezier(0.3, 0.0, 0.2, 1);
+}
+#fj-border-pixels rect {
+    transition: opacity 0.25s ease;
 }
 
 /* Timer digits — heavier, bigger, richer glow */
@@ -700,10 +722,16 @@ body::before {
 
 /* Responsive adjustments — keep hero feel on narrower screens */
 @media (max-width: 480px) {
-    #finjan-svg         { height: 320px; }
+    #finjan-svg         { height: 300px; }
     .finjan-time-display{ font-size: 3.0rem; }
 }
-@media (max-height: 780px) {
-    #finjan-svg         { height: 360px; }
+@media (max-height: 820px) {
+    #finjan-svg         { height: 380px; }
     .finjan-time-display{ font-size: 3.4rem; }
+}
+@media (max-height: 680px) {
+    #finjan-svg         { height: 320px; }
+    .finjan-time-display{ font-size: 3.0rem; margin-bottom: 14px; }
+    .focus-phase-tabs   { margin-bottom: 18px; }
+    .focus-session-label{ margin-bottom: 20px; }
 }

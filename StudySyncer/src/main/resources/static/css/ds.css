@@ -1508,3 +1508,632 @@ header {
         padding: 11px 22px;
     }
 }
+
+
+/* ════════════════════════════════════════════════════════════════
+   ██  SECTION 21 — AGGRESSIVE POLISH LAYER v3  ███████████████████
+   Goal: turn the dashboard into a cohesive, premium, intentional
+   product surface.  Works by overriding earlier ds.css + style.css
+   rules without any HTML rename.
+   ════════════════════════════════════════════════════════════════ */
+
+
+/* ── 21.0  Design token refresh ───────────────────────────────── */
+:root {
+    --accent-1:         #a78bfa;
+    --accent-2:         #7c5cfc;
+    --accent-3:         #5b3fd4;
+    --accent-grad:      linear-gradient(135deg, #a78bfa 0%, #7c5cfc 52%, #6842ee 100%);
+    --accent-grad-soft: linear-gradient(135deg, rgba(167, 139, 250, 0.16) 0%, rgba(124, 92, 252, 0.10) 100%);
+
+    --bg-deep:        #070810;
+    --bg-raised:      #10111d;
+    --bg-card:        linear-gradient(180deg, #161827 0%, #101120 100%);
+    --bg-card-hover:  linear-gradient(180deg, #1a1c2f 0%, #131426 100%);
+
+    --hairline:       rgba(255, 255, 255, 0.055);
+    --hairline-soft:  rgba(255, 255, 255, 0.028);
+
+    --shadow-card:    0 1px 0 rgba(255, 255, 255, 0.035) inset,
+                      0 24px 56px -32px rgba(0, 0, 0, 0.70),
+                      0 8px 18px -10px rgba(0, 0, 0, 0.45);
+    --shadow-hero:    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+                      0 34px 96px -40px rgba(83, 56, 214, 0.58),
+                      0 14px 36px -12px rgba(0, 0, 0, 0.55);
+    --shadow-press:   0 2px 8px -2px rgba(124, 92, 252, 0.35);
+
+    --r-card: 18px;
+    --r-btn:  12px;
+    --r-pill: 999px;
+    --t:      0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+
+/* ── 21.1  Root surface — deeper, richer, single atmospheric stage ── */
+html, body {
+    background: var(--bg-deep);
+}
+
+body {
+    background:
+        radial-gradient(ellipse 92% 48% at 50% -8%,
+            rgba(124, 92, 252, 0.20) 0%, transparent 58%),
+        radial-gradient(ellipse 48% 42% at 100% 6%,
+            rgba(99, 102, 241, 0.09) 0%, transparent 62%),
+        radial-gradient(ellipse 56% 46% at 0% 42%,
+            rgba(124, 92, 252, 0.07) 0%, transparent 62%),
+        #070810;
+    background-attachment: fixed;
+    color: #e9eaf5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+/* Fine paper-grain for tactile premium feel */
+body::before {
+    content: '';
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background-image:
+        radial-gradient(circle at 1px 1px,
+            rgba(255, 255, 255, 0.022) 1px, transparent 0);
+    background-size: 3px 3px;
+    mix-blend-mode: overlay;
+    opacity: 0.55;
+}
+
+/* Custom native selection color */
+::selection {
+    background: rgba(167, 139, 250, 0.34);
+    color: #fff;
+}
+
+/* Refined scrollbar */
+::-webkit-scrollbar           { width: 11px; height: 11px; }
+::-webkit-scrollbar-track     { background: transparent; }
+::-webkit-scrollbar-thumb     {
+    background: linear-gradient(180deg, rgba(124, 92, 252, 0.28), rgba(124, 92, 252, 0.14));
+    border-radius: 99px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(124, 92, 252, 0.48), rgba(124, 92, 252, 0.22));
+    background-clip: padding-box;
+}
+
+
+/* ── 21.2  Header — glassier, refined wordmark ─────────────────── */
+header {
+    background: linear-gradient(180deg,
+        rgba(10, 11, 20, 0.88) 0%,
+        rgba(10, 11, 20, 0.60) 100%);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-bottom: 1px solid rgba(124, 92, 252, 0.12);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    position: relative;
+    z-index: 10;
+}
+
+/* Wordmark — crisp dual-tone gradient */
+.logo-study,
+.logo-sync {
+    font-weight: 800;
+    letter-spacing: -0.025em;
+}
+.logo-study {
+    color: #f5f3ff;
+    text-shadow: 0 0 24px rgba(167, 139, 250, 0.18);
+}
+.logo-sync {
+    background: var(--accent-grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 28px rgba(167, 139, 250, 0.35);
+}
+
+/* Hero tagline under the header */
+.hero-tagline {
+    font-size: 0.94rem;
+    color: rgba(200, 197, 228, 0.66);
+    letter-spacing: 0.015em;
+    font-weight: 500;
+}
+
+
+/* ── 21.3  Card system — unified premium surface ───────────────── */
+.timer-card,
+.syllabus-card,
+.results-card,
+.goal-card-main,
+.study-plan-card,
+.priority-widget-section,
+.estimation-card,
+.custom-time-card {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-card);
+    transition: transform var(--t), box-shadow var(--t), border-color var(--t), background var(--t);
+    z-index: 1;
+}
+
+/* Top edge micro-gloss on every card */
+.timer-card::before,
+.syllabus-card::before,
+.results-card::before,
+.goal-card-main::before,
+.study-plan-card::before,
+.priority-widget-section::before,
+.estimation-card::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.12) 50%,
+        transparent 100%);
+    border-radius: var(--r-card) var(--r-card) 0 0;
+    pointer-events: none;
+}
+
+.syllabus-card:hover,
+.results-card:hover,
+.goal-card-main:hover,
+.study-plan-card:hover {
+    border-color: rgba(124, 92, 252, 0.26);
+}
+
+
+/* ── 21.4  Hero timer — the visual anchor ──────────────────────── */
+.timer-card {
+    background:
+        radial-gradient(ellipse 80% 58% at 50% -10%,
+            rgba(124, 92, 252, 0.13) 0%, transparent 60%),
+        linear-gradient(180deg, #181a2e 0%, #0f1020 100%);
+    border: 1px solid rgba(124, 92, 252, 0.22);
+    box-shadow: var(--shadow-hero);
+    overflow: hidden;
+}
+.timer-card::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg,
+        rgba(167, 139, 250, 0.40) 0%,
+        rgba(124, 92, 252, 0.12) 40%,
+        transparent 70%);
+    -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+}
+
+/* Timer display — monospaced hero type */
+.timer-display {
+    font-family: 'JetBrains Mono', ui-monospace, monospace !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.012em !important;
+    background: linear-gradient(180deg, #fbfaff 0%, #d5c9ff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 48px rgba(167, 139, 250, 0.32);
+}
+.timer-display.running {
+    animation: tc-pulse 3.2s ease-in-out infinite;
+}
+@keyframes tc-pulse {
+    0%, 100% { filter: brightness(1);    }
+    50%      { filter: brightness(1.14); }
+}
+
+/* Start/Pause — primary action gets the full hero treatment */
+#btn-start-pause {
+    background: var(--accent-grad);
+    border: 1px solid rgba(167, 139, 250, 0.50);
+    color: #fff;
+    font-weight: 700;
+    letter-spacing: 0.015em;
+    padding: 13px 40px;
+    min-width: 138px;
+    border-radius: 14px;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.26),
+        0 10px 28px -6px rgba(124, 92, 252, 0.48),
+        0 3px 10px rgba(0, 0, 0, 0.32);
+    transition: transform 0.12s ease, box-shadow var(--t), filter var(--t);
+}
+#btn-start-pause:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.30),
+        0 14px 36px -6px rgba(124, 92, 252, 0.62),
+        0 4px 12px rgba(0, 0, 0, 0.38);
+}
+#btn-start-pause:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-press);
+}
+#btn-start-pause.is-pausing {
+    background: linear-gradient(135deg, #ffb3a0 0%, #ff8a73 60%, #ff6f5a 100%);
+    border-color: rgba(255, 180, 160, 0.55);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.28),
+        0 10px 28px -6px rgba(255, 125, 100, 0.46);
+}
+
+/* Skip button — ghost tier */
+.ctrl-btn.skip {
+    background: rgba(255, 255, 255, 0.028);
+    border: 1px solid var(--hairline);
+    color: rgba(200, 197, 228, 0.80);
+    font-weight: 500;
+    border-radius: var(--r-btn);
+    transition: var(--t);
+}
+.ctrl-btn.skip:hover {
+    background: rgba(124, 92, 252, 0.10);
+    border-color: rgba(124, 92, 252, 0.32);
+    color: #f0edff;
+}
+
+/* Phase tabs — lifted, richer active pill */
+.timer-phase-tabs,
+.phase-tabs {
+    background: rgba(255, 255, 255, 0.022);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-pill);
+    padding: 5px;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.035),
+        0 8px 28px -14px rgba(0, 0, 0, 0.55);
+}
+.phase-tab {
+    border-radius: var(--r-pill);
+    font-weight: 600;
+    letter-spacing: 0.012em;
+    color: rgba(200, 197, 228, 0.62);
+    transition: var(--t);
+}
+.phase-tab.active {
+    background: var(--accent-grad) !important;
+    color: #fff !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.28),
+        0 4px 18px -2px rgba(124, 92, 252, 0.48) !important;
+}
+
+/* Session dots — bigger, glowier */
+.session-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 99px;
+    background: rgba(255, 255, 255, 0.10);
+    transition: var(--t);
+}
+.session-dot.filled {
+    background: var(--accent-grad);
+    box-shadow: 0 0 12px rgba(167, 139, 250, 0.65);
+}
+
+
+/* ── 21.5  Goal card — premium progress display ───────────────── */
+.goal-card-main {
+    padding: 22px 24px;
+}
+.goal-card-title {
+    font-size: 1.14rem;
+    font-weight: 700;
+    letter-spacing: -0.012em;
+    background: linear-gradient(120deg, #f5f3ff 0%, #c4b5fd 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.today-goal-bar-track {
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-pill);
+    overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+    height: 10px;
+}
+.today-goal-bar-fill {
+    background: var(--accent-grad);
+    border-radius: var(--r-pill);
+    box-shadow:
+        0 0 16px rgba(167, 139, 250, 0.56),
+        inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    position: relative;
+    overflow: hidden;
+    transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.today-goal-bar-fill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.30) 50%,
+        transparent 100%);
+    animation: goal-shimmer 2.8s linear infinite;
+}
+@keyframes goal-shimmer {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%);  }
+}
+
+/* Goal number input — bigger, more confident */
+.today-goal-input {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 1.42rem;
+    font-weight: 700;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-btn);
+    color: #f5f3ff;
+    transition: var(--t);
+    text-align: center;
+}
+.today-goal-input:focus {
+    border-color: rgba(167, 139, 250, 0.60);
+    background: rgba(124, 92, 252, 0.08);
+    box-shadow: 0 0 0 4px rgba(124, 92, 252, 0.14);
+    outline: none;
+}
+.today-goal-unit {
+    font-size: 0.84rem;
+    color: rgba(200, 197, 228, 0.58);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+
+/* ── 21.6  Forms & inputs — unified focus ring ─────────────────── */
+.field-input,
+.subject-field input,
+.syllabus-card textarea {
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-btn);
+    color: #f1eeff;
+    font-family: inherit;
+    transition: var(--t);
+}
+.field-input::placeholder,
+.syllabus-card textarea::placeholder {
+    color: rgba(200, 197, 228, 0.38);
+}
+.field-input:hover,
+.syllabus-card textarea:hover {
+    border-color: rgba(124, 92, 252, 0.24);
+    background: rgba(255, 255, 255, 0.033);
+}
+.field-input:focus,
+.syllabus-card textarea:focus {
+    outline: none;
+    border-color: rgba(167, 139, 250, 0.60);
+    background: rgba(124, 92, 252, 0.06);
+    box-shadow: 0 0 0 4px rgba(124, 92, 252, 0.15);
+}
+
+/* Drop zone — more deliberate */
+.drop-zone {
+    background: rgba(124, 92, 252, 0.035);
+    border: 1px dashed rgba(124, 92, 252, 0.28);
+    border-radius: var(--r-card);
+    transition: var(--t);
+}
+.drop-zone:hover {
+    background: rgba(124, 92, 252, 0.07);
+    border-color: rgba(167, 139, 250, 0.52);
+}
+
+
+/* ── 21.7  Buttons — unified tier system ───────────────────────── */
+.save-btn,
+.apply-btn,
+.today-goal-btn,
+.set-email-btn,
+.acct-confirm-primary {
+    background: var(--accent-grad);
+    color: #fff;
+    border: 1px solid rgba(167, 139, 250, 0.50);
+    border-radius: var(--r-btn);
+    font-weight: 600;
+    letter-spacing: 0.012em;
+    padding: 10px 22px;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        0 6px 20px -6px rgba(124, 92, 252, 0.42);
+    transition: transform 0.12s ease, box-shadow var(--t), filter var(--t);
+}
+.save-btn:hover,
+.apply-btn:hover,
+.today-goal-btn:hover,
+.set-email-btn:hover,
+.acct-confirm-primary:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.26),
+        0 10px 28px -6px rgba(124, 92, 252, 0.56);
+}
+.save-btn:active,
+.apply-btn:active,
+.today-goal-btn:active,
+.set-email-btn:active,
+.acct-confirm-primary:active {
+    transform: translateY(0);
+}
+
+.clear-btn,
+.acct-confirm-secondary {
+    background: rgba(255, 255, 255, 0.028);
+    border: 1px solid var(--hairline);
+    color: rgba(200, 197, 228, 0.82);
+    border-radius: var(--r-btn);
+    font-weight: 500;
+    transition: var(--t);
+}
+.clear-btn:hover,
+.acct-confirm-secondary:hover {
+    background: rgba(124, 92, 252, 0.10);
+    border-color: rgba(124, 92, 252, 0.32);
+    color: #f3f0ff;
+}
+
+
+/* ── 21.8  Results table — cleaner rows ────────────────────────── */
+.results-table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+.results-table th {
+    color: rgba(200, 197, 228, 0.52);
+    font-weight: 600;
+    font-size: 0.74rem;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--hairline);
+}
+.results-table td {
+    padding: 14px 16px;
+    color: #e6e3f7;
+    border-bottom: 1px solid var(--hairline-soft);
+    font-size: 0.9rem;
+}
+.results-table tr:last-child td {
+    border-bottom: none;
+}
+.results-table tr {
+    transition: background var(--t);
+}
+.results-table tr:hover {
+    background: rgba(124, 92, 252, 0.05);
+}
+
+.tracker-status-done {
+    color: #7dd8a8;
+    font-weight: 600;
+}
+.tracker-status-partial {
+    color: #f4b678;
+    font-weight: 600;
+}
+
+
+/* ── 21.9  Section headings — tighter, more confident ─────────── */
+.syllabus-header h2,
+.study-plan-header h2,
+.results-card h2,
+.goal-card-title {
+    font-size: 1.12rem;
+    font-weight: 700;
+    letter-spacing: -0.014em;
+    color: #f5f3ff;
+}
+.card-hint {
+    font-size: 0.82rem;
+    color: rgba(200, 197, 228, 0.50);
+    letter-spacing: 0.010em;
+}
+
+
+/* ── 21.10  Study plan items — richer rows ─────────────────────── */
+.study-plan-items > * {
+    border-radius: var(--r-btn);
+    transition: var(--t);
+}
+.study-plan-items > *:hover {
+    background: rgba(124, 92, 252, 0.07);
+}
+
+
+/* ── 21.11  Auth modal polish ──────────────────────────────────── */
+.auth-modal-box {
+    background: linear-gradient(180deg, #141627 0%, #0d0e1c 100%);
+    border: 1px solid rgba(124, 92, 252, 0.28);
+    border-radius: 20px;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.06) inset,
+        0 40px 96px -24px rgba(0, 0, 0, 0.75),
+        0 0 0 1px rgba(124, 92, 252, 0.05);
+    position: relative;
+    overflow: hidden;
+}
+.auth-modal-box::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg,
+        rgba(167, 139, 250, 0.55) 0%,
+        rgba(124, 92, 252, 0.10) 40%,
+        transparent 75%);
+    -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+}
+.auth-modal-logo { font-weight: 800; letter-spacing: -0.02em; }
+
+
+/* ── 21.12  Settings panel polish ──────────────────────────────── */
+.timer-settings-panel {
+    background: rgba(15, 16, 32, 0.72);
+    border: 1px solid rgba(124, 92, 252, 0.16);
+    border-radius: 14px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+
+/* ── 21.13  Settle position of top-layer content above grain ──── */
+header,
+.top-panel,
+main,
+.syllabus-card,
+.results-card,
+.study-plan-card,
+.priority-widget-section,
+.timer-card,
+.goal-card-main,
+.auth-modal {
+    position: relative;
+    z-index: 1;
+}
+
+
+/* ── 21.14  Responsive — keep hero feel on narrow screens ─────── */
+@media (max-width: 900px) {
+    .timer-card     { padding: 22px; }
+    .goal-card-main { padding: 18px 20px; }
+}
+@media (max-width: 600px) {
+    .timer-display { font-size: 3.2rem !important; }
+    #btn-start-pause {
+        padding: 12px 32px;
+        min-width: 118px;
+    }
+}
+

@@ -42,113 +42,44 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════════════
-         FINJAN — Arabic qahwa cup, pixel-art inspired.
+         FINJAN — Arabic qahwa cup, symmetric pixel-art.
 
-         Shape:  204 px wide rim (x=48–252) with a distinct outward flare
-         (CP x=268) creating the authentic Arabic shoulder, then a strong
-         inward sweep to a 52 px base span at y≈205.
-         Height rim → bottom arc ≈ 172 px.  Aspect ≈ 1.19 : 1 — wide and
-         stocky, matching an Arabic finjan front view.
+         All pixels (both white silhouette border and purple fill) are
+         procedurally generated in focus.js from a symmetric grid.  The
+         half-width function in _bodyHalfAt() guarantees pixel-perfect
+         left/right symmetry — no hand-drawn path, no snap artefacts.
 
-         Cup border: white 3×3 pixel squares generated in focus.js, snapped
-         to a 4 px grid, tracing the outer silhouette + inner rim opening.
-         Placed in #fj-border-pixels (outside the interior clip).
-
-         Fill: 4×4 purple micro-pixel <rect> elements inside the interior
-         clip region, driven by timer progress.  Bottom pixels always show
-         first; top pixels vanish as time runs out.
-
-         ViewBox 0 0 300 270  |  CSS height: 420 px
-         Click → fullscreen toggle (wired in focus.js)
+         Grid:    42 cols × 45 rows, 5-unit cells
+         ViewBox: 0 0 300 300 (square — cup with flared foot fits cleanly)
+         Click  → fullscreen toggle (wired in focus.js)
          ══════════════════════════════════════════════════════════════ -->
     <div class="finjan-scene" id="finjan-scene">
 
         <svg id="finjan-svg"
-             viewBox="0 0 300 270"
+             viewBox="0 0 300 300"
              xmlns="http://www.w3.org/2000/svg"
              role="button"
              tabindex="0"
              aria-label="Focus timer — click to toggle fullscreen">
 
             <defs>
-
-                <!--
-                    Interior clip — identical to the outer body path so purple
-                    pixels fill right up to the white border pixels with no
-                    dark "ceramic wall" gap in between.
-                -->
-                <clipPath id="fj-clip">
-                    <path d="M 48,48 L 252,48
-                             C 268,70  242,162  176,205
-                             Q 150,220  124,205
-                             C  58,162   32, 70   48, 48 Z"/>
-                </clipPath>
-
-                <!--
-                    Soft purple glow — applied to the inner pixel group only.
-                    Keeps a controlled bloom without bleeding onto the white
-                    border pixels.
-                -->
+                <!-- Soft purple bloom on the interior fill pixels only -->
                 <filter id="fj-px-glow"
                         x="-25%" y="-25%" width="150%" height="150%"
                         color-interpolation-filters="sRGB">
-                    <feGaussianBlur in="SourceGraphic" stdDeviation="1.4" result="blur"/>
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="blur"/>
                     <feMerge>
                         <feMergeNode in="blur"/>
                         <feMergeNode in="SourceGraphic"/>
                     </feMerge>
                 </filter>
-
             </defs>
 
-            <!--
-                Cup body shell — almost-transparent fill so the ceramic wall
-                area reads as subtly solid against the dark background.
-                The visible border is entirely white pixel squares generated
-                by focus.js and placed in #fj-border-pixels.
+            <!-- Purple interior pixels — built and drained by focus.js -->
+            <g id="fj-pixels" filter="url(#fj-px-glow)"></g>
 
-                Outer silhouette:
-                  Rim  y=48, x=48–252  →  204 px wide
-                  Right: C(268,70)(242,162) → (176,205)   strong outward shoulder
-                  Base Q: 150,220 → (124,205)              52 px wide base
-                  Left: mirror of right (symmetric around x=150)
-            -->
-            <path id="fj-body"
-                  d="M 48,48 L 252,48
-                     C 268,70  242,162  176,205
-                     Q 150,220  124,205
-                     C  58,162   32, 70   48, 48 Z"
-                  fill="rgba(255,255,255,0.022)"
-                  stroke="none"/>
-
-            <!-- ── Interior — clipped to inner ceramic wall ── -->
-            <g clip-path="url(#fj-clip)">
-                <!-- Deep dark empty-cup background -->
-                <rect x="0" y="0" width="300" height="270" fill="#06031a"/>
-                <!-- Purple micro-pixel fill — built and driven by focus.js -->
-                <g id="fj-pixels" filter="url(#fj-px-glow)"></g>
-            </g>
-
-            <!--
-                White pixel border — focus.js samples the outer silhouette
-                and inner rim line, snaps points to a 4 px grid, and renders
-                3×3 white squares here.  This group sits on top of the clip
-                so the border is always fully visible.
-            -->
+            <!-- White silhouette + solid foot pixels -->
             <g id="fj-border-pixels"></g>
-
-            <!-- Foot ring — very subtle arc grounding the base -->
-            <ellipse cx="150" cy="213" rx="36" ry="4"
-                     fill="none"
-                     stroke="rgba(200,185,255,0.15)"
-                     stroke-width="1.1"/>
-
-            <!-- Left inner-wall gloss — barely visible depth hint -->
-            <path d="M 68,70 C 64,106 62,158 66,190"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.030)"
-                  stroke-width="12"
-                  stroke-linecap="round"/>
 
         </svg>
 
