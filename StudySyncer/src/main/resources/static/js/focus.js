@@ -117,6 +117,14 @@ const _toggleBtn  = document.getElementById('focus-toggle-btn');
 let _allPixels   = [];
 let _lastVisible = -1;
 
+// ── Letter reveal state ──────────────────────────────────────
+// Letter pixels start invisible and flip to .revealed row-by-row
+// as the fill drain line descends past them.  _lastDrainLineRow
+// caches the last computed drain row so we only touch the DOM
+// when the level actually drops to a new row.
+let _letterPixels     = [];
+let _lastDrainLineRow = -1;
+
 // ── Time formatter ───────────────────────────────────────────
 function _fmt(secs) {
     const m = String(Math.floor(secs / 60)).padStart(2, '0');
@@ -138,10 +146,107 @@ function _makeRect(px, py, fill) {
     return r;
 }
 
+// ══════════════════════════════════════════════════════════════
+//  LOCK IN TEXT REVEAL
+//  5×7 (and 3×7 for I) pixel-art letters placed INSIDE the body
+//  grid.  Bitmaps use '1' for a lit pixel.  Layout coordinates
+//  are expressed in body-grid (col, row) units and are converted
+//  to SVG coordinates by _initBattery() using the same CELL
+//  stride as the battery fills.
+//
+//  Symmetry notes:
+//    Body grid is 36 cols × 58 rows.
+//    LOCK: 4 letters × 5 cols + 3 × 2-col gaps = 26 cols
+//          → offset 5, spans cols 5-30, margin 5 ‖ 5  (symmetric)
+//    IN  : I(3) + gap(2) + N(5) = 10 cols
+//          → offset 13, spans 13-22, margin 13 ‖ 13  (symmetric)
+//    Rows: LOCK 20-26, gap 27-30, IN 31-37
+//          → top margin 20, bottom margin 20  (symmetric)
+// ══════════════════════════════════════════════════════════════
+const LTR_L = [
+    '10000',
+    '10000',
+    '10000',
+    '10000',
+    '10000',
+    '10000',
+    '11111',
+];
+const LTR_O = [
+    '01110',
+    '10001',
+    '10001',
+    '10001',
+    '10001',
+    '10001',
+    '01110',
+];
+const LTR_C = [
+    '01111',
+    '10000',
+    '10000',
+    '10000',
+    '10000',
+    '10000',
+    '01111',
+];
+const LTR_K = [
+    '10001',
+    '10010',
+    '10100',
+    '11000',
+    '10100',
+    '10010',
+    '10001',
+];
+const LTR_I = [
+    '111',
+    '010',
+    '010',
+    '010',
+    '010',
+    '010',
+    '111',
+];
+const LTR_N = [
+    '10001',
+    '11001',
+    '10101',
+    '10101',
+    '10101',
+    '10011',
+    '10001',
+];
+
+const LETTER_LAYOUT = [
+    { bitmap: LTR_L, col:  5, row: 20 },
+    { bitmap: LTR_O, col: 12, row: 20 },
+    { bitmap: LTR_C, col: 19, row: 20 },
+    { bitmap: LTR_K, col: 26, row: 20 },
+    { bitmap: LTR_I, col: 13, row: 31 },
+    { bitmap: LTR_N, col: 18, row: 31 },
+];
+
+function _buildLetterCells() {
+    const cells = [];
+    for (const { bitmap, col: cOff, row: rOff } of LETTER_LAYOUT) {
+        for (let r = 0; r < bitmap.length; r++) {
+            const rowStr = bitmap[r];
+            for (let c = 0; c < rowStr.length; c++) {
+                if (rowStr[c] === '1') {
+                    cells.push({ col: cOff + c, row: rOff + r });
+                }
+            }
+        }
+    }
+    return cells;
+}
+
 // ── Build and render both pixel groups ───────────────────────
 function _initBattery() {
     const borderGroup = document.getElementById('fj-border-pixels');
     const fillGroup   = document.getElementById('fj-pixels');
+    const letterGroup = document.getElementById('fj-letter-pixels');
     if (!borderGroup || !fillGroup) return;
 
     const { borders, fills } = _buildBattery();
@@ -151,11 +256,27 @@ function _initBattery() {
 
     // Fills have NO fill attribute — CSS drives colour so the
     // body.battery-mid / body.battery-low tiers can swap hues smoothly.
+    // `row` is stored so _updatePixels can derive the drain-line row
+    // and flip letter pixels on at the right moment.
     _allPixels = fills.map(p => {
         const rect = _makeRect(p.x, p.y, null);
         fillGroup.appendChild(rect);
-        return { x: p.x, y: p.y, el: rect };
+        return { x: p.x, y: p.y, row: p.row, el: rect };
     });
+
+    // Letter pixels — start invisible, reveal row-by-row as the
+    // drain descends.  Painted above the fill group but beneath the
+    // white silhouette group so the battery outline is never covered.
+    if (letterGroup) {
+        const letterCells = _buildLetterCells();
+        _letterPixels = letterCells.map(lc => {
+            const x = ORIGIN_X      + lc.col * CELL;
+            const y = BODY_ORIGIN_Y + lc.row * CELL;
+            const rect = _makeRect(x, y, null);
+            letterGroup.appendChild(rect);
+            return { row: lc.row, el: rect };
+        });
+    }
 }
 
 // ── Update pixel visibility from timer progress ──────────────
@@ -172,6 +293,18 @@ function _updatePixels(progress) {
         if (!px.el) return;
         px.el.style.opacity = i >= showFrom ? '' : '0';
     });
+
+    // Drain-line row — the topmost still-filled row.  When the water
+    // level has dropped below a letter row, that row's pixels flip
+    // on via the .revealed class (CSS handles the smooth fade).
+    const drainLineRow = showFrom < total ? _allPixels[showFrom].row : BODY_ROWS;
+    if (drainLineRow !== _lastDrainLineRow && _letterPixels.length) {
+        _lastDrainLineRow = drainLineRow;
+        for (let i = 0; i < _letterPixels.length; i++) {
+            const lp = _letterPixels[i];
+            lp.el.classList.toggle('revealed', lp.row < drainLineRow);
+        }
+    }
 }
 
 // ── Update all battery visuals from a state snapshot ─────────

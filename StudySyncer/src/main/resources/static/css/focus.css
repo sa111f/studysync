@@ -687,6 +687,50 @@ body::before {
     transition: opacity 0.25s ease;
 }
 
+/* ══════════════════════════════════════════════════════════
+   LOCK IN TEXT REVEAL
+   White 5×7 pixel-art letters rendered INSIDE the battery body.
+   Every rect starts invisible; focus.js flips `.revealed` on row
+   by row as the purple fill drain line descends past that row,
+   producing a smooth rising-text reveal tied to real progress.
+   ══════════════════════════════════════════════════════════ */
+#fj-letter-pixels rect {
+    fill: #ffffff;
+    opacity: 0;
+    transition:
+        opacity 1.35s cubic-bezier(0.22, 1, 0.36, 1),
+        fill    0.9s ease;
+}
+#fj-letter-pixels rect.revealed {
+    opacity: 0.94;
+}
+
+/* Tier tinting — as the battery warms into amber / pink, the text
+   warms with it so everything stays cohesive */
+body.battery-mid #fj-letter-pixels rect { fill: #fff0d6; }
+body.battery-low #fj-letter-pixels rect { fill: #ffe0e8; }
+
+/* Running — gentle pulse on whatever text is already exposed */
+.is-running #fj-letter-pixels rect.revealed {
+    animation: fj-letter-breathe 3.2s ease-in-out infinite;
+}
+@keyframes fj-letter-breathe {
+    0%, 100% { opacity: 0.88; }
+    50%      { opacity: 1.00; }
+}
+
+/* Paused — dim the text along with the rest of the battery */
+.is-paused #fj-letter-pixels rect.revealed { opacity: 0.45; }
+
+/* Done — emphatic strobe on the fully-revealed "LOCK IN" */
+.is-done #fj-letter-pixels rect.revealed {
+    animation: fj-letter-strobe 1.6s ease-in-out infinite;
+}
+@keyframes fj-letter-strobe {
+    0%, 100% { opacity: 0.92; }
+    50%      { opacity: 1.00; }
+}
+
 /* Timer digits — heavier, bigger, richer glow */
 .finjan-time-display {
     font-size: 4.2rem;

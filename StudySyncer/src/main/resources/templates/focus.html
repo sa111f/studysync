@@ -78,10 +78,25 @@
                         <feMergeNode in="SourceGraphic"/>
                     </feMerge>
                 </filter>
+                <!-- Tighter halo on the LOCK IN letter pixels so the
+                     text reads crisp even as it bleeds light -->
+                <filter id="fj-letter-glow"
+                        x="-30%" y="-30%" width="160%" height="160%"
+                        color-interpolation-filters="sRGB">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="0.85" result="lblur"/>
+                    <feMerge>
+                        <feMergeNode in="lblur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
             </defs>
 
             <!-- Interior fill pixels — built and drained by focus.js -->
             <g id="fj-pixels" filter="url(#fj-px-glow)"></g>
+
+            <!-- LOCK IN text reveal — drawn above fills but below the
+                 white silhouette so the battery outline stays on top -->
+            <g id="fj-letter-pixels" filter="url(#fj-letter-glow)"></g>
 
             <!-- White silhouette + solid terminal-cap pixels -->
             <g id="fj-border-pixels"></g>
