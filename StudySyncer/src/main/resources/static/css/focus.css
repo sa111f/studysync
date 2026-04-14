@@ -827,3 +827,63 @@ body.battery-low #fj-letter-pixels rect { fill: #ffe0e8; }
     .focus-session-label{ margin-bottom: 18px; }
     .focus-controls     { margin-bottom: 14px; }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   OVERTIME — focus mode
+   ───────────────────────────────────────────────────────────── */
+body.is-overtime .finjan-time-display {
+    color: #c4b5fd;
+    text-shadow: 0 0 32px rgba(167,139,250,0.70);
+    animation: fj-ot-pulse 3.2s ease-in-out infinite;
+}
+@keyframes fj-ot-pulse {
+    0%, 100% { opacity: 0.92; }
+    50%       { opacity: 1.00; }
+}
+
+/* Keep the battery visually "empty but active" in overtime:
+   fill pixels are already hidden at 0% progress. Pulse the
+   border so it's clear the session is still running. */
+body.is-overtime #fj-border-pixels {
+    animation: fj-ot-border 2.4s ease-in-out infinite;
+}
+@keyframes fj-ot-border {
+    0%, 100% { opacity: 0.85; filter: none; }
+    50%       { opacity: 1.00;
+                filter: drop-shadow(0 0 14px rgba(167,139,250,0.60)); }
+}
+
+body.is-overtime .finjan-scene::before {
+    background: radial-gradient(ellipse 50% 56% at 50% 50%,
+        rgba(167,139,250,0.34) 0%,
+        rgba(124, 92,252,0.12) 38%,
+        transparent 64%) !important;
+}
+
+body.is-overtime .focus-bar-fill {
+    background: linear-gradient(90deg,
+        #a78bfa, #c4b5fd, #a78bfa);
+    width: 100% !important;
+    animation: fj-ot-bar 2.6s ease-in-out infinite;
+}
+@keyframes fj-ot-bar {
+    0%, 100% { box-shadow: 0 0 10px rgba(167,139,250,0.40); }
+    50%       { box-shadow: 0 0 22px rgba(167,139,250,0.80); }
+}
+
+/* Stop button — shares focus-btn layout with a clear danger tone */
+.focus-btn-stop {
+    background: #ef4444;
+    color: #fff;
+    font-size: 0.92rem;
+    padding: 12px 22px;
+    box-shadow: 0 4px 18px rgba(239,68,68,0.28);
+    letter-spacing: 0.02em;
+}
+.focus-btn-stop:hover {
+    background: #f05454;
+    box-shadow: 0 6px 24px rgba(239,68,68,0.42);
+}
+
+.focus-btn.hidden { display: none; }
+

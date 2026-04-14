@@ -234,17 +234,27 @@ function renderSessionRows(sessions) {
 
     emptyEl.classList.add('hidden');
     table.classList.remove('hidden');
-    body.innerHTML = sessions.map(s => `
+    body.innerHTML = sessions.map(s => {
+        const overtime = (s.overtimeMinutes || 0);
+        const planned  = (s.plannedMinutes  || 0);
+        let durationCell;
+        if (overtime > 0 && planned > 0) {
+            durationCell = `<span style="font-variant-numeric:tabular-nums">${planned}m planned · ${s.durationMinutes}m actual</span> <span class="ot-badge">+${overtime}m</span>`;
+        } else {
+            durationCell = `<span style="font-variant-numeric:tabular-nums">${fmtMins(s.durationMinutes)}</span>`;
+        }
+        return `
         <tr>
             <td>${esc(s.date)}</td>
             <td>${esc(s.time)}</td>
             <td>${esc(s.materialName)}</td>
-            <td style="font-variant-numeric:tabular-nums">${fmtMins(s.durationMinutes)}</td>
+            <td>${durationCell}</td>
             <td>${esc(s.timerMode)}</td>
             <td class="${s.completed ? 'tracker-status-done' : 'tracker-status-partial'}">
                 ${s.completed ? '&#10003; Completed' : '&#9679; Skipped'}
             </td>
-        </tr>`).join('');
+        </tr>`;
+    }).join('');
 }
 
 function filterSessions() {

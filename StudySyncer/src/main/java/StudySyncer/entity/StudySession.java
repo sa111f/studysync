@@ -20,7 +20,18 @@ public class StudySession {
     @Column(length = 200)
     private String materialName;
 
+    /** Actual minutes the user studied (may exceed plannedMinutes in overtime). */
     private int durationMinutes;
+
+    /** Configured phase length when the session started — 0 for legacy rows. */
+    @Column(name = "planned_minutes",
+            columnDefinition = "INT DEFAULT 0")
+    private int plannedMinutes;
+
+    /** max(0, duration - planned). Persisted so reports don't recompute on every read. */
+    @Column(name = "overtime_minutes",
+            columnDefinition = "INT DEFAULT 0")
+    private int overtimeMinutes;
 
     @Column(length = 50)
     private String timerMode;
@@ -51,6 +62,8 @@ public class StudySession {
     public User          getUser()            { return user; }
     public String        getMaterialName()    { return materialName; }
     public int           getDurationMinutes() { return durationMinutes; }
+    public int           getPlannedMinutes()  { return plannedMinutes; }
+    public int           getOvertimeMinutes() { return overtimeMinutes; }
     public String        getTimerMode()       { return timerMode; }
     public boolean       isCompleted()        { return completed; }
     public LocalDateTime getStartedAt()       { return startedAt; }
@@ -62,6 +75,8 @@ public class StudySession {
     public void setUser(User u)                  { this.user = u; }
     public void setMaterialName(String n)        { this.materialName = n; }
     public void setDurationMinutes(int d)        { this.durationMinutes = d; }
+    public void setPlannedMinutes(int m)         { this.plannedMinutes = m; }
+    public void setOvertimeMinutes(int m)        { this.overtimeMinutes = m; }
     public void setTimerMode(String m)           { this.timerMode = m; }
     public void setCompleted(boolean c)          { this.completed = c; }
     public void setStartedAt(LocalDateTime t)    { this.startedAt = t; }

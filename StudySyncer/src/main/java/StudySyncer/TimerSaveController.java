@@ -20,9 +20,10 @@ import java.util.Map;
  *   GET  /api/timer/state                 — read current state
  *   POST /api/timer/start                 — start / resume current phase
  *   POST /api/timer/pause                 — pause current phase
+ *   POST /api/timer/stop                  — finalize session (user-triggered end)
+ *     body: { phase: string, actualDurationSeconds: int,
+ *             plannedSeconds: int, overtimeSeconds: int }
  *   POST /api/timer/skip                  — skip to next phase (no auto-start)
- *   POST /api/timer/complete              — natural phase-end (idempotent)
- *     body: { phase: string, runEndAtMs: long }
  *   POST /api/timer/phase                 — switch phase
  *     body: { phase: string }
  *   POST /api/timer/durations             — update pomodoro / break durations
@@ -33,6 +34,7 @@ import java.util.Map;
  * Legacy endpoints (kept for backward compat with older clients / tests)
  *   POST /api/timer/save                  — write mode + totalSeconds + sessionCount
  *   GET  /api/timer/load                  — read same three fields
+ *   POST /api/timer/complete              — legacy no-op, returns current state
  *
  * Guests get 401 silently; the client swallows it and runs in localStorage mode.
  */
@@ -82,21 +84,30 @@ public class TimerSaveController {
         return ResponseEntity.ok(timerStateService.skip(user));
     }
 
-    @PostMapping("/complete")
-    public ResponseEntity<?> complete(@RequestBody Map<String, Object> body,
-                                      HttpSession session) {
+    @PostMapping("/stop")
+    public ResponseEntity<?> stop(@RequestBody(required = false) Map<String, Object> body,
+                                  HttpSession session) {
         User user = resolveUser(session);
         if (user == null) return unauthorized();
 
-        String phase = (String) body.get("phase");
-        Long runEndAtMs = null;
-        Object raw = body.get("runEndAtMs");
-        if (raw instanceof Number) {
-            runEndAtMs = ((Number) raw).longValue();
-        } else if (raw instanceof String && !((String) raw).isEmpty()) {
-            try { runEndAtMs = Long.parseLong((String) raw); } catch (NumberFormatException ignored) {}
+        Integer actual = null;
+        if (body != null) {
+            Object raw = body.get("actualDurationSeconds");
+            if (raw instanceof Number) {
+                actual = ((Number) raw).intValue();
+            } else if (raw instanceof String && !((String) raw).isEmpty()) {
+                try { actual = Integer.parseInt((String) raw); } catch (NumberFormatException ignored) {}
+            }
         }
-        return ResponseEntity.ok(timerStateService.completePhase(user, phase, runEndAtMs));
+        return ResponseEntity.ok(timerStateService.stop(user, actual));
+    }
+
+    /** Legacy no-op kept so any lingering client doesn't 404 in overtime mode. */
+    @PostMapping("/complete")
+    public ResponseEntity<?> complete(HttpSession session) {
+        User user = resolveUser(session);
+        if (user == null) return unauthorized();
+        return ResponseEntity.ok(timerStateService.getState(user));
     }
 
     @PostMapping("/phase")

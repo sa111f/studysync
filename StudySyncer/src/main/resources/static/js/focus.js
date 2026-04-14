@@ -127,6 +127,7 @@ let _lastDrainLineRow = -1;
 
 // ── Time formatter ───────────────────────────────────────────
 function _fmt(secs) {
+    secs = Math.max(0, secs | 0);
     const m = String(Math.floor(secs / 60)).padStart(2, '0');
     const s = String(secs % 60).padStart(2, '0');
     return `${m}:${s}`;
@@ -309,24 +310,36 @@ function _updatePixels(progress) {
 
 // ── Update all battery visuals from a state snapshot ─────────
 function _renderBattery(state, visState) {
-    const progress = state.totalSeconds > 0
-        ? state.remaining / state.totalSeconds
-        : 0;
+    // Battery fraction drains from 1 → 0 over the planned duration.
+    // Once elapsed crosses planned, we clamp to 0 (empty) and the
+    // CSS .is-overtime class takes over for the "keep going" glow.
+    const planned = state.plannedSeconds || 0;
+    const elapsed = state.elapsedSeconds || 0;
+    let progress  = planned > 0 ? (1 - elapsed / planned) : 0;
+    if (progress < 0) progress = 0;
+    if (progress > 1) progress = 1;
 
     const timeEl = document.getElementById('finjan-time');
-    if (timeEl) timeEl.textContent = _fmt(state.remaining);
+    if (timeEl) {
+        timeEl.textContent = state.isOvertime
+            ? '+' + _fmt(state.overtimeSeconds)
+            : _fmt(state.remainingSeconds);
+        timeEl.classList.toggle('overtime', !!state.isOvertime);
+    }
 
     _updatePixels(progress);
 
     if (_barFill) _barFill.style.width = (progress * 100) + '%';
 
     const body = document.body;
-    body.classList.toggle('is-running', visState === 'running');
-    body.classList.toggle('is-paused',  visState === 'paused');
-    body.classList.toggle('is-done',    visState === 'done');
+    body.classList.toggle('is-running',  visState === 'running');
+    body.classList.toggle('is-paused',   visState === 'paused');
+    body.classList.toggle('is-overtime', !!state.isOvertime);
 
     // Charge tiers — drive the CSS colour swap on #fj-pixels rect.
-    body.classList.toggle('battery-low', progress > 0   && progress <= 0.20);
+    // In overtime, remainingFrac = 0 so both guards fail and we use the
+    // dedicated .is-overtime styling instead.
+    body.classList.toggle('battery-low', progress > 0    && progress <= 0.20);
     body.classList.toggle('battery-mid', progress > 0.20 && progress <= 0.50);
 }
 
@@ -345,6 +358,13 @@ function _updateTabs(state) {
 // ── Session / phase label ────────────────────────────────────
 function _updateSessionLabel(state) {
     if (!_sessionLbl) return;
+
+    if (state.isOvertime && (state.phase === 'pomodoro' || state.phase === 'countdown')) {
+        _sessionLbl.textContent =
+            `Goal reached \u2014 overtime +${_fmt(state.overtimeSeconds)}`;
+        return;
+    }
+
     switch (state.phase) {
         case 'shortbreak':
             _sessionLbl.textContent = `Short Break \u2014 ${state.shortBreakMins} min`;
@@ -357,11 +377,18 @@ function _updateSessionLabel(state) {
     }
 }
 
+// ── Toggle stop-button visibility based on session activity ──
+function _updateStopBtn(state) {
+    const stopBtn = document.getElementById('focus-stop-btn');
+    if (!stopBtn) return;
+    const hasActive = state.isRunning || state.isPaused || state.elapsedSeconds > 0;
+    stopBtn.classList.toggle('hidden', !hasActive);
+}
+
 // ── TimerCore event subscriber ───────────────────────────────
 function _onCoreEvent(event, state) {
     let visState;
-    if      (event === 'done')  visState = 'done';
-    else if (event === 'pause') visState = 'paused';
+    if      (event === 'pause') visState = 'paused';
     else if (state.isRunning)   visState = 'running';
     else if (state.isPaused)    visState = 'paused';
     else                        visState = '';
@@ -370,52 +397,40 @@ function _onCoreEvent(event, state) {
         _renderBattery(state, visState);
         _updateTabs(state);
         _updateSessionLabel(state);
+        _updateStopBtn(state);
         if (_toggleBtn) _toggleBtn.textContent = state.isRunning ? 'Pause' : 'Start';
     }
 
-    // Session logging — study phases only.  Break phases MUST NOT be
-    // POSTed to /api/tracker/sessions or they would credit the daily goal.
-    if (event === 'sessionEnd') {
-        if (window.currentUser
+    // Session logging on manual stop / skip. Break phases MUST NOT POST
+    // or they would credit the daily goal.
+    if (event === 'sessionEnd' || event === 'skip') {
+        const isStop     = event === 'sessionEnd';
+        const actualMins = Math.max(0, Math.round(state.actualDurationSeconds / 60));
+        const plannedMin = Math.max(0, Math.round(state.plannedSeconds       / 60));
+        const overtime   = Math.max(0, actualMins - plannedMin);
+        if (actualMins > 0
+            && window.currentUser
             && (state.phase === 'pomodoro' || state.phase === 'countdown')) {
-            const mins = Math.round(state.totalSeconds / 60);
-            if (mins > 0) {
-                fetch('/api/tracker/sessions', {
-                    method:    'POST',
-                    headers:   { 'Content-Type': 'application/json' },
-                    keepalive: true,
-                    body: JSON.stringify({
-                        materialName:    'Focus Session',
-                        durationMinutes: mins,
-                        timerMode:       _phaseLabel(state.phase),
-                        completed:       true,
-                    }),
-                })
-                .then(() => {
-                    if (typeof window.onSessionCompleted === 'function') {
-                        window.onSessionCompleted('Focus Session', mins, new Date().toISOString().split('T')[0]);
-                    }
-                })
-                .catch(() => {});
-            }
-        }
-    } else if (event === 'skip') {
-        if (state.phase === 'pomodoro' || state.phase === 'countdown') {
-            const elapsed = state.totalSeconds - state.remaining;
-            const mins    = Math.round(Math.max(0, elapsed) / 60);
-            if (mins > 0 && window.currentUser) {
-                fetch('/api/tracker/sessions', {
-                    method:    'POST',
-                    headers:   { 'Content-Type': 'application/json' },
-                    keepalive: true,
-                    body: JSON.stringify({
-                        materialName:    'Focus Session',
-                        durationMinutes: mins,
-                        timerMode:       _phaseLabel(state.phase),
-                        completed:       false,
-                    }),
-                }).catch(() => {});
-            }
+            fetch('/api/tracker/sessions', {
+                method:    'POST',
+                headers:   { 'Content-Type': 'application/json' },
+                keepalive: true,
+                body: JSON.stringify({
+                    materialName:    'Focus Session',
+                    durationMinutes: actualMins,
+                    plannedMinutes:  plannedMin,
+                    overtimeMinutes: overtime,
+                    timerMode:       _phaseLabel(state.phase),
+                    completed:       isStop,
+                }),
+            })
+            .then(() => {
+                if (isStop && typeof window.onSessionCompleted === 'function') {
+                    window.onSessionCompleted('Focus Session', actualMins,
+                        new Date().toISOString().split('T')[0]);
+                }
+            })
+            .catch(() => {});
         }
     }
 }
@@ -433,6 +448,7 @@ TimerCore.subscribe(_onCoreEvent);
 function setPhase(phase)  { TimerCore.setPhase(phase); }
 function toggleTimer()    { TimerCore.toggle();        }
 function skipPhase()      { TimerCore.skip();          }
+function stopPhase()      { TimerCore.stop();          }
 
 // ── Fullscreen toggle ────────────────────────────────────────
 function _toggleFullscreen() {
@@ -478,6 +494,7 @@ document.addEventListener('keydown', e => {
     _renderBattery(state, initVis);
     _updateTabs(state);
     _updateSessionLabel(state);
+    _updateStopBtn(state);
     if (_toggleBtn) _toggleBtn.textContent = state.isRunning ? 'Pause' : 'Start';
 
     const svg = document.getElementById('finjan-svg');

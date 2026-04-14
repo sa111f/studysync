@@ -7,13 +7,12 @@
  *
  * Responsibilities:
  *   - Subscribe to TimerCore events and update dashboard DOM
- *   - Manage the in-page session log (results table)
+ *     (countdown until zero, then overtime overlay after zero).
+ *   - Manage the in-page session log (results table).
  *   - Expose global shims that HTML onclick attributes and
- *     subjects.js / auth.js call (same API as the old timer.js)
- *   - POST completed study sessions to /api/tracker/sessions
- *
- * Backend timer-state persistence (/api/timer/start, /pause, /phase, etc.)
- * is owned entirely by TimerCore — this layer does not write timer state.
+ *     subjects.js / auth.js call.
+ *   - POST completed study sessions to /api/tracker/sessions with
+ *     planned / actual / overtime fields on manual stop.
  */
 
 // ── DOM refs ──────────────────────────────────────────────────
@@ -28,6 +27,7 @@ let sessions = [];
 
 // ── Helpers ───────────────────────────────────────────────────
 function _fmt(secs) {
+    secs = Math.max(0, secs | 0);
     const m = String(Math.floor(secs / 60)).padStart(2, '0');
     const s = String(secs % 60).padStart(2, '0');
     return `${m}:${s}`;
@@ -49,22 +49,38 @@ function _activeSubject() {
 // ── Refresh dashboard timer display ───────────────────────────
 function _refreshDisplay(state, visState) {
     if (display) {
-        display.textContent = _fmt(state.remaining);
-        display.className   = 'timer-display' + (visState ? ' ' + visState : '');
+        // Countdown MM:SS until zero, then OVERTIME +MM:SS
+        if (state.isOvertime) {
+            display.textContent = '+' + _fmt(state.overtimeSeconds);
+        } else {
+            display.textContent = _fmt(state.remainingSeconds);
+        }
+        let cls = 'timer-display';
+        if (visState) cls += ' ' + visState;
+        if (state.isOvertime) cls += ' overtime';
+        display.className = cls;
     }
 
-    // SVG progress ring
+    // SVG progress ring — fills normally to 100%, then freezes (clamped).
     const ring = document.getElementById('timer-ring-progress');
     if (ring) {
         const circ     = 2 * Math.PI * 88;
-        const progress = state.totalSeconds > 0 ? state.remaining / state.totalSeconds : 0;
+        let progress   = state.plannedSeconds > 0
+            ? state.elapsedSeconds / state.plannedSeconds
+            : 0;
+        // In the existing UI the ring DEPLETES (remaining / planned).
+        // Keep that direction but clamp so overtime leaves it at zero.
+        let remainingFrac = Math.max(0, 1 - progress);
         ring.style.strokeDasharray  = circ;
-        ring.style.strokeDashoffset = circ * (1 - progress);
+        ring.style.strokeDashoffset = circ * (1 - remainingFrac);
     }
 
-    // Pulse class on ring wrapper
+    // Wrapper classes for pulse / overtime glow.
     const wrap = document.getElementById('timer-ring-wrap');
-    if (wrap) wrap.classList.toggle('timer-running', visState === 'running');
+    if (wrap) {
+        wrap.classList.toggle('timer-running', visState === 'running');
+        wrap.classList.toggle('timer-overtime', !!state.isOvertime);
+    }
 
     // Start/Pause toggle button
     const startBtn = document.getElementById('btn-start-pause');
@@ -74,11 +90,17 @@ function _refreshDisplay(state, visState) {
         startBtn.classList.toggle('is-pausing', running);
     }
 
-    // Session progress dots
+    // Stop button — visible whenever there is an active session
+    // (running, paused with progress, or in overtime).
+    const stopBtn = document.getElementById('btn-stop');
+    if (stopBtn) {
+        const hasActive = state.isRunning || state.isPaused || state.elapsedSeconds > 0;
+        stopBtn.classList.toggle('hidden', !hasActive);
+    }
+
     _updateSessionDots(state);
 }
 
-// ── Update session progress dots ─────────────────────────────
 function _updateSessionDots(state) {
     const completed = (state.sessionCount - 1) % 4;
     for (let i = 1; i <= 4; i++) {
@@ -87,7 +109,6 @@ function _updateSessionDots(state) {
     }
 }
 
-// ── Update phase tabs ─────────────────────────────────────────
 function _updateTabs(state) {
     ['pomodoro', 'shortbreak', 'longbreak'].forEach(p => {
         const tab = document.getElementById('tab-' + p);
@@ -95,9 +116,16 @@ function _updateTabs(state) {
     });
 }
 
-// ── Update pomodoro info line ─────────────────────────────────
 function _updatePomodoroInfo(state) {
     if (!pomodoroInfo) return;
+
+    // Overtime banner wins over default phase info while in overtime.
+    if (state.isOvertime && (state.phase === 'pomodoro' || state.phase === 'countdown')) {
+        pomodoroInfo.textContent =
+            `Goal reached \u2014 still studying. +${_fmt(state.overtimeSeconds)} overtime.`;
+        return;
+    }
+
     switch (state.phase) {
         case 'shortbreak':
             pomodoroInfo.textContent =
@@ -109,7 +137,7 @@ function _updatePomodoroInfo(state) {
             break;
         case 'countdown':
             pomodoroInfo.textContent =
-                `Countdown \u2014 ${Math.round(state.totalSeconds / 60)} min`;
+                `Countdown \u2014 ${Math.round(state.plannedSeconds / 60)} min`;
             break;
         default: // pomodoro
             pomodoroInfo.innerHTML =
@@ -119,40 +147,49 @@ function _updatePomodoroInfo(state) {
 }
 
 // ── TimerCore event subscriber ────────────────────────────────
-//
-// Timer state persistence (start/pause/phase/countdown) is now handled
-// inside TimerCore via its own REST calls to /api/timer/*, so this layer
-// is purely UI + session logging.  We also MUST NOT POST break phases
-// to /api/tracker/sessions — those must never credit the study goal.
 function _onCoreEvent(event, state) {
-    // --- Compute visual state ---
     let visState;
-    if      (event === 'done')  visState = 'done';
-    else if (event === 'pause') visState = 'paused';
+    if      (event === 'pause') visState = 'paused';
     else if (state.isRunning)   visState = 'running';
     else if (state.isPaused)    visState = 'paused';
     else                        visState = '';
 
-    // --- Update dashboard DOM for all events except logging-only ---
     if (event !== 'sessionEnd' && event !== 'skip') {
         _refreshDisplay(state, visState);
         _updateTabs(state);
         _updatePomodoroInfo(state);
     }
 
-    // --- Session logging — study phases only ---
+    // --- Session logging on manual stop / skip ---
     if (event === 'sessionEnd') {
-        // state is the pre-completion snapshot (phase that just finished)
+        // state is the frozen pre-stop snapshot. Only study phases credit
+        // the daily goal; breaks are intentionally ignored here.
         if (state.phase === 'pomodoro' || state.phase === 'countdown') {
-            const mins = Math.round(state.totalSeconds / 60);
-            if (mins > 0) logSession(_activeSubject(), _phaseLabel(state.phase), mins, true);
+            const actualMins  = Math.max(0, Math.round(state.actualDurationSeconds / 60));
+            const plannedMins = Math.max(0, Math.round(state.plannedSeconds       / 60));
+            if (actualMins > 0) {
+                logSession(
+                    _activeSubject(),
+                    _phaseLabel(state.phase),
+                    actualMins,
+                    plannedMins,
+                    true,
+                );
+            }
         }
     } else if (event === 'skip') {
-        // state is the pre-skip snapshot
         if (state.phase === 'pomodoro' || state.phase === 'countdown') {
-            const elapsed = state.totalSeconds - state.remaining;
-            const mins    = Math.round(elapsed / 60);
-            if (mins > 0) logSession(_activeSubject(), _phaseLabel(state.phase), mins, false);
+            const actualMins  = Math.max(0, Math.round(state.actualDurationSeconds / 60));
+            const plannedMins = Math.max(0, Math.round(state.plannedSeconds       / 60));
+            if (actualMins > 0) {
+                logSession(
+                    _activeSubject(),
+                    _phaseLabel(state.phase),
+                    actualMins,
+                    plannedMins,
+                    false,
+                );
+            }
         }
     }
 }
@@ -160,37 +197,47 @@ function _onCoreEvent(event, state) {
 TimerCore.subscribe(_onCoreEvent);
 
 // ── Session log ───────────────────────────────────────────────
-function logSession(subject, mode, mins, completed = true) {
+function logSession(subject, mode, mins, plannedMins, completed = true) {
     const now  = new Date();
     const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const date = now.toISOString().split('T')[0];
-    sessions.push({ subject, mode, duration: mins + ' min', durationMins: mins, time, date, completed });
+    const overtime = Math.max(0, mins - (plannedMins | 0));
+    sessions.push({
+        subject,
+        mode,
+        duration:     mins + ' min',
+        durationMins: mins,
+        plannedMins:  plannedMins | 0,
+        overtimeMins: overtime,
+        time,
+        date,
+        completed,
+    });
     renderResults();
 
     if (window.currentUser) {
         const docEl = document.getElementById('doc-subject-name');
         const name  = (docEl && docEl.value.trim()) ? docEl.value.trim() : subject;
         fetch('/api/tracker/sessions', {
-            method:   'POST',
-            headers:  { 'Content-Type': 'application/json' },
+            method:    'POST',
+            headers:   { 'Content-Type': 'application/json' },
             keepalive: true,
             body: JSON.stringify({
                 materialName:    name,
                 durationMinutes: mins,
+                plannedMinutes:  plannedMins | 0,
+                overtimeMinutes: overtime,
                 timerMode:       mode,
                 completed,
             }),
         })
         .then(() => {
-            // Session is now saved in DB — safe to refresh the goal display
             if (typeof onSessionCompleted === 'function') onSessionCompleted(subject, mins, date);
         })
         .catch(() => {
-            // Save failed; still fire the hook so the UI at least re-checks
             if (typeof onSessionCompleted === 'function') onSessionCompleted(subject, mins, date);
         });
     } else {
-        // Guest — no server save, but notify UI (localStorage-based goal display)
         if (typeof onSessionCompleted === 'function') onSessionCompleted(subject, mins, date);
     }
 }
@@ -204,18 +251,23 @@ function renderResults() {
     }
     resultsEmpty.classList.add('hidden');
     resultsTable.classList.remove('hidden');
-    resultsBody.innerHTML = sessions.map((s, i) => `
+    resultsBody.innerHTML = sessions.map((s, i) => {
+        let durationCell = htmlEsc(s.duration);
+        if (s.overtimeMins > 0 && s.plannedMins > 0) {
+            durationCell = `${s.plannedMins}m planned · ${s.durationMins}m actual <span class="ot-badge">+${s.overtimeMins}m</span>`;
+        }
+        return `
         <tr>
             <td>${i + 1}</td>
             <td>${htmlEsc(s.subject)}</td>
             <td>${htmlEsc(s.mode)}</td>
-            <td>${htmlEsc(s.duration)}</td>
+            <td>${durationCell}</td>
             <td>${htmlEsc(s.time)}</td>
             <td class="${s.completed ? 'tracker-status-done' : 'tracker-status-partial'}">
                 ${s.completed ? '&#10003; Completed' : '&#9679; Skipped'}
             </td>
-        </tr>
-    `).join('');
+        </tr>`;
+    }).join('');
 }
 
 function htmlEsc(str) {
@@ -235,47 +287,28 @@ function clearResults() {
 
 // ── Global shims — called from HTML onclick and other scripts ──
 
-/** Called directly from HTML: <button onclick="startTimer()"> */
 function startTimer()  { TimerCore.start();  }
-
-/** Called directly from HTML: <button onclick="pauseTimer()"> */
 function pauseTimer()  { TimerCore.pause();  }
-
-/** Called from Start/Pause toggle button */
 function toggleTimer() { TimerCore.toggle(); }
-
-/** Called directly from HTML: <button onclick="skipTimer()"> */
+function stopTimer()   { TimerCore.stop();   }
 function skipTimer()   { TimerCore.skip();   }
-
-/** Called directly from HTML: <button onclick="setTimerPhase(...)"> */
 function setTimerPhase(phase) { TimerCore.setPhase(phase); }
 
-/**
- * Called by subjects.js when a study-time recommendation is applied.
- * Switches to countdown phase with the given duration.
- */
 function applyTimerDuration(mins) {
     console.log('[StudySyncer] applyTimerDuration:', mins, 'min');
     TimerCore.applyCountdownDuration(mins);
-    // Keep hidden input in sync (backward compat)
     const inp = document.getElementById('duration');
     if (inp) inp.value = mins;
 }
 
-/** Called by subjects.js when starting a new study material */
 function resetTimerForNewMaterial() {
     TimerCore.setPhase('pomodoro');
 }
 
-/**
- * Called by auth.js after login to restore backend-persisted state.
- * Delegates to TimerCore which merges carefully with localStorage state.
- */
 function restoreTimerState(state) {
     TimerCore.restoreFromServer(state);
 }
 
-/** Legacy no-op — TimerCore now persists transitions itself. */
 function saveTimerState() { /* intentionally empty */ }
 
 // ── Settings panel ────────────────────────────────────────────
@@ -327,11 +360,9 @@ document.addEventListener('keydown', e => {
     _updateTabs(state);
     _updatePomodoroInfo(state);
 
-    // Keep hidden duration input in sync
     const inp = document.getElementById('duration');
-    if (inp) inp.value = Math.round(state.totalSeconds / 60);
+    if (inp) inp.value = Math.round(state.plannedSeconds / 60);
 
-    // Sync settings inputs to restored durations
     const pd = document.getElementById('dur-pomodoro');
     const sd = document.getElementById('dur-shortbreak');
     const ld = document.getElementById('dur-longbreak');

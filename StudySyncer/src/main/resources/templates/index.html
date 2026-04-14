@@ -210,10 +210,11 @@
             <div class="timer-display" id="timer-display">25:00</div>
         </div>
 
-        <!-- Controls: Start/Pause toggle · Skip -->
+        <!-- Controls: Start/Pause toggle · Stop · Skip -->
         <div class="timer-controls">
             <button class="ctrl-btn start shine-btn" id="btn-start-pause" onclick="toggleTimer()">Start</button>
-            <button class="ctrl-btn skip"  onclick="skipTimer()">Skip</button>
+            <button class="ctrl-btn stop hidden"     id="btn-stop" onclick="stopTimer()">Stop</button>
+            <button class="ctrl-btn skip"            onclick="skipTimer()">Skip</button>
         </div>
 
         <!-- Pomodoro session info -->

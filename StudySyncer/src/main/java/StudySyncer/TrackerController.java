@@ -58,6 +58,7 @@ public class TrackerController {
 
         trackerService.saveSession(user,
                 dto.getMaterialName(), dto.getDurationMinutes(),
+                dto.getPlannedMinutes(), dto.getOvertimeMinutes(),
                 dto.getTimerMode(), dto.isCompleted());
         // Goal-progress sync and goal-reached email check are both handled inside
         // trackerService.saveSession — do NOT add a duplicate call here.

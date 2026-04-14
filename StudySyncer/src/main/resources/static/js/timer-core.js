@@ -8,84 +8,92 @@
  *
  * Model
  * ─────
- *   The authoritative live state is just:
- *     runEndAtMs (epoch ms)   — when the current phase's timer will hit 0
- *     isRunning (bool)        — whether we're currently counting down
- *     remainingSeconds (int)  — ONLY meaningful when NOT running
+ *   phase              'pomodoro' | 'shortbreak' | 'longbreak' | 'countdown'
+ *   plannedSeconds     configured length of the current phase
+ *   elapsedBase        seconds accumulated from any PRIOR running segments
+ *                      of this session (while the current segment is paused
+ *                      or stopped).  Authoritative when !isRunning.
+ *   runStartAtMs       epoch ms when the CURRENT running segment began.
+ *                      Null when stopped/paused.
+ *   isRunning / isPaused
  *
- *   While running, `remaining` is a PURE FUNCTION of
- *     max(0, round((runEndAtMs - Date.now()) / 1000))
+ *   Derived (pure functions of the above):
+ *     elapsedSeconds       = isRunning
+ *                              ? elapsedBase + (now - runStartAtMs)/1000
+ *                              : elapsedBase
+ *     remainingSeconds     = max(0, plannedSeconds - elapsedSeconds)
+ *     isOvertime           = elapsedSeconds > plannedSeconds
+ *     overtimeSeconds      = max(0, elapsedSeconds - plannedSeconds)
+ *     actualDurationSeconds = elapsedSeconds
  *
- *   Nothing in this file decrements a stored counter while running.
- *   The setInterval ticks every 250 ms purely to refresh displays.
- *
- * Why the rewrite
- * ───────────────
- *   The previous version stored a `remaining` counter and decremented
- *   it on every interval tick.  On page navigation, init() would read
- *   the already-decremented counter AND subtract wall-clock elapsed time
- *   AGAIN, double-counting and losing ~15 minutes per navigation cycle.
- *   It also triggered a spurious auto-start() after landing remaining at
- *   zero, which produced a hidden auto-started break.
+ * Key behavioural rule
+ *   Reaching zero does NOT stop the session. The timer continues
+ *   counting elapsed, and the UI flips to overtime display. A session
+ *   is only finalized when the user calls stop() or skip().
  *
  * Persistence
  *   localStorage           — cross-page navigation in the same browser
  *   BroadcastChannel       — cross-tab live sync of state transitions
  *   Backend /api/timer/*   — cross-device truth for logged-in users
- *
- * Idempotency
- *   Phase-end firing is guarded by _endedMarker = `${phase}:${runEndAtMs}`.
- *   Two tabs racing to finalize the same phase-instance will only advance
- *   the state once; the second call becomes a no-op.
  */
 (function (global) {
 
-    var LS_KEY  = 'ss_timer_v3';   // bump: v3 invalidates the old decrement-based format
-    var BC_NAME = 'ss_timer_bc_v3';
+    var LS_KEY  = 'ss_timer_v4';   // v4 switches to elapsed-based model with overtime
+    var BC_NAME = 'ss_timer_bc_v4';
 
-    // ── Default state ──────────────────────────────────────────
     var DEFAULTS = {
         pomodoroMins:     25,
         shortBreakMins:   5,
         longBreakMins:    15,
-        phase:            'pomodoro',  // 'pomodoro'|'shortbreak'|'longbreak'|'countdown'
+        phase:            'pomodoro',
         sessionCount:     1,
-        totalSeconds:     25 * 60,
-        remainingSeconds: 25 * 60,     // authoritative only when !isRunning
+        plannedSeconds:   25 * 60,
+        elapsedBase:      0,
+        runStartAtMs:     null,
         isRunning:        false,
         isPaused:         false,
-        runEndAtMs:       null,        // epoch ms when the running phase will hit 0
+        milestoneFired:   false,
     };
 
-    var _s              = Object.assign({}, DEFAULTS);
-    var _ivl            = null;
-    var _subs           = [];
-    var _bc             = null;
-    var _mute           = false;
-    var _endedMarker    = null;  // prevents double-firing sessionEnd across tabs/reloads
+    var _s    = Object.assign({}, DEFAULTS);
+    var _ivl  = null;
+    var _subs = [];
+    var _bc   = null;
+    var _mute = false;
 
     // ── Helpers ────────────────────────────────────────────────
-    function _computeRemaining() {
-        if (_s.isRunning && _s.runEndAtMs) {
-            return Math.max(0, Math.round((_s.runEndAtMs - Date.now()) / 1000));
+    function _computeElapsed() {
+        if (_s.isRunning && _s.runStartAtMs) {
+            var delta = (Date.now() - _s.runStartAtMs) / 1000;
+            return Math.max(0, _s.elapsedBase + delta);
         }
-        return Math.max(0, _s.remainingSeconds | 0);
+        return Math.max(0, _s.elapsedBase);
     }
 
     function _snap() {
-        var remaining = _computeRemaining();
+        var elapsed   = _computeElapsed();
+        var planned   = Math.max(0, _s.plannedSeconds | 0);
+        var remaining = Math.max(0, planned - elapsed);
+        var overtime  = Math.max(0, elapsed - planned);
+        var isOt      = elapsed > planned;
+
         return {
-            phase:            _s.phase,
-            pomodoroMins:     _s.pomodoroMins,
-            shortBreakMins:   _s.shortBreakMins,
-            longBreakMins:    _s.longBreakMins,
-            sessionCount:     _s.sessionCount,
-            totalSeconds:     _s.totalSeconds,
-            remaining:        remaining,        // canonical live value for UIs
-            remainingSeconds: _s.remainingSeconds,
-            isRunning:        _s.isRunning,
-            isPaused:         _s.isPaused,
-            runEndAtMs:       _s.runEndAtMs,
+            phase:                 _s.phase,
+            pomodoroMins:          _s.pomodoroMins,
+            shortBreakMins:        _s.shortBreakMins,
+            longBreakMins:         _s.longBreakMins,
+            sessionCount:          _s.sessionCount,
+            plannedSeconds:        planned,
+            totalSeconds:          planned,            // legacy alias
+            elapsedSeconds:        Math.round(elapsed),
+            remainingSeconds:      Math.round(remaining),
+            remaining:             Math.round(remaining),   // legacy alias
+            overtimeSeconds:       Math.round(overtime),
+            actualDurationSeconds: Math.round(elapsed),
+            isOvertime:            isOt,
+            isRunning:             _s.isRunning,
+            isPaused:              _s.isPaused,
+            runStartAtMs:          _s.runStartAtMs,
         };
     }
 
@@ -103,20 +111,19 @@
         } catch (_) {}
     }
 
-    /** Persistable form: raw state fields only, no computed values. */
     function _persistable() {
         return {
-            phase:            _s.phase,
-            pomodoroMins:     _s.pomodoroMins,
-            shortBreakMins:   _s.shortBreakMins,
-            longBreakMins:    _s.longBreakMins,
-            sessionCount:     _s.sessionCount,
-            totalSeconds:     _s.totalSeconds,
-            remainingSeconds: _s.remainingSeconds,
-            isRunning:        _s.isRunning,
-            isPaused:         _s.isPaused,
-            runEndAtMs:       _s.runEndAtMs,
-            endedMarker:      _endedMarker,
+            phase:          _s.phase,
+            pomodoroMins:   _s.pomodoroMins,
+            shortBreakMins: _s.shortBreakMins,
+            longBreakMins:  _s.longBreakMins,
+            sessionCount:   _s.sessionCount,
+            plannedSeconds: _s.plannedSeconds,
+            elapsedBase:    _s.elapsedBase,
+            runStartAtMs:   _s.runStartAtMs,
+            isRunning:      _s.isRunning,
+            isPaused:       _s.isPaused,
+            milestoneFired: _s.milestoneFired,
         };
     }
 
@@ -127,12 +134,8 @@
     function _durationFor(phase) {
         if (phase === 'shortbreak') return _s.shortBreakMins * 60;
         if (phase === 'longbreak')  return _s.longBreakMins  * 60;
-        if (phase === 'countdown')  return _s.totalSeconds || (_s.pomodoroMins * 60);
-        return _s.pomodoroMins * 60;  // 'pomodoro'
-    }
-
-    function _markerFor(phase, runEndAtMs) {
-        return phase + ':' + (runEndAtMs || 0);
+        if (phase === 'countdown')  return _s.plannedSeconds || (_s.pomodoroMins * 60);
+        return _s.pomodoroMins * 60;
     }
 
     // ── BroadcastChannel (cross-tab live sync) ─────────────────
@@ -143,7 +146,6 @@
             if (!d || d.type !== 'STATE' || !d.state) return;
             _mute = true;
             Object.assign(_s, d.state);
-            if (d.state.endedMarker != null) _endedMarker = d.state.endedMarker;
             _save();
             _fire(_s.isRunning ? 'start' : (_s.isPaused ? 'pause' : 'phase'));
             _mute = false;
@@ -157,13 +159,8 @@
             if (raw) {
                 var saved = JSON.parse(raw);
                 Object.assign(_s, saved);
-                if (saved.endedMarker) _endedMarker = saved.endedMarker;
             }
         } catch (_) {}
-
-        // If the saved state says "running" but runEndAtMs has already passed,
-        // we'll handle it naturally in the first _tick() below.  No destructive
-        // rewrite of remaining here — that was the old bug.
         _startDisplayInterval();
     })();
 
@@ -173,108 +170,55 @@
         _ivl = setInterval(_tick, 250);
     }
 
-    function _stopDisplayInterval() {
-        if (_ivl) { clearInterval(_ivl); _ivl = null; }
-    }
-
     function _tick() {
-        if (_s.isRunning && _s.runEndAtMs) {
-            var rem = _computeRemaining();
-            if (rem <= 0) {
-                _onSessionEnd();
-                return;
-            }
-            _fire('tick');
-        } else if (_s.isRunning && !_s.runEndAtMs) {
-            // Shouldn't happen, but heal gracefully
-            _s.isRunning = false;
+        if (!_s.isRunning || !_s.runStartAtMs) return;
+
+        var elapsed = _computeElapsed();
+
+        // Fire the zero-crossing milestone exactly once per session, so the
+        // UI can flash / chime. Does NOT stop the session — overtime takes over.
+        if (!_s.milestoneFired && elapsed >= _s.plannedSeconds && _s.plannedSeconds > 0) {
+            _s.milestoneFired = true;
             _save();
-            _fire('phase');
-        }
-    }
-
-    // ── Phase end (idempotent, guarded by _endedMarker) ────────
-    function _onSessionEnd() {
-        var endedPhase     = _s.phase;
-        var endedRunEndAt  = _s.runEndAtMs;
-        var marker         = _markerFor(endedPhase, endedRunEndAt);
-
-        if (_endedMarker === marker) {
-            // Another tab or this tab's earlier tick already handled it.
-            return;
-        }
-        _endedMarker = marker;
-
-        // Freeze the "just finished" snapshot so subscribers can log it.
-        var preState = {
-            phase:            endedPhase,
-            pomodoroMins:     _s.pomodoroMins,
-            shortBreakMins:   _s.shortBreakMins,
-            longBreakMins:    _s.longBreakMins,
-            sessionCount:     _s.sessionCount,
-            totalSeconds:     _s.totalSeconds,
-            remaining:        0,
-            remainingSeconds: 0,
-            isRunning:        false,
-            isPaused:         false,
-            runEndAtMs:       null,
-        };
-
-        // Stop the running clock locally.
-        _s.isRunning  = false;
-        _s.isPaused   = false;
-        _s.runEndAtMs = null;
-        _s.remainingSeconds = 0;
-
-        _fire('done', preState);
-        _fire('sessionEnd', preState);
-        _save();
-        _broadcast('STATE');
-
-        // Advance to the next phase locally (frontend optimistic update).
-        if (endedPhase === 'pomodoro') {
-            var nextBreak = (_s.sessionCount % 4 === 0) ? 'longbreak' : 'shortbreak';
-            _s.sessionCount++;
-            _setPhaseLocal(nextBreak);
-            // Auto-start the break after a short grace period so subscribers
-            // can finish rendering their "done" flash.
-            setTimeout(function () { _api.start(); }, 1100);
-        } else if (endedPhase === 'shortbreak' || endedPhase === 'longbreak') {
-            if (_s.sessionCount > 4) _s.sessionCount = 1;
-            _setPhaseLocal('pomodoro');
-        } else {
-            // Countdown — reset to full, stay stopped.
-            _s.remainingSeconds = _s.totalSeconds;
-            _save();
-            _fire('phase');
             _broadcast('STATE');
+            _fire('milestone');
         }
-
-        // Backend reconciliation — fire-and-forget.  The idempotency guard
-        // on the server means multiple tabs racing here all resolve safely.
-        if (global.currentUser) {
-            fetch('/api/timer/complete', {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                keepalive: true,
-                body: JSON.stringify({ phase: endedPhase, runEndAtMs: endedRunEndAt })
-            }).catch(function () {});
-        }
+        _fire('tick');
     }
 
-    // Internal: switch phase locally without firing a backend call
-    // (used during auto-advance after session end).
-    function _setPhaseLocal(phase) {
-        _s.phase            = phase;
-        _s.totalSeconds     = _durationFor(phase);
-        _s.remainingSeconds = _s.totalSeconds;
-        _s.isRunning        = false;
-        _s.isPaused         = false;
-        _s.runEndAtMs       = null;
-        _endedMarker        = null;
+    // ── Phase reset (internal — no backend call) ───────────────
+    function _resetPhaseLocal(phase) {
+        _s.phase          = phase;
+        _s.plannedSeconds = _durationFor(phase);
+        _s.elapsedBase    = 0;
+        _s.runStartAtMs   = null;
+        _s.isRunning      = false;
+        _s.isPaused       = false;
+        _s.milestoneFired = false;
         _save();
         _broadcast('STATE');
         _fire('phase');
+    }
+
+    function _advancePhaseAfterStop(endedPhase) {
+        if (endedPhase === 'pomodoro') {
+            var nextBreak = (_s.sessionCount % 4 === 0) ? 'longbreak' : 'shortbreak';
+            _s.sessionCount++;
+            _resetPhaseLocal(nextBreak);
+        } else if (endedPhase === 'shortbreak' || endedPhase === 'longbreak') {
+            if (_s.sessionCount > 4) _s.sessionCount = 1;
+            _resetPhaseLocal('pomodoro');
+        } else {
+            // countdown — reset ready on the same phase
+            _s.elapsedBase    = 0;
+            _s.runStartAtMs   = null;
+            _s.isRunning      = false;
+            _s.isPaused       = false;
+            _s.milestoneFired = false;
+            _save();
+            _broadcast('STATE');
+            _fire('phase');
+        }
     }
 
     // ── Backend sync helpers ───────────────────────────────────
@@ -288,33 +232,32 @@
           .catch(function () { return null; });
     }
 
-    /**
-     * Adopt an authoritative state from the backend.  Used when:
-     *   - another device started the timer and this tab just logged in
-     *   - the server's /start response arrived with a refined runEndAtMs
-     */
     function _adoptServerState(serverDto) {
         if (!serverDto || typeof serverDto !== 'object') return;
         _mute = true;
-        if (serverDto.phase)             _s.phase            = serverDto.phase;
-        if (serverDto.pomodoroMinutes)   _s.pomodoroMins     = serverDto.pomodoroMinutes;
-        if (serverDto.shortBreakMinutes) _s.shortBreakMins   = serverDto.shortBreakMinutes;
-        if (serverDto.longBreakMinutes)  _s.longBreakMins    = serverDto.longBreakMinutes;
-        if (serverDto.sessionCount)      _s.sessionCount     = serverDto.sessionCount;
-        if (serverDto.totalSeconds)      _s.totalSeconds     = serverDto.totalSeconds;
-        if (typeof serverDto.remainingSeconds === 'number') _s.remainingSeconds = serverDto.remainingSeconds;
-        _s.isRunning  = !!serverDto.running;
-        _s.isPaused   = !!serverDto.paused;
+        if (serverDto.phase)             _s.phase          = serverDto.phase;
+        if (serverDto.pomodoroMinutes)   _s.pomodoroMins   = serverDto.pomodoroMinutes;
+        if (serverDto.shortBreakMinutes) _s.shortBreakMins = serverDto.shortBreakMinutes;
+        if (serverDto.longBreakMinutes)  _s.longBreakMins  = serverDto.longBreakMinutes;
+        if (serverDto.sessionCount)      _s.sessionCount   = serverDto.sessionCount;
+        if (typeof serverDto.plannedSeconds === 'number') _s.plannedSeconds = serverDto.plannedSeconds;
+        if (typeof serverDto.elapsedBase    === 'number') _s.elapsedBase    = serverDto.elapsedBase;
+        _s.isRunning = !!serverDto.running;
+        _s.isPaused  = !!serverDto.paused;
 
-        // Correct for clock skew between the server and this client.
-        if (_s.isRunning && serverDto.runEndAtMs) {
+        // Correct for clock skew between server and client.
+        if (_s.isRunning && serverDto.runStartAtMs) {
             var skew = Date.now() - (serverDto.serverNowMs || Date.now());
-            _s.runEndAtMs = serverDto.runEndAtMs + skew;
+            _s.runStartAtMs = serverDto.runStartAtMs + skew;
         } else {
-            _s.runEndAtMs = null;
+            _s.runStartAtMs = null;
         }
 
-        _endedMarker = null;
+        // Milestone flag: derive from current elapsed vs planned so we don't
+        // refire a crossing that's already happened on another device.
+        var elapsed = _computeElapsed();
+        _s.milestoneFired = elapsed >= _s.plannedSeconds;
+
         _save();
         _broadcast('STATE');
         _fire(_s.isRunning ? 'start' : (_s.isPaused ? 'pause' : 'phase'));
@@ -324,38 +267,31 @@
     // ── Public API ─────────────────────────────────────────────
     var _api = {
 
-        subscribe: function (fn) {
+        subscribe:   function (fn) {
             if (typeof fn === 'function' && _subs.indexOf(fn) < 0) _subs.push(fn);
         },
-
         unsubscribe: function (fn) {
             _subs = _subs.filter(function (f) { return f !== fn; });
         },
 
-        /** Full live snapshot. `.remaining` is the canonical display value. */
         getState: function () { return _snap(); },
 
+        /** 0..1 fraction of plannedSeconds elapsed, clamped at 1.0. */
         getProgress: function () {
-            var rem = _computeRemaining();
-            return _s.totalSeconds > 0 ? rem / _s.totalSeconds : 0;
+            if (_s.plannedSeconds <= 0) return 0;
+            var elapsed = _computeElapsed();
+            return Math.min(1, elapsed / _s.plannedSeconds);
         },
 
         start: function () {
             if (_s.isRunning) return;
 
-            // If remaining has drained to zero or below, reset to full phase
-            // duration so the user can actually begin again.  This also
-            // handles the "phase just ended and we're about to auto-start"
-            // flow from _onSessionEnd.
-            if (_s.remainingSeconds <= 0) {
-                _s.remainingSeconds = _durationFor(_s.phase);
-                _s.totalSeconds     = _s.remainingSeconds;
-            }
-
-            _s.isRunning  = true;
-            _s.isPaused   = false;
-            _s.runEndAtMs = Date.now() + _s.remainingSeconds * 1000;
-            _endedMarker  = null;
+            _s.runStartAtMs = Date.now();
+            _s.isRunning    = true;
+            _s.isPaused     = false;
+            // Re-derive milestone in case elapsedBase already crosses planned
+            // (e.g. resuming a session that hit overtime then was paused).
+            _s.milestoneFired = _s.elapsedBase >= _s.plannedSeconds;
             _save();
             _broadcast('STATE');
             _fire('start');
@@ -367,11 +303,10 @@
 
         pause: function () {
             if (!_s.isRunning) return;
-
-            _s.remainingSeconds = _computeRemaining();
-            _s.isRunning        = false;
-            _s.isPaused         = true;
-            _s.runEndAtMs       = null;
+            _s.elapsedBase  = _computeElapsed();
+            _s.isRunning    = false;
+            _s.isPaused     = true;
+            _s.runStartAtMs = null;
             _save();
             _broadcast('STATE');
             _fire('pause');
@@ -386,36 +321,99 @@
         },
 
         /**
-         * Skip the current phase.  Fires 'skip' with the pre-skip snapshot
-         * so the UI can log a partial session, then advances.
+         * Finalize the running session. Fires 'sessionEnd' with a frozen
+         * snapshot so subscribers can persist actual/planned/overtime, then
+         * advances to the next phase in stopped state (no auto-start).
+         * This is the ONLY way a pomodoro/countdown session is marked done.
+         */
+        stop: function () {
+            // If fully idle with no elapsed time at all, nothing to log.
+            var elapsed = _computeElapsed();
+            if (!_s.isRunning && !_s.isPaused && elapsed <= 0) {
+                return;
+            }
+
+            var endedPhase = _s.phase;
+            var pre = {
+                phase:                 endedPhase,
+                pomodoroMins:          _s.pomodoroMins,
+                shortBreakMins:        _s.shortBreakMins,
+                longBreakMins:         _s.longBreakMins,
+                sessionCount:          _s.sessionCount,
+                plannedSeconds:        _s.plannedSeconds,
+                totalSeconds:          _s.plannedSeconds,
+                elapsedSeconds:        Math.round(elapsed),
+                actualDurationSeconds: Math.round(elapsed),
+                overtimeSeconds:       Math.max(0, Math.round(elapsed - _s.plannedSeconds)),
+                isOvertime:            elapsed > _s.plannedSeconds,
+                remainingSeconds:      Math.max(0, Math.round(_s.plannedSeconds - elapsed)),
+                remaining:             Math.max(0, Math.round(_s.plannedSeconds - elapsed)),
+                isRunning:             false,
+                isPaused:              false,
+                runStartAtMs:          null,
+                endedByUser:           true,
+            };
+
+            // Stop locally before broadcasting so any concurrent tick can't
+            // race a second sessionEnd.
+            _s.isRunning      = false;
+            _s.isPaused       = false;
+            _s.runStartAtMs   = null;
+            _s.elapsedBase    = 0;
+            _s.milestoneFired = false;
+
+            _fire('sessionEnd', pre);
+
+            _advancePhaseAfterStop(endedPhase);
+
+            _postBackend('/api/timer/stop', {
+                phase:                 endedPhase,
+                actualDurationSeconds: pre.actualDurationSeconds,
+                plannedSeconds:        pre.plannedSeconds,
+                overtimeSeconds:       pre.overtimeSeconds,
+            }).then(function (dto) {
+                if (dto) _adoptServerState(dto);
+            });
+        },
+
+        /**
+         * Skip the current phase. For study phases, logs whatever was elapsed
+         * (if anything) as a partial session, then advances.
          */
         skip: function () {
-            var pre = _snap();
-            pre.remaining = _computeRemaining();
+            var elapsed = _computeElapsed();
+            var pre = {
+                phase:                 _s.phase,
+                pomodoroMins:          _s.pomodoroMins,
+                shortBreakMins:        _s.shortBreakMins,
+                longBreakMins:         _s.longBreakMins,
+                sessionCount:          _s.sessionCount,
+                plannedSeconds:        _s.plannedSeconds,
+                totalSeconds:          _s.plannedSeconds,
+                elapsedSeconds:        Math.round(elapsed),
+                actualDurationSeconds: Math.round(elapsed),
+                overtimeSeconds:       Math.max(0, Math.round(elapsed - _s.plannedSeconds)),
+                isOvertime:            elapsed > _s.plannedSeconds,
+                remainingSeconds:      Math.max(0, Math.round(_s.plannedSeconds - elapsed)),
+                remaining:             Math.max(0, Math.round(_s.plannedSeconds - elapsed)),
+                isRunning:             false,
+                isPaused:              false,
+                runStartAtMs:          null,
+                endedByUser:           false,
+            };
 
             _fire('skip', pre);
 
-            if (pre.phase === 'pomodoro' || pre.phase === 'countdown') {
-                var nextBreak = (_s.sessionCount % 4 === 0) ? 'longbreak' : 'shortbreak';
-                if (pre.phase === 'pomodoro') _s.sessionCount++;
-                _setPhaseLocal(nextBreak);
-                setTimeout(function () { _api.start(); }, 700);
-            } else {
-                if (_s.sessionCount > 4) _s.sessionCount = 1;
-                _setPhaseLocal('pomodoro');
-            }
+            _advancePhaseAfterStop(_s.phase);
 
             _postBackend('/api/timer/skip').then(function (dto) {
                 if (dto) _adoptServerState(dto);
             });
         },
 
-        /**
-         * Switch phase.  Pauses first if running.  Resets remaining to full.
-         */
         setPhase: function (phase) {
             if (_s.isRunning) _api.pause();
-            _setPhaseLocal(phase);
+            _resetPhaseLocal(phase);
             _postBackend('/api/timer/phase', { phase: phase }).then(function (dto) {
                 if (dto) _adoptServerState(dto);
             });
@@ -427,11 +425,12 @@
             if (!isNaN(longBreak)  && longBreak  >= 1 && longBreak  <= 999) _s.longBreakMins  = longBreak;
 
             if (_s.phase !== 'countdown') {
-                _s.totalSeconds     = _durationFor(_s.phase);
-                _s.remainingSeconds = _s.totalSeconds;
-                _s.isRunning        = false;
-                _s.isPaused         = false;
-                _s.runEndAtMs       = null;
+                _s.plannedSeconds = _durationFor(_s.phase);
+                _s.elapsedBase    = 0;
+                _s.runStartAtMs   = null;
+                _s.isRunning      = false;
+                _s.isPaused       = false;
+                _s.milestoneFired = false;
             }
             _save();
             _broadcast('STATE');
@@ -449,13 +448,13 @@
         applyCountdownDuration: function (mins) {
             var m = Math.max(1, Math.min(999, mins | 0 || 25));
             if (_s.isRunning) _api.pause();
-            _s.phase            = 'countdown';
-            _s.totalSeconds     = m * 60;
-            _s.remainingSeconds = _s.totalSeconds;
-            _s.isRunning        = false;
-            _s.isPaused         = false;
-            _s.runEndAtMs       = null;
-            _endedMarker        = null;
+            _s.phase          = 'countdown';
+            _s.plannedSeconds = m * 60;
+            _s.elapsedBase    = 0;
+            _s.runStartAtMs   = null;
+            _s.isRunning      = false;
+            _s.isPaused       = false;
+            _s.milestoneFired = false;
             _save();
             _broadcast('STATE');
             _fire('phase');
@@ -465,18 +464,11 @@
             });
         },
 
-        /**
-         * Called by auth.js after login with the authoritative backend state.
-         * Always overrides local state when present — the server wins on cross-
-         * device sync.
-         */
         restoreFromServer: function (serverState) {
             if (!serverState) return;
             _adoptServerState(serverState);
         },
 
-        /** Legacy no-op kept for callers in focus.js.  Backend sync is now
-         *  gated purely on window.currentUser. */
         enableBackendSync: function () { /* no-op */ },
     };
 

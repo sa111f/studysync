@@ -46,7 +46,8 @@ public class TimerProgress {
             columnDefinition = "INT DEFAULT 15")
     private int longBreakMinutes;
 
-    /** Seconds left when the timer was paused. Only meaningful when !running. */
+    /** Legacy column — retained so ddl-auto doesn't drop it and so /load still works.
+     *  Meaning now mirrors plannedSeconds - elapsedBaseSeconds. */
     @Column(name = "remaining_seconds",
             columnDefinition = "INT DEFAULT 1500")
     private int remainingSeconds;
@@ -59,13 +60,28 @@ public class TimerProgress {
             columnDefinition = "BOOLEAN DEFAULT FALSE")
     private boolean paused;
 
-    /**
-     * When running, the absolute epoch millis at which the current phase ends.
-     * Null when stopped or paused.  The single source of truth for elapsed time
-     * across page reloads — no decrement-based counters anywhere in the system.
-     */
+    /** Legacy column — kept for backward compat; no longer read. */
     @Column(name = "run_end_at_ms")
     private Long runEndAtMs;
+
+    // ── Overtime-aware fields ─────────────────────────────────────────
+    /** Planned duration of the current phase (seconds). */
+    @Column(name = "planned_seconds",
+            columnDefinition = "INT DEFAULT 1500")
+    private int plannedSeconds;
+
+    /**
+     * Elapsed seconds accumulated from previous running segments of the
+     * current session (before the active segment). Authoritative when
+     * !running. While running, the true elapsed is this + (now - runStartAtMs).
+     */
+    @Column(name = "elapsed_base_seconds",
+            columnDefinition = "INT DEFAULT 0")
+    private int elapsedBaseSeconds;
+
+    /** Epoch ms at which the current running segment began. Null when stopped/paused. */
+    @Column(name = "run_start_at_ms")
+    private Long runStartAtMs;
 
     private LocalDateTime updatedAt;
 
@@ -84,6 +100,9 @@ public class TimerProgress {
     public boolean isRunning()           { return running; }
     public boolean isPaused()            { return paused; }
     public Long getRunEndAtMs()          { return runEndAtMs; }
+    public int getPlannedSeconds()       { return plannedSeconds; }
+    public int getElapsedBaseSeconds()   { return elapsedBaseSeconds; }
+    public Long getRunStartAtMs()        { return runStartAtMs; }
     public LocalDateTime getUpdatedAt()  { return updatedAt; }
 
     // ── Setters ───────────────────────────────────────────────────────
@@ -100,5 +119,8 @@ public class TimerProgress {
     public void setRunning(boolean r)                   { this.running = r; }
     public void setPaused(boolean p)                    { this.paused = p; }
     public void setRunEndAtMs(Long ms)                  { this.runEndAtMs = ms; }
+    public void setPlannedSeconds(int s)                { this.plannedSeconds = s; }
+    public void setElapsedBaseSeconds(int s)            { this.elapsedBaseSeconds = s; }
+    public void setRunStartAtMs(Long ms)                { this.runStartAtMs = ms; }
     public void setUpdatedAt(LocalDateTime t)           { this.updatedAt = t; }
 }

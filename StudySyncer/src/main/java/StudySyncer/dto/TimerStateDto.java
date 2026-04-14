@@ -3,18 +3,23 @@ package StudySyncer.dto;
 /**
  * Wire format for the full timer state.
  *
- * Legacy fields (mode, totalSeconds, sessionCount) are kept populated so the
- * old POST /api/timer/save and GET /api/timer/load handlers continue to work
- * for any client that hasn't been upgraded.
+ * Overtime-aware model
+ * ────────────────────
+ *   plannedSeconds   — the configured length of the current phase
+ *   elapsedBase      — elapsed seconds accumulated from prior running
+ *                      segments of this session; authoritative while !running
+ *   runStartAtMs     — epoch ms when the current running segment began
  *
- * The authoritative fields are:
- *   phase, pomodoroMinutes, shortBreakMinutes, longBreakMinutes,
- *   remainingSeconds, running, paused, runEndAtMs, serverNowMs.
+ *   The client combines these with its live clock to compute elapsed,
+ *   remaining, isOvertime, and overtimeSeconds. Reaching zero no longer
+ *   finalizes a session; only an explicit /stop does.
+ *
+ * Legacy fields (mode, totalSeconds, sessionCount, remainingSeconds,
+ * runEndAtMs) are populated so the old /api/timer/save and /load handlers
+ * continue to work for any client that hasn't been upgraded.
  *
  * serverNowMs is set on every read so the frontend can compute wall-clock
- * drift and correct its local display.  completedPhase / completedSeconds
- * are only populated in the response of POST /api/timer/complete — the
- * controller returns them so the client knows what was just committed.
+ * drift and correct its local display.
  */
 public class TimerStateDto {
 
@@ -34,7 +39,12 @@ public class TimerStateDto {
     private Long    runEndAtMs;
     private long    serverNowMs;
 
-    // Set by /complete response so the frontend knows what to log
+    // Overtime-aware fields
+    private int     plannedSeconds;
+    private int     elapsedBase;
+    private Long    runStartAtMs;
+
+    // Set by /stop and /skip responses so the frontend knows what was just committed
     private String  completedPhase;
     private Integer completedSeconds;
     private Boolean shouldLogStudy;
@@ -57,6 +67,9 @@ public class TimerStateDto {
     public boolean isPaused()                 { return paused; }
     public Long    getRunEndAtMs()            { return runEndAtMs; }
     public long    getServerNowMs()           { return serverNowMs; }
+    public int     getPlannedSeconds()        { return plannedSeconds; }
+    public int     getElapsedBase()           { return elapsedBase; }
+    public Long    getRunStartAtMs()          { return runStartAtMs; }
     public String  getCompletedPhase()        { return completedPhase; }
     public Integer getCompletedSeconds()      { return completedSeconds; }
     public Boolean getShouldLogStudy()        { return shouldLogStudy; }
@@ -70,6 +83,9 @@ public class TimerStateDto {
     public void setPaused(boolean p)            { this.paused = p; }
     public void setRunEndAtMs(Long ms)          { this.runEndAtMs = ms; }
     public void setServerNowMs(long ms)         { this.serverNowMs = ms; }
+    public void setPlannedSeconds(int s)        { this.plannedSeconds = s; }
+    public void setElapsedBase(int s)           { this.elapsedBase = s; }
+    public void setRunStartAtMs(Long ms)        { this.runStartAtMs = ms; }
     public void setCompletedPhase(String p)     { this.completedPhase = p; }
     public void setCompletedSeconds(Integer s)  { this.completedSeconds = s; }
     public void setShouldLogStudy(Boolean b)    { this.shouldLogStudy = b; }

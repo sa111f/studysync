@@ -36,12 +36,24 @@ public class TrackerService {
     // ── Save ──────────────────────────────────────────────
 
     public void saveSession(User user, String materialName, int durationMinutes,
+                             Integer plannedMinutes, Integer overtimeMinutes,
                              String timerMode, boolean completed) {
         StudySession s = new StudySession();
         s.setUser(user);
         s.setMaterialName((materialName != null && !materialName.isBlank())
                 ? materialName : "General");
         s.setDurationMinutes(durationMinutes);
+
+        // Default planned to duration when the client doesn't supply it so
+        // older callers still record a sensible row. Overtime is derived
+        // from (actual - planned) with a zero floor.
+        int planned = plannedMinutes != null && plannedMinutes >= 0
+                ? plannedMinutes : durationMinutes;
+        int overtime = overtimeMinutes != null && overtimeMinutes >= 0
+                ? overtimeMinutes : Math.max(0, durationMinutes - planned);
+        s.setPlannedMinutes(planned);
+        s.setOvertimeMinutes(overtime);
+
         s.setTimerMode(timerMode);
         s.setCompleted(completed);
 
@@ -287,6 +299,8 @@ public class TrackerService {
                         s.getCompletedAt().toLocalTime().toString().substring(0, 5),
                         s.getMaterialName(),
                         s.getDurationMinutes(),
+                        s.getPlannedMinutes(),
+                        s.getOvertimeMinutes(),
                         s.getTimerMode(),
                         s.isCompleted()))
                 .collect(Collectors.toList());
