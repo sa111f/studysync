@@ -273,6 +273,19 @@
         <!-- Authenticated dashboard sections. Hidden until auth resolves. -->
         <div id="dashboard-sections" class="dashboard-sections hidden">
 
+            <!-- Dashboard toolbar — quick-add actions for both task entry flows.
+                 Mirrors the /tasks page header so users discover "Add with AI"
+                 from either entry point. -->
+            <div class="dashboard-toolbar">
+                <button class="dl-add-trigger-btn ai-trigger-btn"
+                        onclick="openAiModal()"
+                        aria-label="Add a task using AI">
+                    <span aria-hidden="true">🤖</span> Add with AI
+                </button>
+                <a href="/tasks" class="dashboard-toolbar-link"
+                   aria-label="Go to the full Tasks page">+ Add Task</a>
+            </div>
+
             <!-- ── Today ── -->
             <section class="dash-section" id="dash-today" aria-label="Tasks due today">
                 <div class="dash-section-header">
@@ -494,11 +507,15 @@
     </div>
 </footer>
 
+<!-- Shared AI modal (Phase 5) -->
+<div th:replace="~{fragments/ai-modal :: aiModal}"></div>
+
 <script th:src="@{/js/util.js}"></script>
 <script th:src="@{/js/timer-core.js}"></script>
 <script th:src="@{/js/timer.js}"></script>
 <script th:src="@{/js/auth.js}"></script>
 <script th:src="@{/js/dashboard.js}"></script>
+<script th:src="@{/js/ai-task.js}"></script>
 <script>
 /* ── Today's Goal + Email Accountability ── */
 (function () {

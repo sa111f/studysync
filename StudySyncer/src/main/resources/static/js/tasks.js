@@ -529,4 +529,11 @@ function escAttr(s) { return esc(s); }
 // ── Kick off ───────────────────────────────────────────────────
 // Expose a boot-complete promise on `window.authReady` so any inline
 // script that awaits it behaves consistently with the other pages.
-window.authReady = initTasks();
+// Also expose fetchTasks + currentFilter so the AI modal (ai-task.js)
+// can refresh the visible list after saving a parsed task.
+window.authReady  = initTasks();
+window.fetchTasks = fetchTasks;
+Object.defineProperty(window, 'currentFilter', {
+    get: () => currentFilter,
+    configurable: true,
+});
