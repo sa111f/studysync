@@ -31,6 +31,13 @@
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
 
+		<!-- Jakarta Bean Validation — enables @Valid on controller params
+		     and @NotNull / @Size / @NotBlank enforcement on request DTOs. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+
 		<!-- STUD-33/34/35: JPA for saving plans + timer progress -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

@@ -57,6 +57,7 @@
 
         <nav class="nav-links">
             <a href="/focus"   class="header-nav-link">Focus Mode</a>
+            <a href="/tasks"   class="header-nav-link">Tasks</a>
             <a href="/tracker" class="header-nav-link">Study Tracker</a>
         </nav>
 
@@ -242,6 +243,14 @@
     </div>
 </aside>
 
+<!-- ── Dashboard preview strip — shown only when logged in AND there are
+     active tasks due within the next 7 days. Populated by the inline
+     script at the bottom of this file once auth has resolved. ── -->
+<aside id="tasks-dashboard-strip" class="tasks-dashboard-strip hidden" aria-live="polite">
+    <span id="tasks-dashboard-msg"></span>
+    <a href="/tasks">View tasks →</a>
+</aside>
+
 <div class="top-panel">
 
     <!-- ── Timer + Today's Goal column ── -->
@@ -399,6 +408,43 @@
 <script th:src="@{/js/timer-core.js}"></script>
 <script th:src="@{/js/timer.js}"></script>
 <script th:src="@{/js/auth.js}"></script>
+<script>
+/* ── Dashboard preview strip — Phase 2.9 ──────────────────────────────
+   One-liner above the timer: "You have N active tasks due this week".
+   Shown only when the user is logged in AND N > 0. Hidden otherwise.
+   ─────────────────────────────────────────────────────────────────────── */
+(async function () {
+    try { await window.authReady; } catch (_) {}
+    if (!window.currentUser) return;
+
+    try {
+        const res = await fetch('/api/tasks?status=active');
+        if (!res.ok) return;
+        const tasks = await res.json();
+
+        // Count tasks due within the next 7 days (inclusive of today).
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const cutoff = new Date(today);
+        cutoff.setDate(cutoff.getDate() + 7);
+
+        const count = (tasks || []).filter(t => {
+            if (!t.dueDate) return false;
+            const [y, m, d] = t.dueDate.split('-').map(Number);
+            const due = new Date(y, m - 1, d);
+            return due >= today && due <= cutoff;
+        }).length;
+
+        if (count <= 0) return;
+
+        const strip = document.getElementById('tasks-dashboard-strip');
+        const msg   = document.getElementById('tasks-dashboard-msg');
+        if (!strip || !msg) return;
+        msg.textContent = `You have ${count} active task${count === 1 ? '' : 's'} due this week —`;
+        strip.classList.remove('hidden');
+    } catch (_) { /* silent — preview strip is a nice-to-have */ }
+})();
+</script>
 <script>
 /* ── Today's Goal + Email Accountability ── */
 (function () {

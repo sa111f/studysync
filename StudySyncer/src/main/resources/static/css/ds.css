@@ -2464,3 +2464,313 @@ a.apply-btn:focus {
     border: 0;
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   TASKS PAGE  —  /tasks (Phase 2)
+   Dark-theme tokens: var(--accent / --success / --muted / --surface /
+   --text / --border) already defined in style.css and ds.css above.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.tasks-page {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem 1.25rem 4rem;
+}
+
+.tasks-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+    gap: 1rem;
+}
+.tasks-page-title {
+    margin: 0;
+    font-size: 1.6rem;
+    color: var(--text);
+}
+
+/* ── Dashboard preview strip (homepage) ───────────────────────── */
+.tasks-dashboard-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.6rem 1rem;
+    margin: 0 auto 1rem;
+    max-width: 720px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 0.9rem;
+}
+.tasks-dashboard-strip a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+}
+.tasks-dashboard-strip a:hover { text-decoration: underline; }
+
+/* ── Create / edit form ───────────────────────────────────────── */
+.task-create-form,
+.task-edit-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.1rem 1.15rem;
+    margin-bottom: 1.1rem;
+    display: grid;
+    gap: 0.8rem;
+}
+.task-create-form.hidden,
+.task-edit-panel.hidden { display: none; }
+
+.task-form-row {
+    display: grid;
+    gap: 0.8rem;
+}
+.task-form-row-2 { grid-template-columns: 2fr 1fr; }
+.task-form-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+@media (max-width: 560px) {
+    .task-form-row-2, .task-form-row-3 { grid-template-columns: 1fr; }
+}
+
+.task-field { display: flex; flex-direction: column; gap: 0.3rem; }
+.task-label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-weight: 500;
+}
+.task-required { color: #ef4444; }
+.task-optional { color: var(--muted); font-weight: 400; font-style: italic; font-size: 0.75rem; }
+
+.task-input { width: 100%; }
+.task-textarea { resize: vertical; min-height: 56px; font-family: inherit; }
+
+.task-form-actions {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: flex-end;
+    margin-top: 0.3rem;
+}
+
+/* ── Filter bar ───────────────────────────────────────────────── */
+.task-filter-bar {
+    display: flex;
+    gap: 0.35rem;
+    margin: 0.4rem 0 1rem;
+    flex-wrap: wrap;
+}
+.task-filter-btn {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.task-filter-btn:hover {
+    color: var(--text);
+    border-color: var(--accent);
+}
+.task-filter-btn.active {
+    background: rgba(124, 92, 252, 0.12);
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+/* ── Task list ────────────────────────────────────────────────── */
+.task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.task-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 0.85rem;
+    align-items: center;
+    padding: 0.75rem 0.9rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+.task-row:hover {
+    border-color: var(--accent);
+}
+.task-row.editing { border-color: var(--accent); }
+
+/* ── Three-state checkbox ─────────────────────────────────────── */
+.task-checkbox {
+    width: 22px; height: 22px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 2px solid var(--muted);
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: border-color 0.15s, background 0.15s;
+}
+.task-checkbox:hover { border-color: var(--accent); }
+.task-checkbox[data-status="NOT_STARTED"] { /* empty circle, default */ }
+.task-checkbox[data-status="IN_PROGRESS"] {
+    border-color: var(--accent);
+    background: linear-gradient(to right, var(--accent) 50%, transparent 50%);
+}
+.task-checkbox[data-status="COMPLETED"] {
+    border-color: var(--success);
+    background: var(--success);
+}
+.task-checkbox[data-status="COMPLETED"]::after {
+    content: "";
+    width: 6px; height: 11px;
+    border: solid #0f1117;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) translate(-1px, -1px);
+}
+
+/* ── Task main text block ─────────────────────────────────────── */
+.task-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0; /* allow ellipsis */
+}
+.task-title {
+    color: var(--text);
+    font-weight: 500;
+    font-size: 0.98rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.task-title.completed {
+    text-decoration: line-through;
+    color: var(--muted);
+}
+
+.task-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    font-size: 0.78rem;
+    color: var(--muted);
+}
+.task-meta .sep { opacity: 0.5; }
+
+.task-type-badge {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(124, 92, 252, 0.1);
+    color: var(--accent);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+/* ── Priority dot ─────────────────────────────────────────────── */
+.task-priority-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 6px currentColor;
+}
+.task-priority-dot.low    { background: var(--muted); color: var(--muted); box-shadow: none; opacity: 0.6; }
+.task-priority-dot.medium { background: #f5c96b; color: #f5c96b; }
+.task-priority-dot.high   { background: #ef4444; color: #ef4444; }
+
+/* ── Overdue badge ────────────────────────────────────────────── */
+.task-overdue-badge {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(239, 68, 68, 0.18);
+    color: #ef4444;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+/* ── Row actions (edit / delete) ──────────────────────────────── */
+.task-row-actions {
+    display: flex;
+    gap: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.task-row:hover .task-row-actions,
+.task-row:focus-within .task-row-actions { opacity: 1; }
+
+.task-icon-btn {
+    background: transparent;
+    border: none;
+    padding: 0.35rem;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, background 0.15s;
+}
+.task-icon-btn:hover { color: var(--accent); background: rgba(124, 92, 252, 0.12); }
+.task-icon-btn.danger:hover { color: #ef4444; background: rgba(239, 68, 68, 0.12); }
+.task-icon-btn svg { width: 15px; height: 15px; }
+
+/* ── Inline edit panel ────────────────────────────────────────── */
+.task-edit-panel {
+    margin-top: 0.35rem;
+    margin-bottom: 0.85rem;
+    border-color: var(--accent);
+}
+.task-edit-panel .task-form-actions .delete-btn {
+    margin-right: auto;
+    background: transparent;
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    padding: 0.45rem 0.9rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.15s;
+}
+.task-edit-panel .task-form-actions .delete-btn:hover {
+    background: rgba(239, 68, 68, 0.14);
+}
+
+/* ── Logged-time note under a task title (Phase 3 hook) ───────── */
+.task-logged-note {
+    color: var(--muted);
+    font-size: 0.78rem;
+}
+
+/* ── Empty state ──────────────────────────────────────────────── */
+.tasks-empty {
+    padding: 2.5rem 1rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.95rem;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    background: rgba(26, 29, 39, 0.4);
+}
+.tasks-empty a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+}
+.tasks-empty a:hover { text-decoration: underline; }

@@ -21,6 +21,11 @@ public class HomeController {
         return "focus";
     }
 
+    @GetMapping("/tasks")
+    public String tasks() {
+        return "tasks";
+    }
+
     @GetMapping("/privacy")
     public String privacy() {
         return "privacy";

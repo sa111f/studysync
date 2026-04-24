@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tasks — StudySyncer</title>
+    <meta name="description" content="Manage your study tasks — assignments, labs, projects, and more." />
+    <link rel="canonical" href="https://www.studysyncer.com/tasks" />
+
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <meta property="og:site_name" content="StudySyncer" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.studysyncer.com/tasks" />
+    <meta property="og:title" content="Tasks — StudySyncer" />
+    <meta property="og:description" content="Manage your study tasks — assignments, labs, projects, and more." />
+    <meta property="og:image" content="https://www.studysyncer.com/og-image.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Tasks — StudySyncer" />
+    <meta name="twitter:description" content="Manage your study tasks — assignments, labs, projects, and more." />
+    <meta name="twitter:image" content="https://www.studysyncer.com/og-image.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" th:href="@{/css/style.css}" />
+    <link rel="stylesheet" th:href="@{/css/ds.css}" />
+</head>
+<body>
+
+<header>
+    <div class="nav-inner">
+        <a href="/" class="nav-logo-link"><span class="logo-study">Study</span><span class="logo-sync">Syncer</span></a>
+        <nav class="nav-links">
+            <a href="/focus"   class="header-nav-link">Focus Mode</a>
+            <span class="nav-page-label">Tasks</span>
+            <a href="/tracker" class="header-nav-link">Study Tracker</a>
+        </nav>
+        <div class="tracker-header-right">
+            <a href="/" class="apply-btn tracker-back-btn">&#8592; Back to App</a>
+            <div id="auth-bar" class="auth-bar">
+                <div id="auth-guest" class="auth-guest hidden">
+                    <a href="/" class="auth-link-btn">Log in</a>
+                    <a href="/" class="auth-link-btn accent">Sign up</a>
+                </div>
+                <div id="auth-user" class="auth-user hidden">
+                    <span id="auth-username" class="auth-username"></span>
+                    <button class="auth-link-btn" onclick="tasksLogout()">Log out</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main class="tasks-page">
+
+    <!-- Guest banner — shown only when not logged in -->
+    <div id="tasks-guest-banner" class="tracker-guest-banner hidden">
+        <span>Log in to manage your tasks.</span>
+        <a href="/" class="apply-btn">Log in on Main Page</a>
+    </div>
+
+    <!-- Page title + add button -->
+    <div class="tasks-header-row">
+        <h1 class="tasks-page-title">Tasks</h1>
+        <button class="dl-add-trigger-btn shine-btn" id="task-add-btn" onclick="showCreateForm()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                 stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5"  y1="12" x2="19" y2="12"/>
+            </svg>
+            Add Task
+        </button>
+    </div>
+
+    <!-- Create form panel -->
+    <form id="task-create-form" class="task-create-form hidden"
+          onsubmit="event.preventDefault(); submitCreateForm()">
+        <div class="task-form-row task-form-row-2">
+            <div class="task-field">
+                <label class="task-label" for="task-create-title">Title <span class="task-required">*</span></label>
+                <input type="text" id="task-create-title" class="field-input task-input"
+                       maxlength="200" autocomplete="off" />
+            </div>
+            <div class="task-field">
+                <label class="task-label" for="task-create-due">Due Date <span class="task-required">*</span></label>
+                <input type="date" id="task-create-due" class="field-input task-input" />
+            </div>
+        </div>
+
+        <div class="task-form-row task-form-row-3">
+            <div class="task-field">
+                <label class="task-label" for="task-create-course">Course</label>
+                <input type="text" id="task-create-course" class="field-input task-input"
+                       maxlength="100" autocomplete="off" />
+            </div>
+            <div class="task-field">
+                <label class="task-label" for="task-create-type">Type</label>
+                <select id="task-create-type" class="field-input task-input">
+                    <option value="ASSIGNMENT">Assignment</option>
+                    <option value="LAB">Lab</option>
+                    <option value="HOMEWORK">Homework</option>
+                    <option value="PROJECT">Project</option>
+                    <option value="READING">Reading</option>
+                    <option value="OTHER" selected>Other</option>
+                </select>
+            </div>
+            <div class="task-field">
+                <label class="task-label" for="task-create-priority">Priority</label>
+                <select id="task-create-priority" class="field-input task-input">
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM" selected>Medium</option>
+                    <option value="HIGH">High</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="task-field">
+            <label class="task-label" for="task-create-notes">Notes <span class="task-optional">optional</span></label>
+            <textarea id="task-create-notes" class="field-input task-input task-textarea"
+                      maxlength="2000" rows="2"></textarea>
+        </div>
+
+        <div id="task-create-error" class="auth-error hidden"></div>
+
+        <div class="task-form-actions">
+            <button type="submit" class="save-btn">Create Task</button>
+            <button type="button" class="apply-btn" onclick="hideCreateForm()">Cancel</button>
+        </div>
+    </form>
+
+    <!-- Filter bar -->
+    <div class="task-filter-bar" role="tablist" aria-label="Task filter">
+        <button class="task-filter-btn active" data-filter="all"       role="tab" onclick="setFilter('all')">All</button>
+        <button class="task-filter-btn"        data-filter="active"    role="tab" onclick="setFilter('active')">Active</button>
+        <button class="task-filter-btn"        data-filter="completed" role="tab" onclick="setFilter('completed')">Completed</button>
+        <button class="task-filter-btn"        data-filter="overdue"   role="tab" onclick="setFilter('overdue')">Overdue</button>
+    </div>
+
+    <!-- Task list -->
+    <div id="task-list" class="task-list">
+        <!-- Populated by tasks.js -->
+    </div>
+
+</main>
+
+<footer class="site-footer">
+    <span>© 2026 StudySyncer</span>
+    <div class="site-footer-links">
+        <a href="/privacy">Privacy</a>
+        <span class="site-footer-sep">·</span>
+        <a href="/terms">Terms</a>
+        <span class="site-footer-sep">·</span>
+        <a href="/about">About</a>
+        <span class="site-footer-sep">·</span>
+        <a href="mailto:[CONTACT_EMAIL_TO_FILL]">Contact</a>
+    </div>
+</footer>
+
+<script th:src="@{/js/tasks.js}"></script>
+</body>
+</html>
