@@ -256,6 +256,10 @@ public class DailyGoalRolloverService {
             goal.setEmailAlertSent(true);
             goal.setEmailAlertSentAt(LocalDateTime.now());
             repo.save(goal);
+            // Phase 8 retrofit — also audit into the unified send-log so the
+            // per-user 5/day cap and future "last sent" UI see this send.
+            emailService.recordGoalEmailSent(
+                    goal.getUser(), StudySyncer.entity.EmailType.GOAL_MISSED, goal.getGoalDate());
             log.info("[ROLLOVER] Missed-goal email sent and recorded — goalId={} userId={}",
                     goal.getId(), goal.getUser().getId());
             return true;

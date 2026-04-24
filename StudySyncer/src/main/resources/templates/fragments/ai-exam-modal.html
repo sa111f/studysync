@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<!--
+    AI Exam Modal — shared fragment (Phase 6.8).
+
+    Cloned from fragments/ai-modal.html per spec option A (clone rather
+    than generalize). All IDs suffixed with `-exam` so ai-exam.js and
+    ai-task.js can coexist on the homepage without DOM collision.
+
+    Usage:
+        <div th:replace="~{fragments/ai-exam-modal :: aiExamModal}"></div>
+-->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="aiExamModal"
+     id="ai-exam-modal" class="ai-modal hidden"
+     role="dialog" aria-labelledby="ai-exam-modal-title" aria-modal="true" aria-hidden="true">
+    <div class="ai-modal-box" role="document">
+
+        <button class="ai-modal-close" type="button"
+                onclick="closeAiExamModal()" aria-label="Close">&times;</button>
+
+        <h3 id="ai-exam-modal-title">Add Exam with AI</h3>
+        <p class="ai-modal-hint">
+            Describe your exam in plain English — title, date, time, topics.
+        </p>
+
+        <!-- State 1: input -->
+        <div id="ai-exam-state-input">
+            <label for="ai-exam-input" class="sr-only">Exam description</label>
+            <textarea id="ai-exam-input" class="ai-textarea field-input"
+                      placeholder="e.g. Chem final April 30 at 2pm chapters 1-6 in Dennis 109"
+                      maxlength="500" rows="3"></textarea>
+            <div class="ai-char-count"><span id="ai-exam-char-count">0</span> / 500</div>
+            <div class="ai-error hidden" id="ai-exam-error" role="alert"></div>
+            <div class="ai-modal-actions">
+                <button type="button" class="save-btn shine-btn"
+                        id="ai-exam-parse-btn" onclick="submitAiExamParse()">Parse with AI</button>
+                <button type="button" class="apply-btn"
+                        onclick="closeAiExamModal()">Cancel</button>
+            </div>
+        </div>
+
+        <!-- State 2: loading -->
+        <div id="ai-exam-state-loading" class="hidden" aria-live="polite">
+            <div class="ai-spinner" aria-hidden="true"></div>
+            <p class="ai-loading-text">Parsing your exam…</p>
+        </div>
+
+        <!-- State 3 + 4 combined (same pattern as Phase 5 task modal) -->
+        <div id="ai-exam-state-confirm" class="hidden">
+
+            <div id="ai-exam-fallback-msg" class="ai-fallback-msg hidden">
+                <p><strong>Couldn't parse that.</strong>
+                   <span id="ai-exam-fallback-reason"></span></p>
+                <p>Fill it in manually:</p>
+            </div>
+
+            <p class="ai-raw-echo" id="ai-exam-raw-echo">
+                You said: "<span id="ai-exam-raw-echo-text"></span>"
+            </p>
+
+            <div class="ai-confirm-form">
+                <div class="ai-field">
+                    <label class="ai-label" for="ai-exam-field-title">Title</label>
+                    <input type="text" id="ai-exam-field-title"
+                           class="field-input ai-input-field"
+                           maxlength="200" autocomplete="off" />
+                </div>
+
+                <div class="ai-field-row">
+                    <div class="ai-field">
+                        <label class="ai-label" for="ai-exam-field-date">Date</label>
+                        <input type="date" id="ai-exam-field-date"
+                               class="field-input ai-input-field" />
+                    </div>
+                    <div class="ai-field">
+                        <label class="ai-label" for="ai-exam-field-time">Time</label>
+                        <input type="time" id="ai-exam-field-time"
+                               class="field-input ai-input-field" />
+                    </div>
+                </div>
+                <p class="ai-date-human" id="ai-exam-date-human"></p>
+
+                <div class="ai-field-row">
+                    <div class="ai-field">
+                        <label class="ai-label" for="ai-exam-field-course">Course <span class="ai-optional">(optional)</span></label>
+                        <input type="text" id="ai-exam-field-course"
+                               class="field-input ai-input-field"
+                               maxlength="100" autocomplete="off" />
+                    </div>
+                    <div class="ai-field">
+                        <label class="ai-label" for="ai-exam-field-location">Location <span class="ai-optional">(optional)</span></label>
+                        <input type="text" id="ai-exam-field-location"
+                               class="field-input ai-input-field"
+                               maxlength="200" autocomplete="off" />
+                    </div>
+                </div>
+
+                <div class="ai-field">
+                    <label class="ai-label" for="ai-exam-field-material">Material <span class="ai-optional">(optional)</span></label>
+                    <textarea id="ai-exam-field-material"
+                              class="field-input ai-input-field task-textarea"
+                              maxlength="2000" rows="2"></textarea>
+                </div>
+
+                <div class="ai-error hidden" id="ai-exam-confirm-error" role="alert"></div>
+
+                <div class="ai-confirm-actions">
+                    <button type="button" class="save-btn shine-btn"
+                            id="ai-exam-save-btn"
+                            onclick="saveAiExam()">Save Exam</button>
+                    <button type="button" class="apply-btn"
+                            onclick="backToAiExamInput()">Try again</button>
+                    <button type="button" class="apply-btn"
+                            onclick="closeAiExamModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+</body>
+</html>

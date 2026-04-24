@@ -1,5 +1,9 @@
 package StudySyncer;
 
+import StudySyncer.entity.EmailSendLog;
+import StudySyncer.entity.EmailType;
+import StudySyncer.entity.User;
+import StudySyncer.repository.EmailSendLogRepository;
 import com.resend.Resend;
 import com.resend.services.emails.model.CreateEmailOptions;
 import org.slf4j.Logger;
@@ -9,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Sends transactional accountability emails via the Resend Java SDK.
@@ -33,6 +38,14 @@ public class EmailService {
     private final String apiKey;
     private final String fromEmail;
     private final String fallbackToEmail;
+    private final EmailSendLogRepository sendLogRepo;
+
+    /**
+     * Retry schedule for transient failures (spec 8.5).
+     * Permanent failures (4xx / invalid address) bail out on the first
+     * attempt — see {@link #isPermanentFailure(Throwable)}.
+     */
+    private static final long[] RETRY_DELAYS_MS = { 0L, 5_000L, 30_000L };
 
     /**
      * Constructor injection — values come from application.properties,
@@ -41,10 +54,12 @@ public class EmailService {
     public EmailService(
             @Value("${resend.api-key:}") String apiKey,
             @Value("${resend.from-email:}") String fromEmail,
-            @Value("${resend.alert-to-email:}") String fallbackToEmail) {
+            @Value("${resend.alert-to-email:}") String fallbackToEmail,
+            EmailSendLogRepository sendLogRepo) {
         this.apiKey          = apiKey;
         this.fromEmail       = fromEmail;
         this.fallbackToEmail = fallbackToEmail;
+        this.sendLogRepo     = sendLogRepo;
     }
 
     // ── Public API ─────────────────────────────────────────────────────────────
@@ -145,6 +160,151 @@ public class EmailService {
                     recipient, userName, date, e.getMessage(), e);
             return false;
         }
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  Phase 8 — unified notification sender
+    // ══════════════════════════════════════════════════════════
+
+    /**
+     * Dispatches a Phase-8 notification (digest / overdue / exam reminder)
+     * with retry + send-log semantics.
+     *
+     * Contract:
+     *   - Caller has already passed their idempotency check (sendLog lookup,
+     *     daily cap). This method doesn't re-check — it trusts the scheduler.
+     *   - On SUCCESS: inserts an {@link EmailSendLog} row and returns true.
+     *   - On PERMANENT FAILURE: logs WARN, returns false, NO send-log row.
+     *     The scheduler's per-type retry window kicks in on the next tick,
+     *     but since the send-log isn't written the "already sent today" guard
+     *     won't short-circuit. Good for transient-looking 4xx too — the spec
+     *     opts us into re-offering after a settings change or manual retry.
+     *   - On TRANSIENT FAILURE: retries per {@link #RETRY_DELAYS_MS} then
+     *     returns false.
+     *
+     * Never throws.
+     */
+    public boolean sendNotification(User user, EmailType type, Long referenceId,
+                                    String subject, String htmlBody, String plainTextBody) {
+
+        if (!isConfigured()) {
+            log.warn("[EMAIL] Resend not configured — skipping {} for userId={}",
+                    type, user.getId());
+            return false;
+        }
+        String recipient = user.getAccountabilityEmail();
+        if (recipient == null || recipient.isBlank()) {
+            // Spec is explicit: do NOT fall back to u.email for Phase 8 emails.
+            log.warn("[EMAIL] No accountability email — skipping {} for userId={}",
+                    type, user.getId());
+            return false;
+        }
+
+        boolean ok = sendWithRetries(recipient, subject, htmlBody, plainTextBody, type, user.getId());
+        if (ok) {
+            EmailSendLog row = new EmailSendLog();
+            row.setUser(user);
+            row.setEmailType(type);
+            row.setReferenceId(referenceId);
+            sendLogRepo.save(row);
+            log.info("[EMAIL] Sent {} to userId={} ref={}", type, user.getId(), referenceId);
+        }
+        return ok;
+    }
+
+    /**
+     * Retrofit hook (spec 8.1): record an {@link EmailSendLog} row for
+     * pre-Phase-8 goal emails that already succeeded via the legacy path.
+     * Safe to call multiple times — the unique constraint on
+     * (userId, emailType, referenceId) dedupes.
+     *
+     * referenceId for goal emails is the date-code (YYYYMMDD) of the goalDate.
+     */
+    public void recordGoalEmailSent(User user, EmailType type, LocalDate goalDate) {
+        if (user == null || type == null || goalDate == null) return;
+        long refId = dateCode(goalDate);
+        if (sendLogRepo.existsByUserAndEmailTypeAndReferenceId(user, type, refId)) return;
+        try {
+            EmailSendLog row = new EmailSendLog();
+            row.setUser(user);
+            row.setEmailType(type);
+            row.setReferenceId(refId);
+            sendLogRepo.save(row);
+        } catch (Exception e) {
+            // Race: another thread inserted between existsBy and save. Unique
+            // constraint raised — log and move on. No user-visible effect.
+            log.debug("[EMAIL] recordGoalEmailSent duplicate skipped userId={} type={}: {}",
+                    user.getId(), type, e.getMessage());
+        }
+    }
+
+    /** YYYYMMDD as a long — callable from NotificationScheduler too. */
+    public static long dateCode(LocalDate date) {
+        return (long) date.getYear() * 10000L
+             + (long) date.getMonthValue() * 100L
+             + (long) date.getDayOfMonth();
+    }
+
+    // ── Retry core ────────────────────────────────────────────────────
+
+    private boolean sendWithRetries(String to, String subject, String html, String text,
+                                    EmailType type, long userId) {
+        Throwable last = null;
+        for (int attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
+            long delay = RETRY_DELAYS_MS[attempt];
+            if (delay > 0) {
+                try { Thread.sleep(delay); } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+            try {
+                CreateEmailOptions.Builder builder = CreateEmailOptions.builder()
+                        .from(fromEmail)
+                        .to(List.of(to))
+                        .subject(subject)
+                        .html(html);
+                if (text != null && !text.isBlank()) {
+                    builder = builder.text(text);
+                }
+                new Resend(apiKey).emails().send(builder.build());
+                return true;
+            } catch (Exception e) {
+                last = e;
+                if (isPermanentFailure(e)) {
+                    log.warn("[EMAIL] Permanent failure (no retry) — type={} userId={}: {}",
+                            type, userId, e.getMessage());
+                    return false;
+                }
+                log.info("[EMAIL] Transient failure attempt {} — type={} userId={}: {}",
+                        attempt + 1, type, userId, e.getMessage());
+            }
+        }
+        log.warn("[EMAIL] Exhausted retries — type={} userId={}: {}",
+                type, userId, last != null ? last.getMessage() : "unknown");
+        return false;
+    }
+
+    /**
+     * Best-effort permanent-vs-transient classifier. The Resend Java SDK
+     * doesn't expose a clean status-code accessor across all error types,
+     * so we do a message sniff:
+     *   - Anything mentioning "validation" / "invalid" / "format" → permanent
+     *   - 4xx-looking codes (400, 401, 403, 404, 422) → permanent
+     *   - Everything else (5xx, network, timeout) → transient, retry
+     *
+     * False positives are cheap (an extra retry on a bad address), false
+     * negatives too (the 5/day cap contains the damage).
+     */
+    private static boolean isPermanentFailure(Throwable e) {
+        String msg = e.getMessage() == null ? "" : e.getMessage().toLowerCase(Locale.ROOT);
+        if (msg.contains("validation")) return true;
+        if (msg.contains("invalid"))    return true;
+        if (msg.contains("not valid"))  return true;
+        // HTTP-code heuristics in the message.
+        if (msg.contains("400") || msg.contains("401") || msg.contains("403")
+                || msg.contains("404") || msg.contains("422")) return true;
+        return false;
     }
 
     /**

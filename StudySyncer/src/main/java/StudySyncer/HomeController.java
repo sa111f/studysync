@@ -26,6 +26,11 @@ public class HomeController {
         return "tasks";
     }
 
+    @GetMapping("/exams")
+    public String exams() {
+        return "exams";
+    }
+
     @GetMapping("/privacy")
     public String privacy() {
         return "privacy";

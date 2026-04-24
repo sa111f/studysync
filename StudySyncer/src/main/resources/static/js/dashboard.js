@@ -58,9 +58,14 @@ async function fetchAndRender() {
     renderSection('overdue',  buckets.overdue);
     renderSection('upcoming', buckets.upcoming);
 
-    // TODO(phase 6): fetch GET /api/exams?upcoming=3 and render here.
-    // For now the Next Exams section always shows its empty-state copy.
-    renderSection('exams', []);
+    // Phase 6 — fetch the nearest 3 upcoming exams and render them.
+    // Separate try/catch so exam fetch failures never break the task UI.
+    let nextExams = [];
+    try {
+        const res = await fetch('/api/exams/next?count=3');
+        if (res.ok) nextExams = await res.json();
+    } catch (_) { /* silent — exam card falls back to empty state */ }
+    renderExamsSection(nextExams);
 }
 
 window.refreshDashboard = fetchAndRender;
@@ -142,6 +147,76 @@ function renderSection(name, tasks) {
         countEl.textContent = String(tasks.length);
         countEl.classList.remove('hidden');
     }
+}
+
+// ── Next Exams section (Phase 6.9) ────────────────────────────
+
+/**
+ * Render the Next Exams card using a compact exam-row layout — title,
+ * course, location, time, and a relative "In N days" label. Clicking an
+ * exam navigates to /exams?focus={id} (exams.js could later scroll-and-
+ * pulse the matching row, same pattern as tasks.js's ?focus handler).
+ */
+function renderExamsSection(exams) {
+    const listEl  = document.getElementById('dash-exams-list');
+    const emptyEl = document.getElementById('dash-exams-empty');
+    const countEl = document.getElementById('dash-exams-count');
+    if (!listEl || !emptyEl) return;
+
+    if (!exams || exams.length === 0) {
+        listEl.innerHTML = '';
+        emptyEl.classList.remove('hidden');
+        // Swap the Phase 4 stub copy for a CTA into /exams.
+        emptyEl.innerHTML = 'No upcoming exams. <a href="/exams">Add one →</a>';
+        if (countEl) { countEl.textContent = ''; countEl.classList.add('hidden'); }
+        return;
+    }
+
+    emptyEl.classList.add('hidden');
+    listEl.innerHTML = exams.map(renderDashExamRow).join('');
+
+    if (countEl) {
+        countEl.textContent = String(exams.length);
+        countEl.classList.remove('hidden');
+    }
+}
+
+function renderDashExamRow(e) {
+    const d = new Date(e.dateTime);
+    const monthAbbrs = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    const pad = n => String(n).padStart(2, '0');
+
+    let time;
+    try {
+        time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(d);
+    } catch (_) { time = pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+
+    let rel;
+    if (e.daysUntil === 0)      rel = 'Today';
+    else if (e.daysUntil === 1) rel = 'Tomorrow';
+    else if (e.daysUntil > 1)   rel = 'In ' + e.daysUntil + ' days';
+    else                        rel = Math.abs(e.daysUntil) + ' days ago';
+
+    const metaBits = [];
+    if (e.course)   metaBits.push(`<span>${_esc(e.course)}</span>`);
+    if (e.location) metaBits.push(`<span>${_esc(e.location)}</span>`);
+    const metaHtml = metaBits.join('<span class="dash-task-meta-sep">·</span>');
+
+    return `
+    <a class="dash-exam-row" href="/exams?focus=${encodeURIComponent(e.id)}">
+        <div class="dash-exam-badge">
+            <span class="dash-exam-month">${_esc(monthAbbrs[d.getMonth()])}</span>
+            <span class="dash-exam-day">${_esc(String(d.getDate()))}</span>
+        </div>
+        <div class="dash-exam-body">
+            <div class="dash-exam-title">${_esc(e.title || '')}</div>
+            <div class="dash-exam-meta">${metaHtml}</div>
+        </div>
+        <div class="dash-exam-right">
+            <span class="dash-exam-time">${_esc(time)}</span>
+            <span class="dash-exam-relative">${_esc(rel)}</span>
+        </div>
+    </a>`;
 }
 
 // ── Row markup ────────────────────────────────────────────────

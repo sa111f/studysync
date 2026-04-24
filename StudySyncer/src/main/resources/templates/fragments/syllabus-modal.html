@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<!--
+    Syllabus Import Modal — shared fragment (Phase 7.4).
+
+    Five visual states toggled by syllabus-import.js:
+        1. upload      — drag-and-drop + file picker
+        2. extracting  — spinner + status text
+        3. review      — editable table of extracted items
+        4. importing   — spinner
+        5. done        — success summary + CTAs
+
+    Usage:
+        <div th:replace="~{fragments/syllabus-modal :: syllabusModal}"></div>
+-->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="syllabusModal"
+     id="syllabus-modal" class="ai-modal syllabus-modal hidden"
+     role="dialog" aria-labelledby="syllabus-modal-title" aria-modal="true" aria-hidden="true">
+    <div class="ai-modal-box syllabus-modal-box" role="document">
+
+        <button class="ai-modal-close" type="button"
+                onclick="closeSyllabusModal()" aria-label="Close">&times;</button>
+
+        <h3 id="syllabus-modal-title">Import from Syllabus</h3>
+
+        <!-- Progress breadcrumb — reflects the current state -->
+        <div class="syllabus-progress-steps" aria-hidden="true">
+            <span class="syllabus-step" data-step="upload">1. Upload</span>
+            <span class="syllabus-step-sep">→</span>
+            <span class="syllabus-step" data-step="review">2. Review</span>
+            <span class="syllabus-step-sep">→</span>
+            <span class="syllabus-step" data-step="done">3. Done</span>
+        </div>
+
+        <!-- ── State 1: upload ──────────────────────────────────────── -->
+        <div id="syllabus-state-upload">
+            <p class="ai-modal-hint">
+                Upload a course syllabus PDF (max 10 MB). We'll extract every
+                dated assignment, lab, reading, and exam for you to review.
+            </p>
+
+            <label for="syllabus-file-input" id="syllabus-dropzone"
+                   class="syllabus-dropzone"
+                   ondragover="onSyllabusDragOver(event)"
+                   ondragleave="onSyllabusDragLeave(event)"
+                   ondrop="onSyllabusDrop(event)">
+                <svg class="syllabus-dropzone-icon" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor" stroke-width="1.5"
+                     stroke-linecap="round" stroke-linejoin="round"
+                     aria-hidden="true">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="12" y1="18" x2="12" y2="12"/>
+                    <polyline points="9 15 12 12 15 15"/>
+                </svg>
+                <span class="syllabus-dropzone-primary" id="syllabus-dropzone-primary">
+                    Drag a PDF here, or click to choose
+                </span>
+                <span class="syllabus-dropzone-sub" id="syllabus-dropzone-sub">
+                    PDF only · max 10 MB
+                </span>
+                <input type="file" id="syllabus-file-input" class="syllabus-file-input"
+                       accept=".pdf,application/pdf"
+                       onchange="onSyllabusFileChosen(event)" />
+            </label>
+
+            <div class="ai-error hidden" id="syllabus-upload-error" role="alert"></div>
+
+            <div class="ai-modal-actions">
+                <button type="button" class="save-btn shine-btn"
+                        id="syllabus-parse-btn"
+                        onclick="uploadSyllabus()" disabled>Parse Syllabus</button>
+                <button type="button" class="apply-btn"
+                        onclick="closeSyllabusModal()">Cancel</button>
+            </div>
+        </div>
+
+        <!-- ── State 2: extracting ──────────────────────────────────── -->
+        <div id="syllabus-state-extracting" class="hidden" aria-live="polite">
+            <div class="ai-spinner" aria-hidden="true"></div>
+            <p class="ai-loading-text" id="syllabus-extracting-text">Reading your syllabus…</p>
+        </div>
+
+        <!-- ── State 3: review ──────────────────────────────────────── -->
+        <div id="syllabus-state-review" class="hidden">
+            <div class="syllabus-review-header">
+                <p class="syllabus-review-count">
+                    Found <strong id="syllabus-found-count">0</strong> items in your syllabus.
+                </p>
+                <div class="syllabus-course-row">
+                    <label for="syllabus-review-course">Course</label>
+                    <input type="text" id="syllabus-review-course"
+                           class="field-input" maxlength="100"
+                           placeholder="e.g. EECS 281" />
+                </div>
+            </div>
+
+            <div class="syllabus-truncated-banner hidden" id="syllabus-truncated-banner">
+                ⚠ Your syllabus was long — we only parsed the first portion.
+                Missing items? Split the PDF into sections and upload separately.
+            </div>
+
+            <div class="syllabus-review-table-wrap">
+                <table class="syllabus-review-table" id="syllabus-review-table">
+                    <thead>
+                        <tr>
+                            <th class="syllabus-col-include" scope="col">
+                                <span class="sr-only">Include</span>
+                            </th>
+                            <th class="syllabus-col-kind"  scope="col">Kind</th>
+                            <th class="syllabus-col-title" scope="col">Title</th>
+                            <th class="syllabus-col-when"  scope="col">When</th>
+                            <th class="syllabus-col-type"  scope="col">Type / Material</th>
+                            <th class="syllabus-col-remove" scope="col">
+                                <span class="sr-only">Remove</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="syllabus-review-tbody">
+                        <!-- Populated by syllabus-import.js -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="ai-error hidden" id="syllabus-review-error" role="alert"></div>
+
+            <div class="ai-confirm-actions">
+                <button type="button" class="save-btn shine-btn"
+                        id="syllabus-import-btn"
+                        onclick="submitBulkImport()">Import 0 items</button>
+                <button type="button" class="apply-btn"
+                        onclick="closeSyllabusModal()">Cancel</button>
+            </div>
+        </div>
+
+        <!-- ── State 4: importing ───────────────────────────────────── -->
+        <div id="syllabus-state-importing" class="hidden" aria-live="polite">
+            <div class="ai-spinner" aria-hidden="true"></div>
+            <p class="ai-loading-text">Saving items…</p>
+        </div>
+
+        <!-- ── State 5: done ────────────────────────────────────────── -->
+        <div id="syllabus-state-done" class="hidden">
+            <div class="syllabus-done-check" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="8 12 11 15 16 9"/>
+                </svg>
+            </div>
+            <h4 class="syllabus-done-title" id="syllabus-done-title">
+                Imported 0 tasks and 0 exams
+            </h4>
+            <p class="syllabus-done-sub">Your dashboard has been updated.</p>
+            <div class="ai-confirm-actions">
+                <a class="save-btn shine-btn" href="/"
+                   onclick="closeSyllabusModal()">View on dashboard</a>
+                <button type="button" class="apply-btn"
+                        onclick="closeSyllabusModal()">Close</button>
+            </div>
+        </div>
+
+        <!-- ── Fallback error pane (used by every step's catch-all) ──── -->
+        <div id="syllabus-state-error" class="hidden">
+            <div class="ai-fallback-msg">
+                <p><strong>Something went wrong.</strong>
+                   <span id="syllabus-error-reason"></span></p>
+            </div>
+            <div class="ai-confirm-actions">
+                <button type="button" class="save-btn"
+                        onclick="setSyllabusState('upload')">Try again</button>
+                <button type="button" class="apply-btn"
+                        onclick="closeSyllabusModal()">Cancel</button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+</body>
+</html>

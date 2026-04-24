@@ -58,6 +58,16 @@
 			<optional>true</optional>
 		</dependency>
 
+		<!-- Apache PDFBox 3.x — syllabus PDF text extraction (Phase 7).
+		     3.0.x is a major-version bump from 2.x: load via Loader.loadPDF(...)
+		     instead of the deprecated PDDocument.load(...). Must not revive the
+		     old 2.0.31 usage. -->
+		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>3.0.3</version>
+		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>

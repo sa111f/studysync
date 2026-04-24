@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Exams — StudySyncer</title>
+    <meta name="description" content="Track your midterms, finals, and quizzes — StudySyncer" />
+    <link rel="canonical" href="https://www.studysyncer.com/exams" />
+
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <meta property="og:site_name" content="StudySyncer" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.studysyncer.com/exams" />
+    <meta property="og:title" content="Exams — StudySyncer" />
+    <meta property="og:description" content="Track your midterms, finals, and quizzes — StudySyncer" />
+    <meta property="og:image" content="https://www.studysyncer.com/og-image.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Exams — StudySyncer" />
+    <meta name="twitter:description" content="Track your midterms, finals, and quizzes — StudySyncer" />
+    <meta name="twitter:image" content="https://www.studysyncer.com/og-image.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" th:href="@{/css/style.css}" />
+    <link rel="stylesheet" th:href="@{/css/ds.css}" />
+</head>
+<body>
+
+<header>
+    <div class="nav-inner">
+        <a href="/" class="nav-logo-link"><span class="logo-study">Study</span><span class="logo-sync">Syncer</span></a>
+        <nav class="nav-links">
+            <a href="/focus"   class="header-nav-link">Focus Mode</a>
+            <a href="/tasks"   class="header-nav-link">Tasks</a>
+            <span class="nav-page-label">Exams</span>
+            <a href="/tracker" class="header-nav-link">Study Tracker</a>
+        </nav>
+        <div class="tracker-header-right">
+            <a href="/" class="apply-btn tracker-back-btn">&#8592; Back to App</a>
+            <div id="auth-bar" class="auth-bar">
+                <div id="auth-guest" class="auth-guest hidden">
+                    <a href="/" class="auth-link-btn">Log in</a>
+                    <a href="/" class="auth-link-btn accent">Sign up</a>
+                </div>
+                <div id="auth-user" class="auth-user hidden">
+                    <span id="auth-username" class="auth-username"></span>
+                    <button class="auth-link-btn" onclick="examsLogout()">Log out</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main class="tasks-page">
+
+    <!-- Guest banner — same shape as /tasks -->
+    <div id="exams-guest-banner" class="tracker-guest-banner hidden">
+        <span>Log in to manage your exams.</span>
+        <a href="/" class="apply-btn">Log in on Main Page</a>
+    </div>
+
+    <!-- Page title + action buttons -->
+    <div class="tasks-header-row">
+        <h1 class="tasks-page-title">Exams</h1>
+        <div class="tasks-header-actions">
+            <button class="dl-add-trigger-btn ai-trigger-btn" id="exam-ai-add-btn"
+                    onclick="openAiExamModal()">
+                <span aria-hidden="true">🤖</span> Add with AI
+            </button>
+            <button class="dl-add-trigger-btn shine-btn" id="exam-add-btn"
+                    onclick="showExamCreateForm()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                     stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5"  y1="12" x2="19" y2="12"/>
+                </svg>
+                Add Exam
+            </button>
+        </div>
+    </div>
+
+    <!-- Manual create form (collapsed) -->
+    <form id="exam-create-form" class="task-create-form hidden"
+          onsubmit="event.preventDefault(); submitExamCreateForm()">
+        <div class="task-form-row task-form-row-2">
+            <div class="task-field">
+                <label class="task-label" for="exam-create-title">Title <span class="task-required">*</span></label>
+                <input type="text" id="exam-create-title" class="field-input task-input"
+                       maxlength="200" autocomplete="off" />
+            </div>
+            <div class="task-field">
+                <label class="task-label" for="exam-create-course">Course</label>
+                <input type="text" id="exam-create-course" class="field-input task-input"
+                       maxlength="100" autocomplete="off" />
+            </div>
+        </div>
+
+        <div class="task-form-row task-form-row-2">
+            <div class="task-field">
+                <label class="task-label" for="exam-create-date">Date <span class="task-required">*</span></label>
+                <input type="date" id="exam-create-date" class="field-input task-input" />
+            </div>
+            <div class="task-field">
+                <label class="task-label" for="exam-create-time">Time <span class="task-required">*</span></label>
+                <input type="time" id="exam-create-time" class="field-input task-input" value="09:00" />
+            </div>
+        </div>
+
+        <div class="task-field">
+            <label class="task-label" for="exam-create-location">Location <span class="task-optional">optional</span></label>
+            <input type="text" id="exam-create-location" class="field-input task-input"
+                   maxlength="200" autocomplete="off" />
+        </div>
+
+        <div class="task-field">
+            <label class="task-label" for="exam-create-material">Material <span class="task-optional">optional</span></label>
+            <textarea id="exam-create-material" class="field-input task-input task-textarea"
+                      maxlength="2000" rows="2"
+                      placeholder="Chapters, topics, or sections to study"></textarea>
+        </div>
+
+        <div class="task-field">
+            <label class="task-label" for="exam-create-notes">Notes <span class="task-optional">optional</span></label>
+            <textarea id="exam-create-notes" class="field-input task-input task-textarea"
+                      maxlength="1000" rows="2"></textarea>
+        </div>
+
+        <div id="exam-create-error" class="auth-error hidden"></div>
+
+        <div class="task-form-actions">
+            <button type="submit" class="save-btn">Create Exam</button>
+            <button type="button" class="apply-btn" onclick="hideExamCreateForm()">Cancel</button>
+        </div>
+    </form>
+
+    <!-- Filter tabs -->
+    <div class="task-filter-bar" role="tablist" aria-label="Exam filter">
+        <button class="task-filter-btn active" data-filter="upcoming" role="tab"
+                onclick="setExamFilter('upcoming')">Upcoming</button>
+        <button class="task-filter-btn" data-filter="past" role="tab"
+                onclick="setExamFilter('past')">Past</button>
+        <button class="task-filter-btn" data-filter="all" role="tab"
+                onclick="setExamFilter('all')">All</button>
+    </div>
+
+    <!-- Grouped sections (Upcoming view) -->
+    <div id="exam-sections">
+        <section class="exam-bucket-section hidden" id="exams-this-week">
+            <h3 class="exam-bucket-title">This week</h3>
+            <div class="exam-list" id="exams-this-week-list"></div>
+        </section>
+        <section class="exam-bucket-section hidden" id="exams-next-week">
+            <h3 class="exam-bucket-title">Next week</h3>
+            <div class="exam-list" id="exams-next-week-list"></div>
+        </section>
+        <section class="exam-bucket-section hidden" id="exams-later">
+            <h3 class="exam-bucket-title">Later</h3>
+            <div class="exam-list" id="exams-later-list"></div>
+        </section>
+    </div>
+
+    <!-- Flat chronological list (Past / All views) -->
+    <div id="exam-flat-list" class="exam-list hidden"></div>
+
+    <!-- Empty state -->
+    <div id="exam-empty" class="tasks-empty hidden"></div>
+
+</main>
+
+<footer class="site-footer">
+    <span>© 2026 StudySyncer</span>
+    <div class="site-footer-links">
+        <a href="/privacy">Privacy</a>
+        <span class="site-footer-sep">·</span>
+        <a href="/terms">Terms</a>
+        <span class="site-footer-sep">·</span>
+        <a href="/about">About</a>
+        <span class="site-footer-sep">·</span>
+        <a href="mailto:[CONTACT_EMAIL_TO_FILL]">Contact</a>
+    </div>
+</footer>
+
+<!-- Shared AI exam modal (Phase 6) -->
+<div th:replace="~{fragments/ai-exam-modal :: aiExamModal}"></div>
+
+<script th:src="@{/js/util.js}"></script>
+<script th:src="@{/js/exams.js}"></script>
+<script th:src="@{/js/ai-exam.js}"></script>
+</body>
+</html>

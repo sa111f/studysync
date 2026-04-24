@@ -58,6 +58,7 @@
         <nav class="nav-links">
             <a href="/focus"   class="header-nav-link">Focus Mode</a>
             <a href="/tasks"   class="header-nav-link">Tasks</a>
+            <a href="/exams"   class="header-nav-link">Exams</a>
             <a href="/tracker" class="header-nav-link">Study Tracker</a>
         </nav>
 
@@ -273,17 +274,32 @@
         <!-- Authenticated dashboard sections. Hidden until auth resolves. -->
         <div id="dashboard-sections" class="dashboard-sections hidden">
 
-            <!-- Dashboard toolbar — quick-add actions for both task entry flows.
-                 Mirrors the /tasks page header so users discover "Add with AI"
-                 from either entry point. -->
+            <!-- Dashboard toolbar — quick-add actions for task + exam AI
+                 flows. Mirrors the /tasks and /exams page headers so users
+                 discover either "Add with AI" from this entry point.
+                 Spec 6.8 recommendation: separate buttons per intent
+                 (task vs exam) instead of a single button with a type
+                 picker — less friction. -->
             <div class="dashboard-toolbar">
                 <button class="dl-add-trigger-btn ai-trigger-btn"
                         onclick="openAiModal()"
                         aria-label="Add a task using AI">
-                    <span aria-hidden="true">🤖</span> Add with AI
+                    <span aria-hidden="true">🤖</span> Add Task with AI
+                </button>
+                <button class="dl-add-trigger-btn ai-trigger-btn"
+                        onclick="openAiExamModal()"
+                        aria-label="Add an exam using AI">
+                    <span aria-hidden="true">🤖</span> Add Exam with AI
+                </button>
+                <button class="dl-add-trigger-btn syllabus-trigger-btn"
+                        onclick="openSyllabusModal()"
+                        aria-label="Import tasks and exams from a syllabus PDF">
+                    <span aria-hidden="true">📄</span> Import from Syllabus
                 </button>
                 <a href="/tasks" class="dashboard-toolbar-link"
-                   aria-label="Go to the full Tasks page">+ Add Task</a>
+                   aria-label="Go to the full Tasks page">+ Task</a>
+                <a href="/exams" class="dashboard-toolbar-link"
+                   aria-label="Go to the full Exams page">+ Exam</a>
             </div>
 
             <!-- ── Today ── -->
@@ -483,6 +499,51 @@
             <div class="accountability-status-row" id="accountability-status-row" style="display:none">
                 <span class="accountability-status-badge" id="accountability-status-badge"></span>
             </div>
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 Phase 8 — additional email notification toggles.
+                 Shown only for logged-in users; initNotif() hydrates the
+                 controls from GET /api/notifications/preferences.
+                 ═══════════════════════════════════════════════════════════ -->
+            <div class="notifications-section" id="notifications-section">
+                <h3 class="notifications-title">Email Notifications</h3>
+
+                <div class="notif-row">
+                    <label class="notif-toggle">
+                        <input type="checkbox" id="notif-digest-enabled" onchange="saveNotif()" />
+                        <span>Daily morning digest</span>
+                    </label>
+                    <p class="notif-hint">Your tasks + exams at a glance, sent every morning.</p>
+                    <div class="notif-time-row" id="notif-digest-time-row">
+                        <label for="notif-digest-time">At</label>
+                        <input type="time" id="notif-digest-time" value="08:00" onchange="saveNotif()" />
+                        <span class="notif-tz-hint">(your local time)</span>
+                    </div>
+                </div>
+
+                <div class="notif-row">
+                    <label class="notif-toggle">
+                        <input type="checkbox" id="notif-overdue-enabled" onchange="saveNotif()" />
+                        <span>Overdue task reminders</span>
+                    </label>
+                    <p class="notif-hint">Evening nudge if a task just went overdue.</p>
+                    <div class="notif-time-row" id="notif-overdue-time-row">
+                        <label for="notif-overdue-time">At</label>
+                        <input type="time" id="notif-overdue-time" value="20:00" onchange="saveNotif()" />
+                        <span class="notif-tz-hint">(your local time)</span>
+                    </div>
+                </div>
+
+                <div class="notif-row">
+                    <label class="notif-toggle">
+                        <input type="checkbox" id="notif-exam-enabled" onchange="saveNotif()" />
+                        <span>Exam reminders</span>
+                    </label>
+                    <p class="notif-hint">Automatic nudges 7 days, 3 days, and 1 day before each exam.</p>
+                </div>
+
+                <p id="notif-save-status" class="notif-save-status"></p>
+            </div>
         </div><!-- /accountability-section -->
 
         <p class="goal-save-status" id="goal-save-status" style="display:none"></p>
@@ -507,8 +568,10 @@
     </div>
 </footer>
 
-<!-- Shared AI modal (Phase 5) -->
+<!-- Shared modals — task AI (Phase 5) + exam AI (Phase 6) + syllabus (Phase 7) -->
 <div th:replace="~{fragments/ai-modal :: aiModal}"></div>
+<div th:replace="~{fragments/ai-exam-modal :: aiExamModal}"></div>
+<div th:replace="~{fragments/syllabus-modal :: syllabusModal}"></div>
 
 <script th:src="@{/js/util.js}"></script>
 <script th:src="@{/js/timer-core.js}"></script>
@@ -516,6 +579,8 @@
 <script th:src="@{/js/auth.js}"></script>
 <script th:src="@{/js/dashboard.js}"></script>
 <script th:src="@{/js/ai-task.js}"></script>
+<script th:src="@{/js/ai-exam.js}"></script>
+<script th:src="@{/js/syllabus-import.js}"></script>
 <script>
 /* ── Today's Goal + Email Accountability ── */
 (function () {
@@ -926,6 +991,94 @@
     (async function () {
         try { await window.authReady; } catch (_) {}
         if (!window.currentUser) fetchTodayGoal();
+    })();
+})();
+</script>
+<script>
+/* ── Phase 8 — notification preferences (digest / overdue / exam) ────
+   Lives on the homepage next to the existing accountability controls.
+   Load on auth-resolve, save on every onchange with a 500ms debounce so
+   a rapid toggle-flip doesn't spawn a POST per click. ─────────────────── */
+(function () {
+    const el = id => document.getElementById(id);
+    const section = () => el('notifications-section');
+
+    let _saveTimer = null;
+    let _hydrating = false;
+
+    function setStatus(msg, isError) {
+        const s = el('notif-save-status');
+        if (!s) return;
+        s.textContent = msg || '';
+        s.classList.toggle('is-error', !!isError);
+        if (msg) setTimeout(() => {
+            if (s.textContent === msg) s.textContent = '';
+        }, 2500);
+    }
+
+    function syncTimeVisibility() {
+        const dOn = el('notif-digest-enabled')?.checked;
+        const oOn = el('notif-overdue-enabled')?.checked;
+        el('notif-digest-time-row')?.classList.toggle('hidden', !dOn);
+        el('notif-overdue-time-row')?.classList.toggle('hidden', !oOn);
+    }
+
+    async function hydrate() {
+        if (!window.currentUser) { if (section()) section().style.display = 'none'; return; }
+        try {
+            const res = await fetch('/api/notifications/preferences');
+            if (!res.ok) return;
+            const p = await res.json();
+
+            _hydrating = true;
+            el('notif-digest-enabled').checked  = !!p.digestEnabled;
+            el('notif-digest-time').value       = p.digestLocalTime || '08:00';
+            el('notif-overdue-enabled').checked = !!p.overdueReminderEnabled;
+            el('notif-overdue-time').value      = p.overdueReminderLocalTime || '20:00';
+            el('notif-exam-enabled').checked    = !!p.examReminderEnabled;
+            _hydrating = false;
+
+            syncTimeVisibility();
+            if (section()) section().style.display = '';
+        } catch (_) { /* silent */ }
+    }
+
+    window.saveNotif = function () {
+        // Hydrate also fires onchange events — short-circuit so we don't
+        // POST the same state we just loaded.
+        if (_hydrating) return;
+        syncTimeVisibility();
+
+        clearTimeout(_saveTimer);
+        _saveTimer = setTimeout(async () => {
+            const body = {
+                digestEnabled:            el('notif-digest-enabled').checked,
+                digestLocalTime:          el('notif-digest-time').value,
+                overdueReminderEnabled:   el('notif-overdue-enabled').checked,
+                overdueReminderLocalTime: el('notif-overdue-time').value,
+                examReminderEnabled:      el('notif-exam-enabled').checked,
+            };
+            try {
+                const res = await fetch('/api/notifications/preferences', {
+                    method:  'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify(body),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    setStatus(data.error || 'Could not save.', true);
+                    return;
+                }
+                setStatus('Saved.', false);
+            } catch (_) {
+                setStatus('Could not reach the server.', true);
+            }
+        }, 500);
+    };
+
+    (async function () {
+        try { await window.authReady; } catch (_) {}
+        await hydrate();
     })();
 })();
 </script>
