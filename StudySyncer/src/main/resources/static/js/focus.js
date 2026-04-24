@@ -2,39 +2,9 @@
 /**
  * focus.js — Focus Mode page UI layer.
  *
- * This file owns NO interval and NO timer state. Everything lives
- * in TimerCore (timer-core.js, loaded before this file).
- *
- * Responsibilities:
- *   - Procedurally generate a symmetric pixel-art vertical battery
- *   - Drain fill pixels top-row-first as timer progresses
- *     (visual "water level drops" effect)
- *   - Swap fill colour via body classes at mid / low charge tiers
- *   - Update phase tabs, progress bar, session label, toggle button
- *   - POST completed sessions to /api/tracker/sessions
- *   - Handle fullscreen toggle on battery click
- *
- * PIXEL-ART BATTERY ARCHITECTURE
- * ──────────────────────────────
- * The battery is a fixed cell grid.  _inBody(c,r) decides whether a cell
- * is inside the rounded-rectangle silhouette.  Because the function uses
- * the symmetric column index  min(c, BODY_COLS-1-c),  the resulting shape
- * is pixel-perfect left/right symmetric.
- *
- * Classification:
- *   BORDER cells → inside cells that have at least one outside 4-neighbor
- *                  (plus every cell of the positive terminal cap, which
- *                  is rendered as a solid white block).
- *   FILL   cells → inside body cells completely surrounded by inside cells.
- *
- * Drain order: fills are sorted by ascending row (then column) so the
- * topmost row empties first — the energy level literally drops.
- *
- * Geometry (SVG-unit cells, stride = CELL):
- *   Body     36 cols × 58 rows   → 180 × 290 units
- *   Terminal 12 cols ×  4 rows   →  60 ×  20 units (centered on top edge)
- *   Total visual footprint       → 180 × 310 units
- *   ViewBox                      → 260 × 360 (40 side / 30 top / 30 bottom pad)
+ * Owns no timer state. Reads from TimerCore and renders the
+ * pixel-art battery, progress bar, countdown/overtime display,
+ * and control buttons. Fullscreen toggle lives on the battery.
  */
 
 // ── Grid geometry ─────────────────────────────────────────────
@@ -42,38 +12,30 @@ const BODY_COLS     = 36;
 const BODY_ROWS     = 58;
 const TERMINAL_COLS = 12;
 const TERMINAL_ROWS = 4;
-const CELL          = 5;                // grid stride (SVG units)
-const VIS_CELL      = 4.25;             // visible square side (0.75 gap)
-const PIXEL_R       = 0.55;             // tiny rounding on each cell
-const ORIGIN_X      = 40;               // body grid origin X
-const TERM_ORIGIN_Y = 30;               // terminal cap top Y
-const BODY_ORIGIN_Y = TERM_ORIGIN_Y + TERMINAL_ROWS * CELL;   // 50
+const CELL          = 5;
+const VIS_CELL      = 4.25;
+const PIXEL_R       = 0.55;
+const ORIGIN_X      = 40;
+const TERM_ORIGIN_Y = 30;
+const BODY_ORIGIN_Y = TERM_ORIGIN_Y + TERMINAL_ROWS * CELL;
 
-// ── Body silhouette — rounded-rectangle with pixel-art bevels ──
-// · 2-cell diagonal bevel on BOTTOM corners  (recognisable battery foot)
-// · 1-cell round        on TOP    corners    (visually covered by cap)
 function _inBody(c, r) {
     if (c < 0 || c >= BODY_COLS || r < 0 || r >= BODY_ROWS) return false;
 
-    const xe      = Math.min(c, BODY_COLS - 1 - c);   // distance from vertical edge
-    const yBottom = BODY_ROWS - 1 - r;                 // distance from bottom
+    const xe      = Math.min(c, BODY_COLS - 1 - c);
+    const yBottom = BODY_ROWS - 1 - r;
 
-    // Bottom bevel — remove three corner cells per side
     if (xe === 0 && yBottom <= 1) return false;
     if (yBottom === 0 && xe <= 1) return false;
-
-    // Top round — remove one corner cell per side
     if (xe === 0 && r === 0) return false;
 
     return true;
 }
 
-// ── Build border + fill buckets ───────────────────────────────
 function _buildBattery() {
     const borders = [];
     const fills   = [];
 
-    // Body cells
     for (let r = 0; r < BODY_ROWS; r++) {
         for (let c = 0; c < BODY_COLS; c++) {
             if (!_inBody(c, r)) continue;
@@ -92,7 +54,6 @@ function _buildBattery() {
         }
     }
 
-    // Positive terminal cap — solid white block centred above the body
     const termColOffset = (BODY_COLS - TERMINAL_COLS) / 2;
     for (let r = 0; r < TERMINAL_ROWS; r++) {
         for (let c = 0; c < TERMINAL_COLS; c++) {
@@ -102,30 +63,19 @@ function _buildBattery() {
         }
     }
 
-    // Drain order — topmost row empties first, left→right within a row.
-    // This produces the "water level drops" effect as cells fade out.
     fills.sort((a, b) => a.row - b.row || a.col - b.col);
     return { borders, fills };
 }
 
-// ── DOM refs ──────────────────────────────────────────────────
 const _barFill    = document.getElementById('focus-bar-fill');
-const _sessionLbl = document.getElementById('focus-session-label');
 const _toggleBtn  = document.getElementById('focus-toggle-btn');
 
-// ── Pixel state ───────────────────────────────────────────────
 let _allPixels   = [];
 let _lastVisible = -1;
 
-// ── Letter reveal state ──────────────────────────────────────
-// Letter pixels start invisible and flip to .revealed row-by-row
-// as the fill drain line descends past them.  _lastDrainLineRow
-// caches the last computed drain row so we only touch the DOM
-// when the level actually drops to a new row.
 let _letterPixels     = [];
 let _lastDrainLineRow = -1;
 
-// ── Time formatter ───────────────────────────────────────────
 function _fmt(secs) {
     secs = Math.max(0, secs | 0);
     const m = String(Math.floor(secs / 60)).padStart(2, '0');
@@ -133,7 +83,6 @@ function _fmt(secs) {
     return `${m}:${s}`;
 }
 
-// ── SVG rect factory ─────────────────────────────────────────
 const _NS = 'http://www.w3.org/2000/svg';
 function _makeRect(px, py, fill) {
     const r = document.createElementNS(_NS, 'rect');
@@ -148,76 +97,15 @@ function _makeRect(px, py, fill) {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  LOCK IN TEXT REVEAL
-//  5×7 (and 3×7 for I) pixel-art letters placed INSIDE the body
-//  grid.  Bitmaps use '1' for a lit pixel.  Layout coordinates
-//  are expressed in body-grid (col, row) units and are converted
-//  to SVG coordinates by _initBattery() using the same CELL
-//  stride as the battery fills.
-//
-//  Symmetry notes:
-//    Body grid is 36 cols × 58 rows.
-//    LOCK: 4 letters × 5 cols + 3 × 2-col gaps = 26 cols
-//          → offset 5, spans cols 5-30, margin 5 ‖ 5  (symmetric)
-//    IN  : I(3) + gap(2) + N(5) = 10 cols
-//          → offset 13, spans 13-22, margin 13 ‖ 13  (symmetric)
-//    Rows: LOCK 20-26, gap 27-30, IN 31-37
-//          → top margin 20, bottom margin 20  (symmetric)
+//  LOCK IN TEXT REVEAL — pixel-art letters revealed as the
+//  battery drains row-by-row.
 // ══════════════════════════════════════════════════════════════
-const LTR_L = [
-    '10000',
-    '10000',
-    '10000',
-    '10000',
-    '10000',
-    '10000',
-    '11111',
-];
-const LTR_O = [
-    '01110',
-    '10001',
-    '10001',
-    '10001',
-    '10001',
-    '10001',
-    '01110',
-];
-const LTR_C = [
-    '01111',
-    '10000',
-    '10000',
-    '10000',
-    '10000',
-    '10000',
-    '01111',
-];
-const LTR_K = [
-    '10001',
-    '10010',
-    '10100',
-    '11000',
-    '10100',
-    '10010',
-    '10001',
-];
-const LTR_I = [
-    '111',
-    '010',
-    '010',
-    '010',
-    '010',
-    '010',
-    '111',
-];
-const LTR_N = [
-    '10001',
-    '11001',
-    '10101',
-    '10101',
-    '10101',
-    '10011',
-    '10001',
-];
+const LTR_L = ['10000','10000','10000','10000','10000','10000','11111'];
+const LTR_O = ['01110','10001','10001','10001','10001','10001','01110'];
+const LTR_C = ['01111','10000','10000','10000','10000','10000','01111'];
+const LTR_K = ['10001','10010','10100','11000','10100','10010','10001'];
+const LTR_I = ['111','010','010','010','010','010','111'];
+const LTR_N = ['10001','11001','10101','10101','10101','10011','10001'];
 
 const LETTER_LAYOUT = [
     { bitmap: LTR_L, col:  5, row: 20 },
@@ -243,7 +131,6 @@ function _buildLetterCells() {
     return cells;
 }
 
-// ── Build and render both pixel groups ───────────────────────
 function _initBattery() {
     const borderGroup = document.getElementById('fj-border-pixels');
     const fillGroup   = document.getElementById('fj-pixels');
@@ -252,22 +139,14 @@ function _initBattery() {
 
     const { borders, fills } = _buildBattery();
 
-    // Border + terminal are solid white — set via attribute
     borders.forEach(p => borderGroup.appendChild(_makeRect(p.x, p.y, '#ffffff')));
 
-    // Fills have NO fill attribute — CSS drives colour so the
-    // body.battery-mid / body.battery-low tiers can swap hues smoothly.
-    // `row` is stored so _updatePixels can derive the drain-line row
-    // and flip letter pixels on at the right moment.
     _allPixels = fills.map(p => {
         const rect = _makeRect(p.x, p.y, null);
         fillGroup.appendChild(rect);
         return { x: p.x, y: p.y, row: p.row, el: rect };
     });
 
-    // Letter pixels — start invisible, reveal row-by-row as the
-    // drain descends.  Painted above the fill group but beneath the
-    // white silhouette group so the battery outline is never covered.
     if (letterGroup) {
         const letterCells = _buildLetterCells();
         _letterPixels = letterCells.map(lc => {
@@ -280,7 +159,6 @@ function _initBattery() {
     }
 }
 
-// ── Update pixel visibility from timer progress ──────────────
 function _updatePixels(progress) {
     if (!_allPixels.length) return;
     const total   = _allPixels.length;
@@ -288,16 +166,12 @@ function _updatePixels(progress) {
     if (visible === _lastVisible) return;
     _lastVisible = visible;
 
-    // fills sorted top→bottom; hide the topmost (total − visible) cells
     const showFrom = total - visible;
     _allPixels.forEach((px, i) => {
         if (!px.el) return;
         px.el.style.opacity = i >= showFrom ? '' : '0';
     });
 
-    // Drain-line row — the topmost still-filled row.  When the water
-    // level has dropped below a letter row, that row's pixels flip
-    // on via the .revealed class (CSS handles the smooth fade).
     const drainLineRow = showFrom < total ? _allPixels[showFrom].row : BODY_ROWS;
     if (drainLineRow !== _lastDrainLineRow && _letterPixels.length) {
         _lastDrainLineRow = drainLineRow;
@@ -308,14 +182,14 @@ function _updatePixels(progress) {
     }
 }
 
-// ── Update all battery visuals from a state snapshot ─────────
 function _renderBattery(state, visState) {
-    // Battery fraction drains from 1 → 0 over the planned duration.
-    // Once elapsed crosses planned, we clamp to 0 (empty) and the
-    // CSS .is-overtime class takes over for the "keep going" glow.
-    const planned = state.plannedSeconds || 0;
+    const target  = state.targetSeconds || 0;
     const elapsed = state.elapsedSeconds || 0;
-    let progress  = planned > 0 ? (1 - elapsed / planned) : 0;
+    // In overtime: freeze battery at full (progress = 1 so no pixels hidden)
+    // with a pulse driven by the body.is-overtime CSS class.
+    let progress  = state.isOvertime
+        ? 1
+        : (target > 0 ? (1 - elapsed / target) : 0);
     if (progress < 0) progress = 0;
     if (progress > 1) progress = 1;
 
@@ -336,48 +210,12 @@ function _renderBattery(state, visState) {
     body.classList.toggle('is-paused',   visState === 'paused');
     body.classList.toggle('is-overtime', !!state.isOvertime);
 
-    // Charge tiers — drive the CSS colour swap on #fj-pixels rect.
-    // In overtime, remainingFrac = 0 so both guards fail and we use the
-    // dedicated .is-overtime styling instead.
-    body.classList.toggle('battery-low', progress > 0    && progress <= 0.20);
-    body.classList.toggle('battery-mid', progress > 0.20 && progress <= 0.50);
+    // Low/mid charge tiers — drive the colour swap. Suppressed in overtime
+    // so the is-overtime styling takes over.
+    body.classList.toggle('battery-low', !state.isOvertime && progress > 0    && progress <= 0.20);
+    body.classList.toggle('battery-mid', !state.isOvertime && progress > 0.20 && progress <= 0.50);
 }
 
-// ── Phase tabs ───────────────────────────────────────────────
-function _updateTabs(state) {
-    ['pomodoro', 'shortbreak', 'longbreak'].forEach(p => {
-        const tab = document.getElementById('ftab-' + p);
-        if (!tab) return;
-        const active = (p === state.phase)
-                    || (state.phase === 'countdown' && p === 'pomodoro');
-        tab.classList.toggle('active', active);
-        tab.setAttribute('aria-selected', String(active));
-    });
-}
-
-// ── Session / phase label ────────────────────────────────────
-function _updateSessionLabel(state) {
-    if (!_sessionLbl) return;
-
-    if (state.isOvertime && (state.phase === 'pomodoro' || state.phase === 'countdown')) {
-        _sessionLbl.textContent =
-            `Goal reached \u2014 overtime +${_fmt(state.overtimeSeconds)}`;
-        return;
-    }
-
-    switch (state.phase) {
-        case 'shortbreak':
-            _sessionLbl.textContent = `Short Break \u2014 ${state.shortBreakMins} min`;
-            break;
-        case 'longbreak':
-            _sessionLbl.textContent = `Long Break \u2014 ${state.longBreakMins} min`;
-            break;
-        default:
-            _sessionLbl.textContent = `Session ${state.sessionCount} of 4`;
-    }
-}
-
-// ── Toggle stop-button visibility based on session activity ──
 function _updateStopBtn(state) {
     const stopBtn = document.getElementById('focus-stop-btn');
     if (!stopBtn) return;
@@ -385,14 +223,12 @@ function _updateStopBtn(state) {
     stopBtn.classList.toggle('hidden', !hasActive);
 }
 
-// Screen-reader announcements. Only fires on phase transitions and start/pause.
 function _announceTimer(msg) {
     const el = document.getElementById('timer-announcer');
     if (!el) return;
     el.textContent = msg;
 }
 
-// ── TimerCore event subscriber ───────────────────────────────
 function _onCoreEvent(event, state) {
     let visState;
     if      (event === 'pause') visState = 'paused';
@@ -400,39 +236,21 @@ function _onCoreEvent(event, state) {
     else if (state.isPaused)    visState = 'paused';
     else                        visState = '';
 
-    if (event !== 'sessionEnd' && event !== 'skip') {
+    if (event !== 'sessionEnd') {
         _renderBattery(state, visState);
-        _updateTabs(state);
-        _updateSessionLabel(state);
         _updateStopBtn(state);
         if (_toggleBtn) _toggleBtn.textContent = state.isRunning ? 'Pause' : 'Start';
     }
 
-    if (event === 'phase') {
-        if      (state.phase === 'pomodoro')   _announceTimer(`Pomodoro started — ${state.pomodoroMins} minutes`);
-        else if (state.phase === 'shortbreak') _announceTimer(`Short break started — ${state.shortBreakMins} minutes`);
-        else if (state.phase === 'longbreak')  _announceTimer(`Long break started — ${state.longBreakMins} minutes`);
-        else if (state.phase === 'countdown')  _announceTimer(`Countdown — ${Math.round(state.plannedSeconds / 60)} minutes`);
-    } else if (event === 'start' && !state.isPaused) {
-        _announceTimer('Timer started');
-    } else if (event === 'pause') {
-        _announceTimer('Timer paused');
-    } else if (event === 'milestone') {
-        _announceTimer(state.phase === 'shortbreak' || state.phase === 'longbreak'
-            ? 'Break complete'
-            : 'Pomodoro complete');
-    }
+    if      (event === 'start' && !state.isPaused) _announceTimer('Timer started');
+    else if (event === 'pause')                    _announceTimer('Timer paused');
+    else if (event === 'milestone')                _announceTimer('Target reached — overtime');
 
-    // Session logging on manual stop / skip. Break phases MUST NOT POST
-    // or they would credit the daily goal.
-    if (event === 'sessionEnd' || event === 'skip') {
-        const isStop     = event === 'sessionEnd';
+    if (event === 'sessionEnd') {
         const actualMins = Math.max(0, Math.round(state.actualDurationSeconds / 60));
         const plannedMin = Math.max(0, Math.round(state.plannedSeconds       / 60));
         const overtime   = Math.max(0, actualMins - plannedMin);
-        if (actualMins > 0
-            && window.currentUser
-            && (state.phase === 'pomodoro' || state.phase === 'countdown')) {
+        if (actualMins > 0 && window.currentUser) {
             fetch('/api/tracker/sessions', {
                 method:    'POST',
                 headers:   { 'Content-Type': 'application/json' },
@@ -442,35 +260,20 @@ function _onCoreEvent(event, state) {
                     durationMinutes: actualMins,
                     plannedMinutes:  plannedMin,
                     overtimeMinutes: overtime,
-                    timerMode:       _phaseLabel(state.phase),
-                    completed:       isStop,
+                    timerMode:       'study',
+                    completed:       true,
                 }),
-            })
-            .then(() => {
-                if (isStop && typeof window.onSessionCompleted === 'function') {
-                    window.onSessionCompleted('Focus Session', actualMins,
-                        new Date().toISOString().split('T')[0]);
-                }
-            })
-            .catch(() => {});
+            }).catch(() => {});
         }
     }
-}
-
-function _phaseLabel(phase) {
-    if (phase === 'shortbreak') return 'Short Break';
-    if (phase === 'longbreak')  return 'Long Break';
-    if (phase === 'countdown')  return 'Countdown';
-    return 'Pomodoro (work)';
 }
 
 TimerCore.subscribe(_onCoreEvent);
 
 // ── Public controls — called from HTML onclick ───────────────
-function setPhase(phase)  { TimerCore.setPhase(phase); }
-function toggleTimer()    { TimerCore.toggle();        }
-function skipPhase()      { TimerCore.skip();          }
-function stopPhase()      { TimerCore.stop();          }
+function toggleTimer()    { TimerCore.toggle(); }
+function skipPhase()      { TimerCore.skip();   }
+function stopPhase()      { TimerCore.stop();   }
 
 // ── Fullscreen toggle ────────────────────────────────────────
 function _toggleFullscreen() {
@@ -499,7 +302,6 @@ async function _initAuth() {
     } catch (_) { /* guest mode — silent */ }
 }
 
-// ── Keyboard shortcut ────────────────────────────────────────
 document.addEventListener('keydown', e => {
     if (e.key === ' ' && e.target === document.body) {
         e.preventDefault();
@@ -507,23 +309,18 @@ document.addEventListener('keydown', e => {
     }
 });
 
-// ── Init ─────────────────────────────────────────────────────
 (function () {
     _initBattery();
 
     const state = TimerCore.getState();
     const initVis = state.isRunning ? 'running' : (state.isPaused ? 'paused' : '');
     _renderBattery(state, initVis);
-    _updateTabs(state);
-    _updateSessionLabel(state);
     _updateStopBtn(state);
     if (_toggleBtn) _toggleBtn.textContent = state.isRunning ? 'Pause' : 'Start';
 
     const svg = document.getElementById('finjan-svg');
     if (svg) {
         svg.addEventListener('click', _toggleFullscreen);
-        // Keyboard parity with click: Enter and Space both toggle fullscreen.
-        // preventDefault on Space blocks the default scroll + timer-toggle behavior.
         svg.addEventListener('keydown', e => {
             if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
                 e.preventDefault();

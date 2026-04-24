@@ -1,7 +1,7 @@
 'use strict';
 
 // ── Auth state ─────────────────────────────────────────
-// window.currentUser is read by subjects.js and timer.js
+// window.currentUser is read by timer.js and tracker.js
 window.currentUser = null;
 
 let authModalMode = 'login'; // 'login' | 'register'
@@ -17,7 +17,6 @@ async function initAuth() {
             const data = await res.json();
             window.currentUser = data.username;
             showLoggedIn(data.username);
-            await loadSavedPlan();
             await loadSavedTimer();
             // Refresh today's goal now that we know the user — fixes the race where
             // fetchTodayGoal() fired before /api/auth/me resolved (window.currentUser
@@ -292,7 +291,6 @@ async function doLogin() {
             window.currentUser = data.username;
             showLoggedIn(data.username);
             closeModal();
-            await loadSavedPlan();
             await loadSavedTimer();
             if (typeof window.fetchTodayGoal === 'function') window.fetchTodayGoal();
             return;
@@ -356,24 +354,9 @@ async function logout() {
     try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (_) {}
     window.currentUser = null;
     showLoggedOut();
-    const planCard = document.getElementById('study-plan-card');
-    if (planCard) planCard.classList.add('hidden');
 }
 
 // ── Load saved data on login ───────────────────────────
-async function loadSavedPlan() {
-    if (!window.currentUser) return;
-    try {
-        const res = await fetch('/api/plans/latest');
-        if (res.ok) {
-            const plan = await res.json();
-            if (plan && Array.isArray(plan.subjectPlans) && plan.subjectPlans.length > 0) {
-                renderStudyPlan(plan);  // defined in subjects.js
-            }
-        }
-    } catch (e) { /* silent */ }
-}
-
 async function loadSavedTimer() {
     if (!window.currentUser) return;
     try {

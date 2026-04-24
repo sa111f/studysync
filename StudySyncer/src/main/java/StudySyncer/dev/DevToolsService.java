@@ -1,7 +1,6 @@
 package StudySyncer.dev;
 
 import StudySyncer.entity.User;
-import StudySyncer.repository.SavedPlanRepository;
 import StudySyncer.repository.StudySessionRepository;
 import StudySyncer.repository.TimerProgressRepository;
 import StudySyncer.repository.UserRepository;
@@ -23,16 +22,13 @@ public class DevToolsService {
 
     private final UserRepository           userRepository;
     private final StudySessionRepository   studySessionRepository;
-    private final SavedPlanRepository      savedPlanRepository;
     private final TimerProgressRepository  timerProgressRepository;
 
     public DevToolsService(UserRepository          userRepository,
                            StudySessionRepository  studySessionRepository,
-                           SavedPlanRepository     savedPlanRepository,
                            TimerProgressRepository timerProgressRepository) {
         this.userRepository          = userRepository;
         this.studySessionRepository  = studySessionRepository;
-        this.savedPlanRepository     = savedPlanRepository;
         this.timerProgressRepository = timerProgressRepository;
     }
 
@@ -69,15 +65,11 @@ public class DevToolsService {
         int count = (int) userRepository.count();
         if (count == 0) return 0;
 
-        // 1. Child tables with direct FK to users (no cascade from User side)
+        // Child tables with direct FK to users (no cascade from User side)
         studySessionRepository.deleteAllInBatch();
         timerProgressRepository.deleteAllInBatch();
 
-        // 2. SavedPlan → SavedSubject has cascade ALL, so deleting SavedPlan
-        //    rows via deleteAll() (not InBatch) triggers JPA cascade to subjects.
-        savedPlanRepository.deleteAll();
-
-        // 3. Users (all FKs now gone)
+        // Users (all FKs now gone)
         userRepository.deleteAllInBatch();
 
         return count;
@@ -90,15 +82,9 @@ public class DevToolsService {
      * Does NOT delete the User row itself — caller does that.
      */
     private void purgeUserData(User user) {
-        // Direct FK children (no cascade from User)
         studySessionRepository.deleteAll(
             studySessionRepository.findByUserOrderByCompletedAtDesc(user));
         timerProgressRepository.findByUser(user)
             .ifPresent(timerProgressRepository::delete);
-
-        // SavedPlan.subjects has cascade=ALL, so deleting a SavedPlan row
-        // also removes its SavedSubject rows automatically.
-        savedPlanRepository.deleteAll(
-            savedPlanRepository.findAllByUser(user));
     }
 }

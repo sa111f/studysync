@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>StudySyncer — Pomodoro Timer with Accountability Emails &amp; AI Study Planner</title>
-    <meta name="description" content="StudySyncer is a free Pomodoro timer with accountability emails and an AI-powered study planner. Set daily goals, track focus sessions, and never miss a deadline." />
+    <title>StudySyncer — Focus Timer with Accountability Emails</title>
+    <meta name="description" content="StudySyncer is a free focus timer with accountability emails. Set daily study goals, track focus sessions, and stay on target." />
     <link rel="canonical" href="https://www.studysyncer.com/" />
 
     <!-- Favicons -->
@@ -15,14 +15,14 @@
     <meta property="og:site_name" content="StudySyncer" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://www.studysyncer.com/" />
-    <meta property="og:title" content="StudySyncer — Pomodoro Timer with Accountability Emails &amp; AI Study Planner" />
-    <meta property="og:description" content="Free Pomodoro timer with accountability emails and AI-powered study planner. Stay focused. Study smarter." />
+    <meta property="og:title" content="StudySyncer — Focus Timer with Accountability Emails" />
+    <meta property="og:description" content="Free focus timer with accountability emails. Stay focused. Study smarter." />
     <meta property="og:image" content="https://www.studysyncer.com/og-image.png" />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="StudySyncer — Pomodoro Timer with Accountability Emails &amp; AI Study Planner" />
-    <meta name="twitter:description" content="Free Pomodoro timer with accountability emails and AI-powered study planner. Stay focused. Study smarter." />
+    <meta name="twitter:title" content="StudySyncer — Focus Timer with Accountability Emails" />
+    <meta name="twitter:description" content="Free focus timer with accountability emails. Stay focused. Study smarter." />
     <meta name="twitter:image" content="https://www.studysyncer.com/og-image.png" />
 
     <!-- JSON-LD structured data -->
@@ -31,7 +31,7 @@
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
       "name": "StudySyncer",
-      "description": "Pomodoro timer with accountability emails and an AI-powered study planner. Set daily study goals, track focus sessions, and manage deadlines.",
+      "description": "Focus timer with accountability emails. Set daily study goals and track focus sessions.",
       "applicationCategory": "EducationalApplication",
       "operatingSystem": "Web",
       "url": "https://www.studysyncer.com/",
@@ -233,9 +233,8 @@
     </div>
     <p class="intro-strip-tag">Stay focused. Study smarter.</p>
     <ul class="intro-strip-list">
-        <li>⏱ Pomodoro timer that actually holds you accountable</li>
+        <li>⏱ A focus timer that actually holds you accountable</li>
         <li>📩 Get a reminder email if you miss your daily study goal</li>
-        <li>🤖 Paste your notes or a PDF — AI tells you how long to study</li>
     </ul>
     <div class="intro-strip-cta-row">
         <button type="button" class="auth-link-btn accent intro-strip-cta shine-btn"
@@ -255,13 +254,6 @@
              events. Every-second countdown ticks are NOT announced. -->
         <div class="sr-only" aria-live="polite" aria-atomic="true" id="timer-announcer"></div>
 
-        <!-- Phase tabs -->
-        <div class="timer-phase-tabs" role="tablist" aria-label="Timer phase">
-            <button class="phase-tab active" id="tab-pomodoro"   role="tab" aria-selected="true"  onclick="setTimerPhase('pomodoro')">Pomodoro</button>
-            <button class="phase-tab"        id="tab-shortbreak" role="tab" aria-selected="false" onclick="setTimerPhase('shortbreak')">Short Break</button>
-            <button class="phase-tab"        id="tab-longbreak"  role="tab" aria-selected="false" onclick="setTimerPhase('longbreak')">Long Break</button>
-        </div>
-
         <!-- Circular progress ring — timer display sits exactly in center -->
         <div class="timer-ring-wrap" id="timer-ring-wrap">
             <svg class="timer-ring" viewBox="0 0 200 200" aria-hidden="true">
@@ -280,18 +272,8 @@
             <button class="ctrl-btn skip"            onclick="skipTimer()">Skip</button>
         </div>
 
-        <!-- Pomodoro session info -->
-        <p class="pomodoro-info" id="pomodoro-info">
-            Session <span id="session-count">1</span> of 4 &mdash; work 25 min, break 5 min.
-        </p>
-
-        <!-- Session progress dots -->
-        <div class="session-dots" id="session-dots">
-            <span class="session-dot" id="dot-1"></span>
-            <span class="session-dot" id="dot-2"></span>
-            <span class="session-dot" id="dot-3"></span>
-            <span class="session-dot" id="dot-4"></span>
-        </div>
+        <!-- Overtime indicator — shown only when elapsed > target -->
+        <p class="timer-overtime-label hidden" id="timer-overtime-label">Overtime</p>
 
         <p class="space-hint">Press Space to pause / resume</p>
 
@@ -309,23 +291,9 @@
             <div class="timer-settings-panel hidden" id="timer-settings-panel">
                 <div class="dur-row">
                     <div class="dur-field">
-                        <label class="dur-label" for="dur-pomodoro">Pomodoro</label>
+                        <label class="dur-label" for="dur-target">Target duration</label>
                         <div class="dur-input-wrap">
-                            <input type="number" id="dur-pomodoro" class="dur-input" value="25" min="1" max="99" />
-                            <span class="dur-unit">min</span>
-                        </div>
-                    </div>
-                    <div class="dur-field">
-                        <label class="dur-label" for="dur-shortbreak">Short Break</label>
-                        <div class="dur-input-wrap">
-                            <input type="number" id="dur-shortbreak" class="dur-input" value="5" min="1" max="99" />
-                            <span class="dur-unit">min</span>
-                        </div>
-                    </div>
-                    <div class="dur-field">
-                        <label class="dur-label" for="dur-longbreak">Long Break</label>
-                        <div class="dur-input-wrap">
-                            <input type="number" id="dur-longbreak" class="dur-input" value="15" min="1" max="99" />
+                            <input type="number" id="dur-target" class="dur-input" value="25" min="1" max="999" />
                             <span class="dur-unit">min</span>
                         </div>
                     </div>
@@ -411,116 +379,8 @@
 
     </div><!-- /timer-col -->
 
-    <!-- ── Study Material ── -->
-    <section class="syllabus-card">
-        <div class="syllabus-header">
-            <h2>Study Material</h2>
-            <button class="clear-btn" onclick="startNewMaterial()">New Material</button>
-        </div>
-        <p class="card-hint">Paste notes or upload a PDF — AI will estimate how long to study</p>
-
-        <div id="document-input-panel">
-
-            <div class="subject-field">
-                <input type="text" id="doc-subject-name" class="field-input"
-                       placeholder="Topic / subject name (optional)" />
-            </div>
-
-            <div class="doc-section">
-                <label class="doc-label">Paste notes or syllabus text</label>
-                <textarea id="doc-notes-input" class="field-input doc-notes-textarea"
-                          placeholder="Paste your lecture notes, topics, or syllabus here..."></textarea>
-                <div class="char-count" id="doc-notes-count">0 / 5000</div>
-            </div>
-
-            <div class="doc-section">
-                <label class="doc-label">Or upload a PDF <span class="doc-limit-note">(max 10 MB)</span></label>
-                <div class="drop-zone doc-upload-row" id="pdf-drop-zone"
-                     ondragover="handlePdfDragOver(event)"
-                     ondragleave="handlePdfDragLeave(event)"
-                     ondrop="handlePdfDrop(event)">
-                    <input type="file" id="doc-pdf-input" accept=".pdf" class="doc-file-input" />
-                    <button id="btn-extract-pdf" class="apply-btn" onclick="extractPdfText()">Extract Text from PDF</button>
-                </div>
-                <span id="doc-file-error" class="field-error hidden"></span>
-                <span id="doc-extract-status" class="save-status"></span>
-            </div>
-
-            <div class="syllabus-footer">
-                <button id="btn-estimate" class="save-btn shine-btn" onclick="estimateStudyTime()"
-                        title="AI estimates how long to study based on your notes">Estimate Study Time</button>
-                <span id="doc-save-status" class="save-status"></span>
-            </div>
-        </div>
-    </section><!-- /syllabus-card -->
-
 </div><!-- /top-panel -->
 
-    <!-- ── Study Priority Widget ── -->
-    <section class="priority-widget-section">
-        <div id="priority-widget" class="priority-widget">
-            <!-- Populated by deadlines.js -->
-        </div>
-    </section>
-
-    <!-- Study time estimation options -->
-    <section id="estimation-card" class="estimation-card hidden">
-        <div class="estimation-header">
-            <h2>Study Time Options</h2>
-            <span id="estimate-source-badge" class="estimate-source-badge"></span>
-            <span id="estimation-rationale" class="estimation-rationale"></span>
-        </div>
-        <div id="estimation-options" class="estimation-options"></div>
-
-        <div id="custom-time-card" class="custom-time-card">
-            <span class="est-label">Custom Time</span>
-            <div class="custom-time-inputs">
-                <input type="number" id="custom-hours" class="field-input custom-time-input"
-                       placeholder="0" min="0" max="23" />
-                <span class="custom-time-sep">h</span>
-                <input type="number" id="custom-minutes" class="field-input custom-time-input"
-                       placeholder="0" min="0" max="59" />
-                <span class="custom-time-sep">m</span>
-            </div>
-            <span id="custom-time-error" class="field-error hidden"></span>
-            <button class="apply-btn" onclick="applyCustomTime()">Apply Custom Time</button>
-        </div>
-    </section>
-
-    <!-- Study plan output -->
-    <section id="study-plan-card" class="study-plan-card hidden">
-        <div class="study-plan-header">
-            <h2>Study Plan</h2>
-            <span id="study-plan-total" class="study-plan-total"></span>
-        </div>
-        <div id="plan-stale-notice" class="plan-stale-notice hidden">
-            Inputs changed &mdash; click <strong>Save Subjects</strong> to refresh the plan.
-        </div>
-        <div id="study-plan-items" class="study-plan-items"></div>
-    </section>
-
-    <!-- Session results / log -->
-    <section class="results-card">
-        <h2>Session Results</h2>
-        <div id="progress-summary" class="progress-summary"></div>
-        <div id="results-empty" class="results-empty">No sessions completed yet. Start a timer to track your progress.</div>
-        <div class="table-wrap">
-        <table id="results-table" class="results-table hidden">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Subject</th>
-                    <th>Mode</th>
-                    <th>Duration</th>
-                    <th>Completed At</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody id="results-body"></tbody>
-        </table>
-        </div>
-        <button class="clear-btn" onclick="clearResults()">Clear Results</button>
-    </section>
 </main>
 
 <footer class="site-footer">
@@ -536,51 +396,9 @@
     </div>
 </footer>
 
-<script th:src="@{/js/subjects.js}"></script>
 <script th:src="@{/js/timer-core.js}"></script>
 <script th:src="@{/js/timer.js}"></script>
 <script th:src="@{/js/auth.js}"></script>
-<script th:src="@{/js/deadlines.js}"></script>
-<script>
-    // Boot the priority widget after auth.js has resolved the session.
-    // `window.authReady` is a Promise set by auth.js; awaiting it removes the
-    // previous 400 ms setTimeout race with /api/auth/me.
-    (async function () {
-        try { await window.authReady; } catch (_) {}
-        if (typeof initDeadlines === 'function') initDeadlines();
-    })();
-</script>
-<script>
-/* ── Drag-and-drop PDF handler ── */
-function handlePdfDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-    document.getElementById('pdf-drop-zone').classList.add('drag-over');
-}
-
-function handlePdfDragLeave(e) {
-    document.getElementById('pdf-drop-zone').classList.remove('drag-over');
-}
-
-function handlePdfDrop(e) {
-    e.preventDefault();
-    document.getElementById('pdf-drop-zone').classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
-    if (file.type !== 'application/pdf') {
-        const errEl = document.getElementById('doc-file-error');
-        if (errEl) { errEl.textContent = 'Only PDF files are supported.'; errEl.classList.remove('hidden'); }
-        return;
-    }
-    // Assign the dropped file to the hidden file input via DataTransfer
-    const dt   = new DataTransfer();
-    dt.items.add(file);
-    const inp = document.getElementById('doc-pdf-input');
-    inp.files = dt.files;
-    // Trigger extraction immediately
-    if (typeof extractPdfText === 'function') extractPdfText();
-}
-</script>
 <script>
 /* ── Today's Goal + Email Accountability ── */
 (function () {

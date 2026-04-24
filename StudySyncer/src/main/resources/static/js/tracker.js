@@ -97,8 +97,7 @@ function switchTab(tab) {
     document.querySelectorAll('.tracker-panel').forEach(p =>
         p.classList.add('hidden'));
     const panel = document.getElementById('tab-' + tab);
-    panel.classList.remove('hidden');
-    if (tab === 'ranking') _syncRankingStats();
+    if (panel) panel.classList.remove('hidden');
 }
 
 // ── Range filter ───────────────────────────────────────
@@ -337,31 +336,6 @@ function filterSessions() {
 // ── Period label sync ──────────────────────────────────
 function setPeriodLabels(label) {
     document.querySelectorAll('.period-label').forEach(el => { el.textContent = label; });
-}
-
-// ── Ranking stats sync ─────────────────────────────────
-function _syncRankingStats() {
-    const hoursEl  = document.getElementById('lb-your-hours');
-    const streakEl = document.getElementById('lb-your-streak');
-    const msgEl    = document.getElementById('lb-you-empty-msg');
-    if (!hoursEl || !streakEl) return;
-    const hours  = document.getElementById('stat-hours-val')?.textContent;
-    const streak = document.getElementById('stat-streak-val')?.textContent;
-    // Consider the account "empty" if either stat is missing or literally zero.
-    // An empty account showing "🔥 0 / 0m" reads as discouraging — swap it for a CTA line.
-    const hasData = hours  && hours  !== '—' && hours  !== '0m'
-                 && streak && streak !== '—' && streak !== '0';
-    if (hasData) {
-        hoursEl.textContent  = hours;
-        streakEl.textContent = `🔥 ${streak}`;
-        hoursEl.classList.remove('hidden');
-        streakEl.classList.remove('hidden');
-        msgEl?.classList.add('hidden');
-    } else {
-        hoursEl.classList.add('hidden');
-        streakEl.classList.add('hidden');
-        msgEl?.classList.remove('hidden');
-    }
 }
 
 // ── Edit toast ─────────────────────────────────────────
