@@ -30,17 +30,23 @@ public class TaskResponse {
     private LocalDateTime completedAt;
     private boolean       overdue;
 
+    /**
+     * Total time the user has logged against this task, in SECONDS.
+     * Phase 1 stored durations as minutes on StudySession; this field returns
+     * minutes × 60 so the client can format with sub-minute precision for
+     * short sessions ("30s logged" for a test run) and "2h 15m" for longer ones.
+     */
+    private long          secondsLogged;
+
     public TaskResponse() { /* Jackson */ }
 
     /**
      * Factory that maps an entity to a response, computing the derived
-     * `overdue` flag against the supplied `today`.
-     *
-     * @param today the user-local date the request arrived on — passed in
-     *              (rather than computed from the entity) so the same instance
-     *              is reused across a batch map call.
+     * `overdue` flag against the supplied `today` and attaching `secondsLogged`
+     * if the caller has pre-aggregated the value. Call sites that don't need
+     * logged-time (future unrelated features) may pass 0.
      */
-    public static TaskResponse from(Task t, LocalDate today) {
+    public static TaskResponse from(Task t, LocalDate today, long secondsLogged) {
         TaskResponse r = new TaskResponse();
         r.id          = t.getId();
         r.title       = t.getTitle();
@@ -55,7 +61,13 @@ public class TaskResponse {
         r.overdue     = t.getStatus() != TaskStatus.COMPLETED
                      && t.getDueDate() != null
                      && t.getDueDate().isBefore(today);
+        r.secondsLogged = Math.max(0L, secondsLogged);
         return r;
+    }
+
+    /** Back-compat overload for call sites that don't need logged time. */
+    public static TaskResponse from(Task t, LocalDate today) {
+        return from(t, today, 0L);
     }
 
     // ── Getters ───────────────────────────────────────────
@@ -70,4 +82,5 @@ public class TaskResponse {
     public LocalDateTime getCreatedAt()   { return createdAt; }
     public LocalDateTime getCompletedAt() { return completedAt; }
     public boolean       isOverdue()      { return overdue; }
+    public long          getSecondsLogged() { return secondsLogged; }
 }

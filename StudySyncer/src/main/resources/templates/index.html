@@ -243,21 +243,93 @@
     </div>
 </aside>
 
-<!-- ── Dashboard preview strip — shown only when logged in AND there are
-     active tasks due within the next 7 days. Populated by the inline
-     script at the bottom of this file once auth has resolved. ── -->
-<aside id="tasks-dashboard-strip" class="tasks-dashboard-strip hidden" aria-live="polite">
-    <span id="tasks-dashboard-msg"></span>
-    <a href="/tasks">View tasks →</a>
-</aside>
+<!-- ══════════════════════════════════════════════════════════════
+     Phase 4 homepage layout.
+       - Logged-in: 2-column dashboard (sections + sidebar).
+       - Guest:     intro-strip above, single-column with timer +
+                    Today's Goal (localStorage) in the sidebar slot.
+     JS (dashboard.js) toggles the .is-logged-in / .is-guest classes
+     on <main> once window.authReady resolves so there is no flash
+     of either state.
+     ══════════════════════════════════════════════════════════════ -->
 
-<div class="top-panel">
+<div class="home-dashboard-layout">
 
-    <!-- ── Timer + Today's Goal column ── -->
-    <div class="timer-col">
+    <!-- ── Dashboard column (logged-in users) ── -->
+    <section class="dashboard-col">
 
-    <!-- ── Timer hero ── -->
-    <section class="timer-card">
+        <!-- Guest fallback — swapped in by dashboard.js when window.currentUser is null. -->
+        <div id="dashboard-guest" class="dashboard-guest hidden">
+            <h1 class="dashboard-guest-title">Stay focused. Study smarter.</h1>
+            <p class="dashboard-guest-sub">
+                Track tasks, run a focus timer, and get an accountability email if you miss your daily goal.
+            </p>
+            <div class="dashboard-guest-cta-row">
+                <button class="auth-link-btn accent shine-btn" onclick="openModal('register')">Sign up free</button>
+                <button class="auth-link-btn" onclick="openModal('login')">Log in</button>
+            </div>
+        </div>
+
+        <!-- Authenticated dashboard sections. Hidden until auth resolves. -->
+        <div id="dashboard-sections" class="dashboard-sections hidden">
+
+            <!-- ── Today ── -->
+            <section class="dash-section" id="dash-today" aria-label="Tasks due today">
+                <div class="dash-section-header">
+                    <h2 class="dash-section-title">Today</h2>
+                    <span class="dash-section-count hidden" id="dash-today-count"></span>
+                </div>
+                <div class="dash-task-list" id="dash-today-list"></div>
+                <div class="dash-empty hidden" id="dash-today-empty">
+                    Nothing due today. <a href="/tasks">Add a task →</a>
+                </div>
+            </section>
+
+            <!-- ── Overdue ── -->
+            <section class="dash-section dash-section-overdue" id="dash-overdue" aria-label="Overdue tasks">
+                <div class="dash-section-header">
+                    <h2 class="dash-section-title dash-section-title-danger">Overdue</h2>
+                    <span class="dash-section-count danger-count hidden" id="dash-overdue-count"></span>
+                </div>
+                <div class="dash-task-list" id="dash-overdue-list"></div>
+                <div class="dash-empty hidden" id="dash-overdue-empty">
+                    Nothing overdue. You're on top of it. 🎯
+                </div>
+            </section>
+
+            <!-- ── Upcoming ── -->
+            <section class="dash-section" id="dash-upcoming" aria-label="Tasks due in the next 7 days">
+                <div class="dash-section-header">
+                    <h2 class="dash-section-title">Upcoming (next 7 days)</h2>
+                    <span class="dash-section-count hidden" id="dash-upcoming-count"></span>
+                </div>
+                <div class="dash-task-list" id="dash-upcoming-list"></div>
+                <div class="dash-empty hidden" id="dash-upcoming-empty">
+                    No tasks due this week. <a href="/tasks">Plan something →</a>
+                </div>
+            </section>
+
+            <!-- ── Next Exams (stub until Phase 6) ── -->
+            <section class="dash-section" id="dash-exams" aria-label="Upcoming exams">
+                <div class="dash-section-header">
+                    <h2 class="dash-section-title">Next Exams</h2>
+                    <span class="dash-section-count hidden" id="dash-exams-count"></span>
+                </div>
+                <div class="dash-task-list" id="dash-exams-list"></div>
+                <div class="dash-empty" id="dash-exams-empty">
+                    No upcoming exams.
+                    <span class="dash-empty-note">Exam tracking coming soon.</span>
+                </div>
+            </section>
+
+        </div><!-- /dashboard-sections -->
+    </section><!-- /dashboard-col -->
+
+    <!-- ── Sidebar (timer + goal) ── -->
+    <aside class="sidebar-col">
+
+    <!-- ── Timer hero (compact on homepage) ── -->
+    <section class="timer-card timer-card-compact" id="home-timer-card">
 
         <!-- Off-screen live region — announces phase transitions + start/stop
              events. Every-second countdown ticks are NOT announced. -->
@@ -274,12 +346,29 @@
             <div class="timer-display" id="timer-display">25:00</div>
         </div>
 
+        <!-- "Studying:" task picker (Phase 3.4) — populated by timer.js.
+             Hidden entirely for guests. Disabled while a session is running
+             so the tracked task can't silently switch mid-session. -->
+        <div class="timer-task-picker hidden" id="timer-task-picker">
+            <label for="timer-task-select" class="timer-task-label">Studying:</label>
+            <select id="timer-task-select" class="timer-task-select">
+                <option value="">No task selected</option>
+                <!-- <option value="{id}">{title}{course ? ' · ' + course : ''}</option> -->
+            </select>
+        </div>
+
         <!-- Controls: Start/Pause toggle · Stop · Skip -->
         <div class="timer-controls">
             <button class="ctrl-btn start shine-btn" id="btn-start-pause" onclick="toggleTimer()">Start</button>
             <button class="ctrl-btn stop hidden"     id="btn-stop" onclick="stopTimer()">Stop</button>
             <button class="ctrl-btn skip"            onclick="skipTimer()">Skip</button>
         </div>
+
+        <!-- Phase 3.7 hint — only when: logged in AND no task selected
+             AND timer idle. Toggled by timer.js _refreshNoTaskHint(). -->
+        <p class="timer-no-task-hint hidden" id="timer-no-task-hint">
+            💡 Select a task above to track time against it.
+        </p>
 
         <!-- Overtime indicator — shown only when elapsed > target -->
         <p class="timer-overtime-label hidden" id="timer-overtime-label">Overtime</p>
@@ -386,9 +475,9 @@
         <p class="goal-save-status" id="goal-save-status" style="display:none"></p>
     </section><!-- /goal-card-main -->
 
-    </div><!-- /timer-col -->
+    </aside><!-- /sidebar-col -->
 
-</div><!-- /top-panel -->
+</div><!-- /home-dashboard-layout -->
 
 </main>
 
@@ -405,46 +494,11 @@
     </div>
 </footer>
 
+<script th:src="@{/js/util.js}"></script>
 <script th:src="@{/js/timer-core.js}"></script>
 <script th:src="@{/js/timer.js}"></script>
 <script th:src="@{/js/auth.js}"></script>
-<script>
-/* ── Dashboard preview strip — Phase 2.9 ──────────────────────────────
-   One-liner above the timer: "You have N active tasks due this week".
-   Shown only when the user is logged in AND N > 0. Hidden otherwise.
-   ─────────────────────────────────────────────────────────────────────── */
-(async function () {
-    try { await window.authReady; } catch (_) {}
-    if (!window.currentUser) return;
-
-    try {
-        const res = await fetch('/api/tasks?status=active');
-        if (!res.ok) return;
-        const tasks = await res.json();
-
-        // Count tasks due within the next 7 days (inclusive of today).
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const cutoff = new Date(today);
-        cutoff.setDate(cutoff.getDate() + 7);
-
-        const count = (tasks || []).filter(t => {
-            if (!t.dueDate) return false;
-            const [y, m, d] = t.dueDate.split('-').map(Number);
-            const due = new Date(y, m - 1, d);
-            return due >= today && due <= cutoff;
-        }).length;
-
-        if (count <= 0) return;
-
-        const strip = document.getElementById('tasks-dashboard-strip');
-        const msg   = document.getElementById('tasks-dashboard-msg');
-        if (!strip || !msg) return;
-        msg.textContent = `You have ${count} active task${count === 1 ? '' : 's'} due this week —`;
-        strip.classList.remove('hidden');
-    } catch (_) { /* silent — preview strip is a nice-to-have */ }
-})();
-</script>
+<script th:src="@{/js/dashboard.js}"></script>
 <script>
 /* ── Today's Goal + Email Accountability ── */
 (function () {

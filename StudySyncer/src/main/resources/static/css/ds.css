@@ -2465,6 +2465,77 @@ a.apply-btn:focus {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   TIMER  —  "Studying:" task picker  (Phase 3)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.timer-task-picker {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.45rem 0.75rem;
+    margin: 0.5rem 0 0.3rem;
+    background: rgba(124, 92, 252, 0.06);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.85rem;
+}
+.timer-task-picker.hidden { display: none; }
+.timer-task-label {
+    color: var(--muted);
+    flex-shrink: 0;
+    font-weight: 500;
+}
+.timer-task-select {
+    flex: 1;
+    background: transparent;
+    color: var(--text);
+    border: none;
+    padding: 0.25rem 0.4rem;
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    outline: none;
+    min-width: 0; /* allow shrinking inside flex */
+}
+.timer-task-select:focus {
+    background: rgba(124, 92, 252, 0.1);
+    border-radius: 4px;
+}
+.timer-task-select:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+.timer-task-select option {
+    background: var(--surface);
+    color: var(--text);
+}
+
+/* Phase 3.7 — no-task hint */
+.timer-no-task-hint {
+    color: var(--muted);
+    font-size: 0.78rem;
+    text-align: center;
+    margin: 0.3rem 0 0;
+    opacity: 0.85;
+}
+.timer-no-task-hint.hidden { display: none; }
+
+/* Phase 3.6 — small purple "Task" badge next to the Material column
+   in the Tracker Detail table. */
+.session-task-badge {
+    display: inline-block;
+    padding: 0.08rem 0.45rem;
+    border-radius: 999px;
+    background: rgba(124, 92, 252, 0.18);
+    color: var(--accent);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    TASKS PAGE  —  /tasks (Phase 2)
    Dark-theme tokens: var(--accent / --success / --muted / --surface /
    --text / --border) already defined in style.css and ds.css above.
@@ -2774,3 +2845,330 @@ a.apply-btn:focus {
     font-weight: 600;
 }
 .tasks-empty a:hover { text-decoration: underline; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   /tasks — focus-pulse (Phase 4.3 row-click from dashboard)
+   ═══════════════════════════════════════════════════════════════════ */
+@keyframes task-row-focus-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(124, 92, 252, 0.55); }
+    70%  { box-shadow: 0 0 0 8px rgba(124, 92, 252, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(124, 92, 252, 0); }
+}
+.task-row-focus-pulse {
+    border-color: var(--accent) !important;
+    animation: task-row-focus-pulse 1.5s ease-out;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   HOMEPAGE DASHBOARD (Phase 4)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Shared danger color — only defined here if not already present elsewhere. */
+:root {
+    --danger:         #ef4444;
+    --danger-muted:   rgba(239, 68, 68, 0.15);
+    --success-muted:  rgba(52, 211, 153, 0.15);
+}
+
+.home-dashboard-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr); /* ≈ 65 / 35 */
+    gap: 1.5rem;
+    max-width: 1200px;
+    margin: 1rem auto 2rem;
+    padding: 0 1.25rem;
+    align-items: start;
+}
+
+.dashboard-col { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.sidebar-col   { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+
+@media (max-width: 900px) {
+    .home-dashboard-layout {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    /* Mobile order: Timer → dashboard sections → Today's Goal.
+       The sidebar-col contains [timer, goal] in that DOM order, so we
+       split them visually with flex order inside a flattened grid. */
+    .sidebar-col   { display: contents; }
+    .dashboard-col { order: 2; }
+    /* Timer inside .sidebar-col gets order 1; Today's Goal gets order 3. */
+    .sidebar-col > .timer-card { order: 1; }
+    .sidebar-col > .goal-card-main { order: 3; }
+}
+
+/* ── Guest pane ───────────────────────────────────────────────── */
+.dashboard-guest {
+    padding: 2rem 1.5rem;
+    text-align: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+.dashboard-guest.hidden { display: none; }
+.dashboard-guest-title {
+    font-size: 1.5rem;
+    color: var(--text);
+    margin: 0 0 0.5rem;
+}
+.dashboard-guest-sub {
+    color: var(--muted);
+    margin: 0 0 1.25rem;
+    font-size: 0.95rem;
+}
+.dashboard-guest-cta-row {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* ── Section cards ────────────────────────────────────────────── */
+.dashboard-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.dashboard-sections.hidden { display: none; }
+
+.dash-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+}
+.dash-section-overdue {
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+.dash-section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.75rem;
+}
+.dash-section-title {
+    font-size: 1.05rem;
+    color: var(--text);
+    margin: 0;
+    font-weight: 600;
+}
+.dash-section-title-danger {
+    color: var(--danger);
+}
+.dash-section-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 22px;
+    padding: 0 0.5rem;
+    border-radius: 999px;
+    background: rgba(124, 92, 252, 0.14);
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1;
+}
+.dash-section-count.hidden { display: none; }
+.dash-section-count.danger-count {
+    background: var(--danger-muted);
+    color: var(--danger);
+}
+
+/* ── Task list + row ──────────────────────────────────────────── */
+.dash-task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.dash-task-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, opacity 0.3s;
+}
+.dash-task-row:hover {
+    background: rgba(124, 92, 252, 0.05);
+    border-color: var(--border);
+}
+.dash-task-row.dash-row-fading-out {
+    opacity: 0;
+    transform: translateX(12px);
+    pointer-events: none;
+}
+
+/* Checkbox — mirrors the /tasks page checkbox but sized slightly down. */
+.dash-task-checkbox {
+    width: 22px; height: 22px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 2px solid var(--muted);
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: border-color 0.15s, background 0.15s;
+}
+.dash-task-checkbox:hover { border-color: var(--accent); }
+.dash-task-checkbox[data-status="IN_PROGRESS"] {
+    border-color: var(--accent);
+    background: linear-gradient(to right, var(--accent) 50%, transparent 50%);
+}
+.dash-task-checkbox[data-status="COMPLETED"] {
+    border-color: var(--success);
+    background: var(--success);
+}
+.dash-task-checkbox[data-status="COMPLETED"]::after {
+    content: "";
+    width: 6px; height: 11px;
+    border: solid #0f1117;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) translate(-1px, -1px);
+}
+
+.dash-task-body { min-width: 0; /* so title can ellipsize */ }
+.dash-task-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+.dash-task-title {
+    color: var(--text);
+    font-weight: 500;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-task-priority-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.dash-task-priority-low    { background: var(--muted); opacity: 0.6; }
+.dash-task-priority-medium { background: #f5c96b; }
+.dash-task-priority-high   { background: var(--danger); box-shadow: 0 0 6px rgba(239, 68, 68, 0.55); }
+
+.dash-task-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+    color: var(--muted);
+    font-size: 0.78rem;
+    margin-top: 0.15rem;
+}
+.dash-task-meta-sep { opacity: 0.5; }
+.dash-task-course { color: var(--muted); }
+.dash-task-due    { color: var(--muted); }
+.dash-section-overdue .dash-task-due {
+    color: var(--danger);
+    font-weight: 500;
+}
+.dash-task-logged {
+    color: var(--success);
+    background: var(--success-muted);
+    padding: 0.08rem 0.45rem;
+    border-radius: 999px;
+    font-weight: 500;
+}
+
+/* Start button */
+.dash-task-start-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--accent);
+    background: rgba(124, 92, 252, 0.12);
+    color: var(--accent);
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+.dash-task-start-btn:hover {
+    background: var(--accent);
+    color: #0f1117;
+}
+.dash-task-start-btn svg {
+    display: block;
+}
+
+/* Empty states */
+.dash-empty {
+    padding: 1rem 0.5rem 0.2rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.88rem;
+}
+.dash-empty.hidden { display: none; }
+.dash-empty a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+}
+.dash-empty a:hover { text-decoration: underline; }
+.dash-empty-note {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 0.75rem;
+    opacity: 0.7;
+    font-style: italic;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   COMPACT TIMER (Phase 4.6 — used on homepage, not /focus)
+   ═══════════════════════════════════════════════════════════════════ */
+.timer-card-compact .timer-ring-wrap {
+    max-width: 200px;
+    margin: 0.5rem auto 0.75rem;
+}
+.timer-card-compact .timer-ring { width: 100%; height: auto; }
+.timer-card-compact .timer-display {
+    font-size: 2.6rem;       /* ~42–44px vs default ~56px */
+}
+.timer-card-compact .timer-controls {
+    gap: 0.4rem;
+}
+.timer-card-compact .timer-controls .ctrl-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+.timer-card-compact .space-hint {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+.timer-card-compact .timer-task-picker {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.82rem;
+}
+.timer-card-compact .timer-settings-btn {
+    font-size: 0.8rem;
+}
+
+/* Pulse ring (dashboard "Start" click) */
+@keyframes timer-card-pulse-kf {
+    0%   { box-shadow: 0 0 0 0 rgba(124, 92, 252, 0.55); }
+    70%  { box-shadow: 0 0 0 14px rgba(124, 92, 252, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(124, 92, 252, 0); }
+}
+.timer-card-pulse {
+    animation: timer-card-pulse-kf 1.5s ease-out;
+}

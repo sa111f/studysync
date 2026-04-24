@@ -308,11 +308,20 @@ function renderSessionRows(sessions) {
         } else {
             durationCell = `<span style="font-variant-numeric:tabular-nums">${fmtMins(s.durationMinutes)}</span>`;
         }
+
+        // Phase 3.6 — if the session has a resolved task title, show it in
+        // the Material column with a small purple "Task" badge. When the
+        // referenced task has been deleted (soft reference from Phase 1)
+        // taskTitle is null and we fall back to the free-text material name.
+        const materialCell = s.taskTitle
+            ? `<span class="session-task-badge">Task</span>&nbsp;<span>${esc(s.taskTitle)}</span>`
+            : esc(s.materialName);
+
         return `
         <tr>
             <td>${esc(s.date)}</td>
             <td>${esc(s.time)}</td>
-            <td>${esc(s.materialName)}</td>
+            <td>${materialCell}</td>
             <td>${durationCell}</td>
             <td>${esc(s.timerMode)}</td>
             <td class="${s.completed ? 'tracker-status-done' : 'tracker-status-partial'}">
@@ -328,6 +337,7 @@ function filterSessions() {
     const filtered = _allSessions.filter(s =>
         (s.date         || '').toLowerCase().includes(q) ||
         (s.materialName || '').toLowerCase().includes(q) ||
+        (s.taskTitle    || '').toLowerCase().includes(q) ||
         (s.timerMode    || '').toLowerCase().includes(q)
     );
     renderSessionRows(filtered);

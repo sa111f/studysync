@@ -3,8 +3,10 @@ package StudySyncer;
 import StudySyncer.dto.*;
 import StudySyncer.entity.DailyGoal;
 import StudySyncer.entity.StudySession;
+import StudySyncer.entity.Task;
 import StudySyncer.entity.User;
 import StudySyncer.repository.StudySessionRepository;
+import StudySyncer.repository.TaskRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.*;
@@ -27,19 +29,36 @@ public class TrackerService {
 
     private final StudySessionRepository sessionRepo;
     private final DailyGoalService       dailyGoalService;
+    private final TaskRepository         taskRepo;
 
-    public TrackerService(StudySessionRepository sessionRepo, DailyGoalService dailyGoalService) {
+    public TrackerService(StudySessionRepository sessionRepo,
+                          DailyGoalService dailyGoalService,
+                          TaskRepository taskRepo) {
         this.sessionRepo      = sessionRepo;
         this.dailyGoalService = dailyGoalService;
+        this.taskRepo         = taskRepo;
     }
 
     // ── Save ──────────────────────────────────────────────
 
     public void saveSession(User user, String materialName, int durationMinutes,
                              Integer plannedMinutes, Integer overtimeMinutes,
-                             String timerMode, boolean completed) {
+                             String timerMode, boolean completed, Long taskId) {
+
+        // Soft reference with up-front ownership validation. If a taskId is
+        // supplied it MUST belong to the current user; otherwise the client
+        // could probe other users' task ids. 404 would leak whether an id
+        // exists at all, so we return 400 per the Phase 3 spec.
+        if (taskId != null) {
+            Task t = taskRepo.findById(taskId).orElse(null);
+            if (t == null || t.getUser() == null || !t.getUser().getId().equals(user.getId())) {
+                throw new IllegalArgumentException("Invalid task.");
+            }
+        }
+
         StudySession s = new StudySession();
         s.setUser(user);
+        s.setTaskId(taskId);
         s.setMaterialName((materialName != null && !materialName.isBlank())
                 ? materialName : "General");
         s.setDurationMinutes(durationMinutes);
@@ -292,6 +311,28 @@ public class TrackerService {
         List<StudySession> sessions = sessionRepo
                 .findByUserAndStudyDateBetweenOrderByCompletedAtDesc(user, r[0], r[1]);
 
+        // Batch-resolve task titles for every referenced (non-null) taskId so
+        // the Detail tab can render a "Task" badge next to the material name.
+        // Titles are soft-referenced: a deleted task leaves sessions intact
+        // and their taskTitle resolves to null.
+        Set<Long> referencedTaskIds = sessions.stream()
+                .map(StudySession::getTaskId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<Long, String> titlesById;
+        if (referencedTaskIds.isEmpty()) {
+            titlesById = Map.of();
+        } else {
+            titlesById = taskRepo.findAllById(referencedTaskIds).stream()
+                    // Defence in depth: only surface titles of tasks owned by
+                    // the current user — even though every session's taskId
+                    // was validated on save, this guards against future code
+                    // paths or stale ids that slipped through.
+                    .filter(t -> t.getUser() != null && t.getUser().getId().equals(user.getId()))
+                    .collect(Collectors.toMap(Task::getId, Task::getTitle));
+        }
+
         return sessions.stream()
                 .map(s -> new TrackerSessionDto(
                         s.getId(),
@@ -302,7 +343,9 @@ public class TrackerService {
                         s.getPlannedMinutes(),
                         s.getOvertimeMinutes(),
                         s.getTimerMode(),
-                        s.isCompleted()))
+                        s.isCompleted(),
+                        s.getTaskId(),
+                        s.getTaskId() != null ? titlesById.get(s.getTaskId()) : null))
                 .collect(Collectors.toList());
     }
 }

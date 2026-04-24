@@ -42,6 +42,55 @@ async function initTasks() {
 
     showLoggedInState();
     await fetchTasks(currentFilter);
+
+    // Phase 4.3 — dashboard row-body clicks route here with ?focus={id}.
+    // After the list is rendered, scroll to that row, briefly pulse it,
+    // then strip the query param so reloads don't re-trigger the pulse.
+    const focusId = _readFocusParam();
+    if (focusId != null) _highlightFocusedTask(focusId);
+}
+
+/** Read `?focus=123` from the current URL, or null if absent / non-numeric. */
+function _readFocusParam() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const raw = params.get('focus');
+        if (!raw) return null;
+        const id = parseInt(raw, 10);
+        return Number.isNaN(id) ? null : id;
+    } catch (_) { return null; }
+}
+
+/**
+ * Scroll-to + 1500ms pulse on a task row matched by data-id, then
+ * remove the `focus` param so a browser reload doesn't re-pulse.
+ * If the task isn't in the current filter's list, switches to 'all' and retries.
+ */
+async function _highlightFocusedTask(focusId) {
+    let row = document.querySelector('.task-row[data-id="' + focusId + '"]');
+    if (!row && currentFilter !== 'all') {
+        // The task might be completed / not in the active filter — fall back
+        // to All and re-render before giving up.
+        currentFilter = 'all';
+        document.querySelectorAll('.task-filter-btn').forEach(b =>
+            b.classList.toggle('active', b.dataset.filter === 'all'));
+        await fetchTasks('all');
+        row = document.querySelector('.task-row[data-id="' + focusId + '"]');
+    }
+    if (!row) return;
+
+    try { row.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    catch (_) { /* older browsers */ }
+
+    row.classList.add('task-row-focus-pulse');
+    setTimeout(() => row.classList.remove('task-row-focus-pulse'), 1500);
+
+    // Strip ?focus so refresh doesn't replay the pulse.
+    try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('focus');
+        window.history.replaceState({}, '', url.pathname + (url.search || ''));
+    } catch (_) { /* history API unavailable */ }
 }
 
 // Sync header auth bar the same way tracker.js does.
@@ -143,6 +192,13 @@ function renderTaskItem(t) {
     if (t.course)  metaParts.push(`<span>${esc(t.course)}</span>`);
     metaParts.push(`<span class="task-type-badge">${esc(typeLabel)}</span>`);
     metaParts.push(`<span>${esc(formatDueDate(t.dueDate, t.status))}</span>`);
+    // Phase 3.5 — show time logged against the task. Omit entirely when 0
+    // so rows for unstarted tasks stay clean.
+    if (t.secondsLogged && t.secondsLogged > 0 && window.SS && window.SS.formatDuration) {
+        metaParts.push(
+            `<span class="task-logged-note">${esc(window.SS.formatDuration(t.secondsLogged))} logged</span>`
+        );
+    }
 
     const overdueBadge = (t.overdue) ? '<span class="task-overdue-badge">Overdue</span>' : '';
 

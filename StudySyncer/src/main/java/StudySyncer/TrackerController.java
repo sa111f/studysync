@@ -56,10 +56,18 @@ public class TrackerController {
         java.time.ZoneId zone = rolloverService.resolveUserZone(user);
         rolloverService.processRolloverForUser(user, zone);
 
-        trackerService.saveSession(user,
-                dto.getMaterialName(), dto.getDurationMinutes(),
-                dto.getPlannedMinutes(), dto.getOvertimeMinutes(),
-                dto.getTimerMode(), dto.isCompleted());
+        try {
+            trackerService.saveSession(user,
+                    dto.getMaterialName(), dto.getDurationMinutes(),
+                    dto.getPlannedMinutes(), dto.getOvertimeMinutes(),
+                    dto.getTimerMode(), dto.isCompleted(),
+                    dto.getTaskId());
+        } catch (IllegalArgumentException e) {
+            // Invalid taskId (unknown OR not owned by the current user).
+            // 400, not 404, so probing for other users' task IDs fails identically
+            // to probing for one that simply doesn't exist.
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
         // Goal-progress sync and goal-reached email check are both handled inside
         // trackerService.saveSession — do NOT add a duplicate call here.
         return ResponseEntity.ok(Map.of("message", "Session saved."));

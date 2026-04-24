@@ -20,7 +20,6 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * REST API for user-scoped tasks.
@@ -51,7 +50,9 @@ public class TaskController {
         if (user == null) return unauthorized();
 
         Task saved = taskService.create(user, req);
-        TaskResponse body = TaskResponse.from(saved, userLocalToday(user));
+        // New tasks have no sessions yet — pass through the single-task
+        // mapper anyway so the logged-time code path is exercised once.
+        TaskResponse body = taskService.toResponse(user, saved, userLocalToday(user));
 
         return ResponseEntity
                 .created(URI.create("/api/tasks/" + saved.getId()))
@@ -69,10 +70,8 @@ public class TaskController {
 
         LocalDate today = userLocalToday(user);
         List<Task> tasks = taskService.listForUser(user, status, today);
-
-        List<TaskResponse> body = tasks.stream()
-                .map(t -> TaskResponse.from(t, today))
-                .collect(Collectors.toList());
+        // Batched logged-time aggregation — single GROUP BY, not N+1.
+        List<TaskResponse> body = taskService.toResponses(user, tasks, today);
         return ResponseEntity.ok(body);
     }
 
@@ -84,7 +83,7 @@ public class TaskController {
         if (user == null) return unauthorized();
 
         Task t = taskService.get(user, id);
-        return ResponseEntity.ok(TaskResponse.from(t, userLocalToday(user)));
+        return ResponseEntity.ok(taskService.toResponse(user, t, userLocalToday(user)));
     }
 
     // ── Full update ───────────────────────────────────────────────────
@@ -97,7 +96,7 @@ public class TaskController {
         if (user == null) return unauthorized();
 
         Task updated = taskService.update(user, id, req);
-        return ResponseEntity.ok(TaskResponse.from(updated, userLocalToday(user)));
+        return ResponseEntity.ok(taskService.toResponse(user, updated, userLocalToday(user)));
     }
 
     // ── Status patch ──────────────────────────────────────────────────
@@ -110,7 +109,7 @@ public class TaskController {
         if (user == null) return unauthorized();
 
         Task updated = taskService.updateStatus(user, id, req.getStatus());
-        return ResponseEntity.ok(TaskResponse.from(updated, userLocalToday(user)));
+        return ResponseEntity.ok(taskService.toResponse(user, updated, userLocalToday(user)));
     }
 
     // ── Delete ────────────────────────────────────────────────────────

@@ -38,4 +38,19 @@ public interface StudySessionRepository extends JpaRepository<StudySession, Long
     @Query("SELECT COALESCE(SUM(s.durationMinutes), 0) FROM StudySession s " +
            "WHERE s.user = :user AND s.taskId = :taskId")
     long sumDurationByUserAndTaskId(@Param("user") User user, @Param("taskId") Long taskId);
+
+    /**
+     * Batch variant of {@link #sumDurationByUserAndTaskId(User, Long)} — one query
+     * returns per-task totals for a page of task ids.  Used by TaskService to
+     * populate TaskResponse.secondsLogged for the whole list without N+1.
+     *
+     * Each row is [taskId: Long, sumMinutes: Long]. Rows with null taskId
+     * (generic sessions) are excluded by the WHERE clause. Missing task ids
+     * (no sessions) are simply absent from the result — callers default to 0.
+     */
+    @Query("SELECT s.taskId, COALESCE(SUM(s.durationMinutes), 0) FROM StudySession s " +
+           "WHERE s.user = :user AND s.taskId IN :taskIds " +
+           "GROUP BY s.taskId")
+    List<Object[]> sumDurationGroupedByTaskIds(@Param("user") User user,
+                                               @Param("taskIds") java.util.Collection<Long> taskIds);
 }

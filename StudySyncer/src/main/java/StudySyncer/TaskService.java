@@ -1,19 +1,24 @@
 package StudySyncer;
 
 import StudySyncer.dto.TaskRequest;
+import StudySyncer.dto.TaskResponse;
 import StudySyncer.entity.Priority;
 import StudySyncer.entity.Task;
 import StudySyncer.entity.TaskStatus;
 import StudySyncer.entity.TaskType;
 import StudySyncer.entity.User;
+import StudySyncer.repository.StudySessionRepository;
 import StudySyncer.repository.TaskRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Task CRUD service. All reads and writes are scoped to a user — callers
@@ -26,10 +31,12 @@ import java.util.List;
 @Service
 public class TaskService {
 
-    private final TaskRepository taskRepo;
+    private final TaskRepository         taskRepo;
+    private final StudySessionRepository sessionRepo;
 
-    public TaskService(TaskRepository taskRepo) {
-        this.taskRepo = taskRepo;
+    public TaskService(TaskRepository taskRepo, StudySessionRepository sessionRepo) {
+        this.taskRepo    = taskRepo;
+        this.sessionRepo = sessionRepo;
     }
 
     // ── Read ──────────────────────────────────────────────────────────
@@ -175,6 +182,50 @@ public class TaskService {
         taskRepo.delete(t);
         // Soft reference: any StudySession rows with this taskId keep it.
         // Phase 3 renders those sessions with no task badge.
+    }
+
+    // ── Response mapping with logged-time aggregation ─────────────────
+
+    /**
+     * Maps a list of tasks to TaskResponses, batching the per-task seconds-logged
+     * aggregation into a single GROUP BY query (avoids N+1).
+     */
+    @Transactional(readOnly = true)
+    public List<TaskResponse> toResponses(User user, List<Task> tasksList, LocalDate today) {
+        if (tasksList == null || tasksList.isEmpty()) return Collections.emptyList();
+
+        Map<Long, Long> minutesByTask = sumMinutesForTasks(user, tasksList);
+
+        List<TaskResponse> out = new java.util.ArrayList<>(tasksList.size());
+        for (Task t : tasksList) {
+            long mins = minutesByTask.getOrDefault(t.getId(), 0L);
+            out.add(TaskResponse.from(t, today, mins * 60L));
+        }
+        return out;
+    }
+
+    /** Maps one task to a response with its own seconds-logged total. */
+    @Transactional(readOnly = true)
+    public TaskResponse toResponse(User user, Task task, LocalDate today) {
+        long mins = sessionRepo.sumDurationByUserAndTaskId(user, task.getId());
+        return TaskResponse.from(task, today, mins * 60L);
+    }
+
+    /**
+     * Executes the batch aggregation and converts the raw Object[] rows into
+     * a taskId → total-minutes map. Extracted so both the list response mapper
+     * and any future batch callers share one query.
+     */
+    private Map<Long, Long> sumMinutesForTasks(User user, List<Task> tasksList) {
+        List<Long> ids = tasksList.stream().map(Task::getId).toList();
+        List<Object[]> rows = sessionRepo.sumDurationGroupedByTaskIds(user, ids);
+        Map<Long, Long> out = new HashMap<>(rows.size() * 2);
+        for (Object[] row : rows) {
+            Long taskId = (Long) row[0];
+            long minutes = ((Number) row[1]).longValue();
+            out.put(taskId, minutes);
+        }
+        return out;
     }
 
     // ── Internals ─────────────────────────────────────────────────────
