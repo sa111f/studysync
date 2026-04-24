@@ -13,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
@@ -61,6 +62,12 @@ public class AiTaskParserService {
     private final RestTemplate    restTemplate;
     private final ObjectMapper    mapper;
 
+    /**
+     * Production constructor used by Spring. {@code @Autowired} is required
+     * because the test-only overload below makes this a multi-constructor
+     * class, which disables Spring 4.3+ single-ctor auto-detection.
+     */
+    @Autowired
     public AiTaskParserService(AnthropicConfig config) {
         this.config       = config;
         this.restTemplate = buildRestTemplate(config.getTimeoutSeconds());
