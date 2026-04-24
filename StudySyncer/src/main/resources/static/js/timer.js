@@ -112,8 +112,18 @@ function _updateSessionDots(state) {
 function _updateTabs(state) {
     ['pomodoro', 'shortbreak', 'longbreak'].forEach(p => {
         const tab = document.getElementById('tab-' + p);
-        if (tab) tab.classList.toggle('active', p === state.phase);
+        if (!tab) return;
+        const active = p === state.phase || (state.phase === 'countdown' && p === 'pomodoro');
+        tab.classList.toggle('active', active);
+        tab.setAttribute('aria-selected', String(active));
     });
+}
+
+// Off-screen live region announces phase + start/pause/stop — but NOT every tick.
+function _announceTimer(msg) {
+    const el = document.getElementById('timer-announcer');
+    if (!el) return;
+    el.textContent = msg;
 }
 
 function _updatePomodoroInfo(state) {
@@ -158,6 +168,23 @@ function _onCoreEvent(event, state) {
         _refreshDisplay(state, visState);
         _updateTabs(state);
         _updatePomodoroInfo(state);
+    }
+
+    // Screen-reader announcements. Tick events are intentionally omitted —
+    // they would spam a reader every 250 ms.
+    if (event === 'phase') {
+        if      (state.phase === 'pomodoro')   _announceTimer(`Pomodoro started — ${state.pomodoroMins} minutes`);
+        else if (state.phase === 'shortbreak') _announceTimer(`Short break started — ${state.shortBreakMins} minutes`);
+        else if (state.phase === 'longbreak')  _announceTimer(`Long break started — ${state.longBreakMins} minutes`);
+        else if (state.phase === 'countdown')  _announceTimer(`Countdown — ${Math.round(state.plannedSeconds / 60)} minutes`);
+    } else if (event === 'start' && !state.isPaused) {
+        _announceTimer('Timer started');
+    } else if (event === 'pause') {
+        _announceTimer('Timer paused');
+    } else if (event === 'milestone') {
+        _announceTimer(state.phase === 'shortbreak' || state.phase === 'longbreak'
+            ? 'Break complete'
+            : 'Pomodoro complete');
     }
 
     // --- Session logging on manual stop / skip ---
@@ -280,6 +307,11 @@ function htmlEsc(str) {
 }
 
 function clearResults() {
+    // Guard behind a native confirm — the button is destructive and the
+    // in-page session log can't be recovered once cleared.
+    if (sessions.length > 0 && !window.confirm("Delete all session history? This can't be undone.")) {
+        return;
+    }
     sessions = [];
     renderResults();
     if (typeof onSessionsCleared === 'function') onSessionsCleared();

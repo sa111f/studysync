@@ -60,11 +60,28 @@ function showLoggedIn(username) {
     document.getElementById('auth-guest').classList.add('hidden');
     document.getElementById('auth-user').classList.remove('hidden');
     document.getElementById('auth-username').textContent = `Hi, ${username}`;
+    // Hide the guest-only intro strip on the homepage
+    const intro = document.getElementById('intro-strip');
+    if (intro) intro.classList.add('hidden');
 }
 
 function showLoggedOut() {
     document.getElementById('auth-guest').classList.remove('hidden');
     document.getElementById('auth-user').classList.add('hidden');
+    // Re-show the intro strip for guests — unless they previously dismissed it
+    const intro = document.getElementById('intro-strip');
+    if (intro) {
+        let dismissed = false;
+        try { dismissed = localStorage.getItem('studysync_hide_intro') === '1'; } catch (_) {}
+        if (!dismissed) intro.classList.remove('hidden');
+    }
+}
+
+/** Persist dismissal across page loads for this browser. */
+function dismissIntroStrip() {
+    try { localStorage.setItem('studysync_hide_intro', '1'); } catch (_) {}
+    const el = document.getElementById('intro-strip');
+    if (el) el.classList.add('hidden');
 }
 
 // ── Modal open / close ─────────────────────────────────
@@ -372,9 +389,16 @@ async function loadSavedTimer() {
 }
 
 // ── Boot ───────────────────────────────────────────────
-// Guard against rare cases where the script executes before DOM is fully parsed
+// `window.authReady` resolves once /api/auth/me has completed and
+// `window.currentUser` is settled. Other bootstrap code (deadlines.js,
+// the inline Today's Goal block) awaits this instead of using setTimeout
+// hacks.
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initAuth);
+    window.authReady = new Promise(function (resolve) {
+        document.addEventListener('DOMContentLoaded', function () {
+            initAuth().then(resolve, resolve);
+        });
+    });
 } else {
-    initAuth();
+    window.authReady = initAuth();
 }

@@ -3,7 +3,25 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Focus Mode — StudySync</title>
+    <title>Focus Mode — StudySyncer</title>
+    <meta name="description" content="Distraction-free Pomodoro focus mode for deep study sessions. Run a full-screen timer with a visual battery drain so you can lock in and study." />
+    <link rel="canonical" href="https://www.studysyncer.com/focus" />
+
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <meta property="og:site_name" content="StudySyncer" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.studysyncer.com/focus" />
+    <meta property="og:title" content="Focus Mode — StudySyncer" />
+    <meta property="og:description" content="Distraction-free Pomodoro focus mode for deep study sessions." />
+    <meta property="og:image" content="https://www.studysyncer.com/og-image.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Focus Mode — StudySyncer" />
+    <meta name="twitter:description" content="Distraction-free Pomodoro focus mode for deep study sessions." />
+    <meta name="twitter:image" content="https://www.studysyncer.com/og-image.png" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
@@ -24,6 +42,10 @@
     <span class="focus-page-title">Focus Mode</span>
     <span class="focus-spacer" aria-hidden="true"></span>
 </div>
+
+<!-- Off-screen live region — announces phase transitions + start/stop.
+     Positioned outside the main focus area so fullscreen toggles don't hide it. -->
+<div class="sr-only" aria-live="polite" aria-atomic="true" id="timer-announcer"></div>
 
 <!-- ── Main focus area ──────────────────────────────────────────── -->
 <main class="focus-main">
@@ -145,6 +167,19 @@
     </p>
 
 </main>
+
+<footer class="site-footer">
+    <span>© 2026 StudySyncer</span>
+    <div class="site-footer-links">
+        <a href="/privacy">Privacy</a>
+        <span class="site-footer-sep">·</span>
+        <a href="/terms">Terms</a>
+        <span class="site-footer-sep">·</span>
+        <a href="/about">About</a>
+        <span class="site-footer-sep">·</span>
+        <a href="mailto:[CONTACT_EMAIL_TO_FILL]">Contact</a>
+    </div>
+</footer>
 
 <!-- timer-core.js MUST load before focus.js -->
 <script th:src="@{/js/timer-core.js}"></script>

@@ -21,12 +21,15 @@ let _activeFilter = 'all';
 // ── Boot ───────────────────────────────────────────────────────
 
 async function initDeadlines() {
-    try {
-        const res = await fetch('/api/auth/me');
-        _dlLoggedIn = res.ok;
-    } catch (_) {
-        _dlLoggedIn = false;
+    // Chain off auth.js — `window.authReady` resolves once /api/auth/me
+    // has been probed and `window.currentUser` is settled. We re-use that
+    // state instead of firing a second /api/auth/me round-trip.
+    // On /tracker the auth state is owned by tracker.js, which sets
+    // `window.currentUser` before calling initDeadlines.
+    if (window.authReady && typeof window.authReady.then === 'function') {
+        try { await window.authReady; } catch (_) {}
     }
+    _dlLoggedIn = !!window.currentUser;
     await loadDeadlines();
 }
 
@@ -308,7 +311,7 @@ function _renderDeadlineItem(d) {
                     <span class="dl-item-date">${_fmtDate(d.dueDate)}</span>
                 </div>
                 <div class="dl-item-actions">
-                    <span class="dl-state-badge dl-state-${isPast ? 'past' : 'still'}">${isPast ? 'Past' : 'Still'}</span>
+                    <span class="dl-state-badge dl-state-${isPast ? 'past' : 'still'}">${isPast ? 'Past' : 'Upcoming'}</span>
                     <button class="dl-action-btn dl-edit-btn" onclick="startEdit(${d.id})"
                             title="Edit" aria-label="Edit deadline">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"

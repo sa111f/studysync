@@ -3,7 +3,25 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Study Tracker — StudySync</title>
+    <title>Study Tracker — StudySyncer</title>
+    <meta name="description" content="Track your study sessions, daily streaks, and upcoming deadlines with StudySyncer's Study Tracker. See weekly focus charts and prioritise what to study next." />
+    <link rel="canonical" href="https://www.studysyncer.com/tracker" />
+
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <meta property="og:site_name" content="StudySyncer" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.studysyncer.com/tracker" />
+    <meta property="og:title" content="Study Tracker — StudySyncer" />
+    <meta property="og:description" content="Track your study sessions, streaks, and deadlines." />
+    <meta property="og:image" content="https://www.studysyncer.com/og-image.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Study Tracker — StudySyncer" />
+    <meta name="twitter:description" content="Track your study sessions, streaks, and deadlines." />
+    <meta name="twitter:image" content="https://www.studysyncer.com/og-image.png" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
@@ -14,11 +32,23 @@
 
 <header>
     <div class="nav-inner">
-        <a href="/" class="nav-logo-link"><span class="logo-study">Study</span><span class="logo-sync">Sync</span></a>
+        <a href="/" class="nav-logo-link"><span class="logo-study">Study</span><span class="logo-sync">Syncer</span></a>
         <nav class="nav-links">
             <span class="nav-page-label">Study Tracker</span>
         </nav>
-        <a href="/" class="apply-btn tracker-back-btn">&#8592; Back to App</a>
+        <div class="tracker-header-right">
+            <a href="/" class="apply-btn tracker-back-btn">&#8592; Back to App</a>
+            <div id="auth-bar" class="auth-bar">
+                <div id="auth-guest" class="auth-guest hidden">
+                    <a href="/" class="auth-link-btn">Log in</a>
+                    <a href="/" class="auth-link-btn accent">Sign up</a>
+                </div>
+                <div id="auth-user" class="auth-user hidden">
+                    <span id="auth-username" class="auth-username"></span>
+                    <button class="auth-link-btn" onclick="trackerLogout()">Log out</button>
+                </div>
+            </div>
+        </div>
     </div>
 </header>
 
@@ -104,26 +134,32 @@
 
         <!-- Focus chart card -->
         <div class="tracker-card">
-            <div class="tracker-card-header">
+            <div class="tracker-card-header chart-card-header">
                 <div class="tracker-card-header-left">
                     <div class="range-toggle">
                         <button class="range-btn"        data-range="today" onclick="setRange('today')">Today</button>
                         <button class="range-btn active" data-range="week"  onclick="setRange('week')">Week</button>
                         <button class="range-btn"        data-range="month" onclick="setRange('month')">Month</button>
-                        <!-- Year is locked — coming soon -->
-                        <span class="range-btn-year-wrap">
-                            <button class="range-btn" data-range="year" disabled>
+                        <!-- Year is locked — coming soon. The span wraps the disabled button
+                             so the tooltip is reachable by keyboard: the wrapper itself is
+                             focusable (tabindex=0) and its :focus-within reveals the tip. -->
+                        <span class="range-btn-year-wrap" tabindex="0" role="button"
+                              aria-disabled="true" aria-label="Year view — coming soon">
+                            <button class="range-btn" data-range="year" disabled tabindex="-1">
                                 Year <span class="year-lock-icon">&#128274;</span>
                             </button>
                             <span class="year-lock-tip">Coming soon</span>
                         </span>
                     </div>
                 </div>
+                <div class="tracker-card-header-center">
+                    <span class="period-total-label" id="period-total-label"></span>
+                </div>
                 <div class="tracker-card-header-right">
                     <div class="period-nav">
-                        <button class="period-nav-btn" onclick="navigatePeriod(-1)" title="Previous period">&#8249;</button>
+                        <button class="period-nav-btn" onclick="navigatePeriod(-1)" title="Previous period" aria-label="Previous period">&#8249;</button>
                         <span   class="period-label"   id="period-label">This Week</span>
-                        <button class="period-nav-btn" onclick="navigatePeriod(1)" id="btn-next-period" title="Next period">&#8250;</button>
+                        <button class="period-nav-btn" onclick="navigatePeriod(1)" id="btn-next-period" title="Next period" aria-label="Next period">&#8250;</button>
                     </div>
                 </div>
             </div>
@@ -142,10 +178,20 @@
                     <canvas id="focus-chart" height="220"></canvas>
                     <div id="chart-tooltip" class="chart-tooltip hidden"></div>
                 </div>
-                <div id="chart-empty" class="tracker-empty hidden">
-                    No study sessions recorded for this period.
+                <div id="chart-empty" class="tracker-empty-cta hidden">
+                    <div class="tracker-empty-cta-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                             stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8"  y1="2" x2="8"  y2="6"/>
+                            <line x1="3"  y1="10" x2="21" y2="10"/>
+                        </svg>
+                    </div>
+                    <p class="tracker-empty-cta-text">No study sessions recorded for this period.</p>
+                    <a href="/" class="apply-btn tracker-empty-cta-btn">Start your first Pomodoro →</a>
                 </div>
-                <button class="chart-edit-btn" onclick="showEditToast()">
+                <button class="chart-edit-btn" id="chart-edit-btn" onclick="showEditToast()">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -160,7 +206,19 @@
         <div class="tracker-card" id="material-card">
             <h3 class="tracker-section-title">Time by Material</h3>
             <div id="material-list">
-                <p class="tracker-empty">No data for this period.</p>
+                <div class="tracker-empty-cta">
+                    <div class="tracker-empty-cta-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                             stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8"  y1="2" x2="8"  y2="6"/>
+                            <line x1="3"  y1="10" x2="21" y2="10"/>
+                        </svg>
+                    </div>
+                    <p class="tracker-empty-cta-text">No study sessions recorded for this period.</p>
+                    <a href="/" class="apply-btn tracker-empty-cta-btn">Start your first Pomodoro →</a>
+                </div>
             </div>
         </div>
 
@@ -171,12 +229,30 @@
          ══════════════════════════════════════════════════ -->
     <div id="tab-detail" class="tracker-panel hidden">
         <div class="tracker-card">
-            <div class="tracker-card-header">
-                <h3 class="tracker-section-title" style="margin:0">Session Log</h3>
-                <div class="period-nav">
-                    <button class="period-nav-btn" onclick="navigatePeriod(-1)" title="Previous period">&#8249;</button>
-                    <span   class="period-label"   id="detail-period-label">This Week</span>
-                    <button class="period-nav-btn" onclick="navigatePeriod(1)" title="Next period">&#8250;</button>
+            <div class="tracker-card-header chart-card-header">
+                <div class="tracker-card-header-left">
+                    <div class="range-toggle">
+                        <button class="range-btn"        data-range="today" onclick="setRange('today')">Today</button>
+                        <button class="range-btn active" data-range="week"  onclick="setRange('week')">Week</button>
+                        <button class="range-btn"        data-range="month" onclick="setRange('month')">Month</button>
+                        <span class="range-btn-year-wrap" tabindex="0" role="button"
+                              aria-disabled="true" aria-label="Year view — coming soon">
+                            <button class="range-btn" data-range="year" disabled tabindex="-1">
+                                Year <span class="year-lock-icon">&#128274;</span>
+                            </button>
+                            <span class="year-lock-tip">Coming soon</span>
+                        </span>
+                    </div>
+                </div>
+                <div class="tracker-card-header-center">
+                    <span class="period-total-label" id="period-total-label-detail"></span>
+                </div>
+                <div class="tracker-card-header-right">
+                    <div class="period-nav">
+                        <button class="period-nav-btn" onclick="navigatePeriod(-1)" title="Previous period" aria-label="Previous period">&#8249;</button>
+                        <span   class="period-label"   id="detail-period-label">This Week</span>
+                        <button class="period-nav-btn" onclick="navigatePeriod(1)" title="Next period" aria-label="Next period">&#8250;</button>
+                    </div>
                 </div>
             </div>
 
@@ -190,13 +266,26 @@
             <!-- Session table (logged-in users) -->
             <div id="session-list-area">
 
-                <div class="session-search-wrap">
+                <div class="session-search-wrap" id="session-search-wrap">
                     <input type="search" id="session-search" class="session-search-input"
                            placeholder="Filter by material, mode, or date…"
-                           oninput="filterSessions()" />
+                           oninput="filterSessions()"
+                           aria-label="Filter sessions" />
                 </div>
 
-                <p id="sessions-empty" class="tracker-empty">No study sessions recorded yet.</p>
+                <div id="sessions-empty" class="tracker-empty-cta">
+                    <div class="tracker-empty-cta-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                             stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8"  y1="2" x2="8"  y2="6"/>
+                            <line x1="3"  y1="10" x2="21" y2="10"/>
+                        </svg>
+                    </div>
+                    <p class="tracker-empty-cta-text">No study sessions recorded yet.</p>
+                    <a href="/" class="apply-btn tracker-empty-cta-btn">Start your first Pomodoro →</a>
+                </div>
                 <div class="table-wrap">
                     <table id="sessions-table" class="results-table hidden">
                         <thead>
@@ -279,10 +368,12 @@
             </div><!-- /dl-form-panel -->
 
             <!-- ── Filter bar ── -->
+            <!-- data-filter value stays "still" for backwards compatibility with
+                 deadlines.js filter logic; only the visible label reads "Upcoming". -->
             <div class="dl-filter-bar">
                 <button class="dl-filter-btn active" data-filter="all"   onclick="setFilter('all')">All</button>
                 <button class="dl-filter-btn"        data-filter="past"  onclick="setFilter('past')">Past</button>
-                <button class="dl-filter-btn"        data-filter="still" onclick="setFilter('still')">Still</button>
+                <button class="dl-filter-btn"        data-filter="still" onclick="setFilter('still')">Upcoming</button>
             </div>
 
             <!-- ── Deadline list ── -->
@@ -324,6 +415,7 @@
                     <span class="lb-name" style="color:var(--accent)">Your rank</span>
                     <span class="lb-streak" id="lb-your-streak">🔥 —</span>
                     <span class="lb-hours" id="lb-your-hours">—</span>
+                    <span class="lb-you-empty-msg hidden" id="lb-you-empty-msg">Start a session to enter the ranking</span>
                 </div>
                 <div class="lb-row">
                     <span class="lb-rank bronze">3</span>
@@ -347,6 +439,19 @@
 
 </main>
 
+
+<footer class="site-footer">
+    <span>© 2026 StudySyncer</span>
+    <div class="site-footer-links">
+        <a href="/privacy">Privacy</a>
+        <span class="site-footer-sep">·</span>
+        <a href="/terms">Terms</a>
+        <span class="site-footer-sep">·</span>
+        <a href="/about">About</a>
+        <span class="site-footer-sep">·</span>
+        <a href="mailto:[CONTACT_EMAIL_TO_FILL]">Contact</a>
+    </div>
+</footer>
 
 <script th:src="@{/js/tracker.js}"></script>
 <script th:src="@{/js/deadlines.js}"></script>

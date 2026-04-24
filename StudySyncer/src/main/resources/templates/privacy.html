@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy Policy — StudySyncer</title>
+    <meta name="description" content="StudySyncer privacy policy — what data is collected, how it's used, and how you can delete your account." />
+    <link rel="canonical" href="https://www.studysyncer.com/privacy" />
+
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <meta property="og:site_name" content="StudySyncer" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.studysyncer.com/privacy" />
+    <meta property="og:title" content="Privacy Policy — StudySyncer" />
+    <meta property="og:description" content="StudySyncer privacy policy." />
+    <meta property="og:image" content="https://www.studysyncer.com/og-image.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Privacy Policy — StudySyncer" />
+    <meta name="twitter:description" content="StudySyncer privacy policy." />
+    <meta name="twitter:image" content="https://www.studysyncer.com/og-image.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" th:href="@{/css/style.css}" />
+    <link rel="stylesheet" th:href="@{/css/ds.css}" />
+</head>
+<body>
+
+<header>
+    <div class="nav-inner">
+        <a href="/" class="nav-logo-link"><span class="logo-study">Study</span><span class="logo-sync">Syncer</span></a>
+        <nav class="nav-links">
+            <span class="nav-page-label">Privacy Policy</span>
+        </nav>
+        <a href="/" class="apply-btn tracker-back-btn">&#8592; Back to App</a>
+    </div>
+</header>
+
+<main class="tracker-main">
+    <div class="tracker-card legal-prose">
+        <h1>Privacy Policy</h1>
+        <p class="legal-updated">Last updated: April 24, 2026</p>
+
+        <p>This policy describes what information StudySyncer collects about you, why it collects it, and what rights you have over it. If anything below is unclear, contact us at <span class="legal-placeholder">[CONTACT_EMAIL_TO_FILL]</span>.</p>
+
+        <h2>1. Information we collect</h2>
+        <p>When you create an account and use StudySyncer, we may store:</p>
+        <ul>
+            <li><strong>Account details</strong> — username and email address (used to sign you in and to send transactional email).</li>
+            <li><strong>Study activity</strong> — completed Pomodoro sessions, goal minutes, deadlines you create, and the materials you name.</li>
+            <li><strong>Accountability settings</strong> — an optional second email address to receive your goal-related reminders.</li>
+            <li><strong>Browser timezone</strong> — used to compute your local "day" boundary for daily goals and reminders.</li>
+            <li><strong>Session cookies</strong> — a single session cookie is used to keep you logged in.</li>
+        </ul>
+
+        <h2>2. Google sign-in (OAuth)</h2>
+        <p>If you choose "Continue with Google", we receive your email address and name from Google so we can create or match an existing StudySyncer account. We do not receive your Google password, contacts, calendar, or any other data beyond basic profile info. You can revoke StudySyncer's access at any time from your Google Account settings.</p>
+
+        <h2>3. How we use your email</h2>
+        <p>We send email only for <strong>accountability</strong> — a confirmation when you hit your daily study goal and a reminder if you miss it by midnight in your local time. We do not send marketing emails. You can turn off accountability email at any time in the dashboard.</p>
+
+        <h2>4. Cookies and local storage</h2>
+        <p>We use a single session cookie (<code>JSESSIONID</code>) to keep you logged in. For guest users, we use <code>localStorage</code> to remember your current daily goal and saved deadlines on this device only — these never leave your browser.</p>
+
+        <h2>5. Data retention and deletion</h2>
+        <p>Your data is retained for as long as your account exists. You can delete your account and associated study data at any time by emailing <span class="legal-placeholder">[CONTACT_EMAIL_TO_FILL]</span>. We will remove your records within 30 days of the request.</p>
+
+        <h2>6. Sharing</h2>
+        <p>We do not sell your personal information. We rely on a small number of third-party services to run StudySyncer (hosting, transactional email, OAuth). These providers only receive the data they need to do their job.</p>
+
+        <h2>7. Security</h2>
+        <p>Passwords are stored hashed with bcrypt. Traffic to and from StudySyncer is encrypted in transit (HTTPS). No system is perfect, so keep your password safe and use a unique one.</p>
+
+        <h2>8. Changes</h2>
+        <p>If we update this policy, we'll update the "Last updated" date above. Material changes will be highlighted in-app.</p>
+
+        <h2>9. Contact</h2>
+        <p>Questions about privacy? Email <span class="legal-placeholder">[CONTACT_EMAIL_TO_FILL]</span>.</p>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <span>© 2026 StudySyncer</span>
+    <div class="site-footer-links">
+        <a href="/privacy">Privacy</a>
+        <span class="site-footer-sep">·</span>
+        <a href="/terms">Terms</a>
+        <span class="site-footer-sep">·</span>
+        <a href="/about">About</a>
+        <span class="site-footer-sep">·</span>
+        <a href="mailto:[CONTACT_EMAIL_TO_FILL]">Contact</a>
+    </div>
+</footer>
+
+</body>
+</html>

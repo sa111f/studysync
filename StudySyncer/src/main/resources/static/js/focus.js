@@ -385,6 +385,13 @@ function _updateStopBtn(state) {
     stopBtn.classList.toggle('hidden', !hasActive);
 }
 
+// Screen-reader announcements. Only fires on phase transitions and start/pause.
+function _announceTimer(msg) {
+    const el = document.getElementById('timer-announcer');
+    if (!el) return;
+    el.textContent = msg;
+}
+
 // ── TimerCore event subscriber ───────────────────────────────
 function _onCoreEvent(event, state) {
     let visState;
@@ -399,6 +406,21 @@ function _onCoreEvent(event, state) {
         _updateSessionLabel(state);
         _updateStopBtn(state);
         if (_toggleBtn) _toggleBtn.textContent = state.isRunning ? 'Pause' : 'Start';
+    }
+
+    if (event === 'phase') {
+        if      (state.phase === 'pomodoro')   _announceTimer(`Pomodoro started — ${state.pomodoroMins} minutes`);
+        else if (state.phase === 'shortbreak') _announceTimer(`Short break started — ${state.shortBreakMins} minutes`);
+        else if (state.phase === 'longbreak')  _announceTimer(`Long break started — ${state.longBreakMins} minutes`);
+        else if (state.phase === 'countdown')  _announceTimer(`Countdown — ${Math.round(state.plannedSeconds / 60)} minutes`);
+    } else if (event === 'start' && !state.isPaused) {
+        _announceTimer('Timer started');
+    } else if (event === 'pause') {
+        _announceTimer('Timer paused');
+    } else if (event === 'milestone') {
+        _announceTimer(state.phase === 'shortbreak' || state.phase === 'longbreak'
+            ? 'Break complete'
+            : 'Pomodoro complete');
     }
 
     // Session logging on manual stop / skip. Break phases MUST NOT POST
@@ -500,8 +522,13 @@ document.addEventListener('keydown', e => {
     const svg = document.getElementById('finjan-svg');
     if (svg) {
         svg.addEventListener('click', _toggleFullscreen);
+        // Keyboard parity with click: Enter and Space both toggle fullscreen.
+        // preventDefault on Space blocks the default scroll + timer-toggle behavior.
         svg.addEventListener('keydown', e => {
-            if (e.key === 'Enter') _toggleFullscreen();
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault();
+                _toggleFullscreen();
+            }
         });
     }
 

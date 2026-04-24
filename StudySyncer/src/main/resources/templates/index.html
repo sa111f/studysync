@@ -3,7 +3,46 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>StudySync</title>
+    <title>StudySyncer — Pomodoro Timer with Accountability Emails &amp; AI Study Planner</title>
+    <meta name="description" content="StudySyncer is a free Pomodoro timer with accountability emails and an AI-powered study planner. Set daily goals, track focus sessions, and never miss a deadline." />
+    <link rel="canonical" href="https://www.studysyncer.com/" />
+
+    <!-- Favicons -->
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Open Graph -->
+    <meta property="og:site_name" content="StudySyncer" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.studysyncer.com/" />
+    <meta property="og:title" content="StudySyncer — Pomodoro Timer with Accountability Emails &amp; AI Study Planner" />
+    <meta property="og:description" content="Free Pomodoro timer with accountability emails and AI-powered study planner. Stay focused. Study smarter." />
+    <meta property="og:image" content="https://www.studysyncer.com/og-image.png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="StudySyncer — Pomodoro Timer with Accountability Emails &amp; AI Study Planner" />
+    <meta name="twitter:description" content="Free Pomodoro timer with accountability emails and AI-powered study planner. Stay focused. Study smarter." />
+    <meta name="twitter:image" content="https://www.studysyncer.com/og-image.png" />
+
+    <!-- JSON-LD structured data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "StudySyncer",
+      "description": "Pomodoro timer with accountability emails and an AI-powered study planner. Set daily study goals, track focus sessions, and manage deadlines.",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Web",
+      "url": "https://www.studysyncer.com/",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
@@ -14,7 +53,7 @@
 
 <header>
     <div class="nav-inner">
-        <a href="/" class="nav-logo-link"><span class="logo-study">Study</span><span class="logo-sync">Sync</span></a>
+        <a href="/" class="nav-logo-link"><span class="logo-study">Study</span><span class="logo-sync">Syncer</span></a>
 
         <nav class="nav-links">
             <a href="/focus"   class="header-nav-link">Focus Mode</a>
@@ -26,7 +65,8 @@
              if the session check succeeds, avoiding a flash of empty nav. -->
         <div id="auth-bar" class="auth-bar">
             <div id="auth-guest" class="auth-guest">
-                <button class="auth-link-btn shine-btn" onclick="openModal('login')">Log in</button>
+                <button class="auth-link-btn" onclick="openModal('login')">Log in</button>
+                <button class="auth-link-btn accent shine-btn" onclick="openModal('register')">Sign up</button>
             </div>
             <div id="auth-user" class="auth-user hidden">
                 <span id="auth-username" class="auth-username"></span>
@@ -35,8 +75,6 @@
         </div>
     </div>
 </header>
-
-<div class="hero-tagline">Stay focused. Study smarter.</div>
 
 <!-- Post-auth notification banner (email verified, OAuth errors, etc.) -->
 <div id="auth-banner" class="auth-banner hidden">
@@ -49,7 +87,7 @@
      ══════════════════════════════════════════════════════════ -->
 <div id="auth-modal" class="auth-modal hidden">
     <div class="auth-modal-box" id="auth-modal-box">
-        <div class="auth-modal-logo"><span class="logo-study">Study</span><span class="logo-sync">Sync</span></div>
+        <div class="auth-modal-logo"><span class="logo-study">Study</span><span class="logo-sync">Syncer</span></div>
         <p class="auth-tagline">Stay focused. Study smarter.</p>
         <h3 id="auth-modal-title">Log in</h3>
 
@@ -184,6 +222,27 @@
 
 <main>
 
+<!-- Guest-only intro strip — explains what StudySyncer is.
+     Hidden when logged in (auth.js) or permanently dismissed (localStorage). -->
+<aside id="intro-strip" class="intro-strip hidden" aria-labelledby="intro-strip-title">
+    <div class="intro-strip-header">
+        <h1 id="intro-strip-title" class="intro-strip-title">What is StudySyncer?</h1>
+        <button type="button" class="intro-strip-dismiss"
+                onclick="dismissIntroStrip()"
+                aria-label="Dismiss intro">&#10005;&nbsp;Dismiss</button>
+    </div>
+    <p class="intro-strip-tag">Stay focused. Study smarter.</p>
+    <ul class="intro-strip-list">
+        <li>⏱ Pomodoro timer that actually holds you accountable</li>
+        <li>📩 Get a reminder email if you miss your daily study goal</li>
+        <li>🤖 Paste your notes or a PDF — AI tells you how long to study</li>
+    </ul>
+    <div class="intro-strip-cta-row">
+        <button type="button" class="auth-link-btn accent intro-strip-cta shine-btn"
+                onclick="openModal('register')">Sign up free</button>
+    </div>
+</aside>
+
 <div class="top-panel">
 
     <!-- ── Timer + Today's Goal column ── -->
@@ -192,11 +251,15 @@
     <!-- ── Timer hero ── -->
     <section class="timer-card">
 
+        <!-- Off-screen live region — announces phase transitions + start/stop
+             events. Every-second countdown ticks are NOT announced. -->
+        <div class="sr-only" aria-live="polite" aria-atomic="true" id="timer-announcer"></div>
+
         <!-- Phase tabs -->
-        <div class="timer-phase-tabs">
-            <button class="phase-tab active" id="tab-pomodoro"   onclick="setTimerPhase('pomodoro')">Pomodoro</button>
-            <button class="phase-tab"        id="tab-shortbreak" onclick="setTimerPhase('shortbreak')">Short Break</button>
-            <button class="phase-tab"        id="tab-longbreak"  onclick="setTimerPhase('longbreak')">Long Break</button>
+        <div class="timer-phase-tabs" role="tablist" aria-label="Timer phase">
+            <button class="phase-tab active" id="tab-pomodoro"   role="tab" aria-selected="true"  onclick="setTimerPhase('pomodoro')">Pomodoro</button>
+            <button class="phase-tab"        id="tab-shortbreak" role="tab" aria-selected="false" onclick="setTimerPhase('shortbreak')">Short Break</button>
+            <button class="phase-tab"        id="tab-longbreak"  role="tab" aria-selected="false" onclick="setTimerPhase('longbreak')">Long Break</button>
         </div>
 
         <!-- Circular progress ring — timer display sits exactly in center -->
@@ -460,18 +523,32 @@
     </section>
 </main>
 
+<footer class="site-footer">
+    <span>© 2026 StudySyncer</span>
+    <div class="site-footer-links">
+        <a href="/privacy">Privacy</a>
+        <span class="site-footer-sep">·</span>
+        <a href="/terms">Terms</a>
+        <span class="site-footer-sep">·</span>
+        <a href="/about">About</a>
+        <span class="site-footer-sep">·</span>
+        <a href="mailto:[CONTACT_EMAIL_TO_FILL]">Contact</a>
+    </div>
+</footer>
+
 <script th:src="@{/js/subjects.js}"></script>
 <script th:src="@{/js/timer-core.js}"></script>
 <script th:src="@{/js/timer.js}"></script>
 <script th:src="@{/js/auth.js}"></script>
 <script th:src="@{/js/deadlines.js}"></script>
 <script>
-    // Boot the priority widget after auth is resolved
-    // auth.js calls initAuth() which sets up the session; we run deadlines after.
-    document.addEventListener('DOMContentLoaded', function() {
-        // Small delay so auth.js has time to resolve the session
-        setTimeout(initDeadlines, 400);
-    });
+    // Boot the priority widget after auth.js has resolved the session.
+    // `window.authReady` is a Promise set by auth.js; awaiting it removes the
+    // previous 400 ms setTimeout race with /api/auth/me.
+    (async function () {
+        try { await window.authReady; } catch (_) {}
+        if (typeof initDeadlines === 'function') initDeadlines();
+    })();
 </script>
 <script>
 /* ── Drag-and-drop PDF handler ── */
@@ -521,11 +598,13 @@ function handlePdfDrop(e) {
     //   - Including in POST /api/daily-goal body
     //   - Including in POST /api/auth/accountability-email body
     // This is the canonical IANA timezone string, e.g. "America/Toronto".
+    // Fallback is "UTC" — using a Canadian timezone when Intl fails would
+    // silently misreport every non-Canadian user's day boundary.
     const USER_TIMEZONE = (function () {
         try {
-            return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Toronto';
+            return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
         } catch (_) {
-            return 'America/Toronto';
+            return 'UTC';
         }
     })();
 
@@ -903,15 +982,16 @@ function handlePdfDrop(e) {
     window.fetchTodayGoal = fetchTodayGoal;
 
     // ════════════════════════════════════════════════════
-    // Init — fallback: fire after 800 ms in case auth
-    // resolves before this listener runs (rare).
-    // The definitive call comes from auth.js after /api/auth/me
-    // completes, so there is no race condition.
+    // Init — chain off window.authReady so there is no race.
+    // auth.js's initAuth() calls fetchTodayGoal() itself on the
+    // logged-in branch; this block covers the guest branch
+    // (otherwise the localStorage goal would never render).
     // ════════════════════════════════════════════════════
 
-    document.addEventListener('DOMContentLoaded', function () {
-        setTimeout(fetchTodayGoal, 800);
-    });
+    (async function () {
+        try { await window.authReady; } catch (_) {}
+        if (!window.currentUser) fetchTodayGoal();
+    })();
 })();
 </script>
 </body>

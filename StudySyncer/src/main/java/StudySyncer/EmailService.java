@@ -80,7 +80,7 @@ public class EmailService {
             CreateEmailOptions email = CreateEmailOptions.builder()
                     .from(fromEmail)
                     .to(List.of(recipient))
-                    .subject("StudySync: Daily goal reached")
+                    .subject("StudySyncer: Daily goal reached")
                     .html(buildGoalReachedHtml(userName, goalMinutes, completedMinutes, date))
                     .build();
 
@@ -129,7 +129,7 @@ public class EmailService {
             CreateEmailOptions email = CreateEmailOptions.builder()
                     .from(fromEmail)
                     .to(List.of(recipient))
-                    .subject("StudySync: Daily goal missed")
+                    .subject("StudySyncer: Daily goal missed")
                     .html(buildMissedGoalHtml(userName, goalMinutes, completedMinutes, date))
                     .build();
 
