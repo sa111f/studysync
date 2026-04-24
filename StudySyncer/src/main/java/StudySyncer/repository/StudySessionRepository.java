@@ -27,4 +27,15 @@ public interface StudySessionRepository extends JpaRepository<StudySession, Long
     @Query("SELECT COALESCE(SUM(s.durationMinutes), 0) FROM StudySession s " +
            "WHERE s.user = :user AND s.studyDate = :date")
     long sumDurationByUserAndDate(@Param("user") User user, @Param("date") LocalDate date);
+
+    /** All sessions logged against a given task for a user, newest first. */
+    List<StudySession> findByUserAndTaskIdOrderByCompletedAtDesc(User user, Long taskId);
+
+    /**
+     * Total minutes this user has logged against a specific task (soft-referenced).
+     * Returns 0 via COALESCE when the task has no sessions or no longer exists.
+     */
+    @Query("SELECT COALESCE(SUM(s.durationMinutes), 0) FROM StudySession s " +
+           "WHERE s.user = :user AND s.taskId = :taskId")
+    long sumDurationByUserAndTaskId(@Param("user") User user, @Param("taskId") Long taskId);
 }
