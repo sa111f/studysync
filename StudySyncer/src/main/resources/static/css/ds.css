@@ -3294,7 +3294,7 @@ body.ai-body-locked {
 }
 
 /* ── Loading state ───────────────────────────────────────────── */
-#ai-state-loading {
+#ai-state-loading:not(.hidden) {
     display: flex;
     flex-direction: column;
     align-items: center;
