@@ -1,11 +1,12 @@
 package StudySyncer;
 
-import StudySyncer.config.AnthropicConfig;
+import StudySyncer.config.OpenAIConfig;
 import StudySyncer.dto.ParsedSyllabusResult;
 import StudySyncer.dto.SyllabusItem;
 import StudySyncer.entity.TaskType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
@@ -18,21 +19,23 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 /**
  * Tests for the batch syllabus parser. Uses MockRestServiceServer so no
- * real Anthropic calls fire.
+ * real OpenAI calls fire.
  */
 class AiSyllabusParserServiceTest {
 
-    private AnthropicConfig         config;
-    private RestTemplate            restTemplate;
-    private MockRestServiceServer   server;
+    private static final String OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+
+    private OpenAIConfig          config;
+    private RestTemplate          restTemplate;
+    private MockRestServiceServer server;
     private AiSyllabusParserService service;
 
     @BeforeEach
     void setUp() {
-        config = new AnthropicConfig();
+        config = new OpenAIConfig();
         config.setKey("test-key");
-        config.setUrl("https://api.anthropic.com/v1/messages");
-        config.setModel("claude-haiku-4-5-20251001");
+        config.setUrl(OPENAI_URL);
+        config.setModel("gpt-4o-mini");
         config.setTimeoutSeconds(15);
 
         restTemplate = new RestTemplate();
@@ -40,33 +43,21 @@ class AiSyllabusParserServiceTest {
         service      = new AiSyllabusParserService(config, restTemplate);
     }
 
-    // ── Happy path: mixed task + exam items ───────────────────
+    // ── Happy path: mixed task + exam items ───────────────────────
 
     @Test
-    void parseSyllabus_validToolUse_mapsBothKinds() {
+    void parseSyllabus_validResponse_mapsBothKinds() {
         String response = """
                 {
-                  "content": [{
-                    "type": "tool_use",
-                    "name": "extract_syllabus_items",
-                    "input": {
-                      "courseCode": "EECS 281",
-                      "items": [
-                        {"kind": "task", "title": "Homework 1",
-                         "dueDate": "2026-05-12", "taskType": "HOMEWORK",
-                         "course": "EECS 281"},
-                        {"kind": "exam", "title": "Midterm 1",
-                         "dateTime": "2026-06-15T09:00:00-04:00",
-                         "material": "Chapters 1-5", "course": "EECS 281"},
-                        {"kind": "task", "title": "Project 2",
-                         "dueDate": "2026-07-01", "taskType": "PROJECT"}
-                      ]
+                  "choices": [{
+                    "message": {
+                      "content": "{\\"courseCode\\":\\"EECS 281\\",\\"items\\":[{\\"kind\\":\\"task\\",\\"title\\":\\"Homework 1\\",\\"dueDate\\":\\"2026-05-12\\",\\"taskType\\":\\"HOMEWORK\\",\\"course\\":\\"EECS 281\\"},{\\"kind\\":\\"exam\\",\\"title\\":\\"Midterm 1\\",\\"dateTime\\":\\"2026-06-15T09:00:00-04:00\\",\\"material\\":\\"Chapters 1-5\\",\\"course\\":\\"EECS 281\\"},{\\"kind\\":\\"task\\",\\"title\\":\\"Project 2\\",\\"dueDate\\":\\"2026-07-01\\",\\"taskType\\":\\"PROJECT\\"}]}"
                     }
                   }]
                 }
                 """;
-        server.expect(requestTo(config.getUrl()))
-              .andExpect(header("x-api-key", "test-key"))
+        server.expect(requestTo(OPENAI_URL))
+              .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-key"))
               .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
 
         ParsedSyllabusResult r = service.parseSyllabus(
@@ -93,20 +84,20 @@ class AiSyllabusParserServiceTest {
         assertThat(r.getItems().get(2).getCourse()).isEqualTo("EECS 281");
     }
 
-    // ── Empty items array is a successful (no-op) result ─────
+    // ── Empty items array is a successful (no-op) result ──────────
 
     @Test
     void parseSyllabus_emptyItemsArray_returnsSuccessWithEmptyList() {
         String response = """
                 {
-                  "content": [{
-                    "type": "tool_use",
-                    "name": "extract_syllabus_items",
-                    "input": { "courseCode": null, "items": [] }
+                  "choices": [{
+                    "message": {
+                      "content": "{\\"courseCode\\":null,\\"items\\":[]}"
+                    }
                   }]
                 }
                 """;
-        server.expect(requestTo(config.getUrl()))
+        server.expect(requestTo(OPENAI_URL))
               .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
 
         ParsedSyllabusResult r = service.parseSyllabus("Course description only", ZoneId.of("UTC"));
@@ -115,25 +106,23 @@ class AiSyllabusParserServiceTest {
         assertThat(r.getCourseCode()).isNull();
     }
 
-    // ── Truncation flag surfaces when input > 40k chars ───────
+    // ── Truncation flag surfaces when input > 40k chars ───────────
 
     @Test
     void parseSyllabus_over40kChars_truncatesAndFlagsResult() {
-        // Build ~42k-char input. Mock server echoes back an empty items list
-        // so we can inspect the `truncated` flag without asserting on items.
         String big = "Lorem ipsum dolor sit amet. ".repeat(1500);
         assertThat(big.length()).isGreaterThan(AiSyllabusParserService.MAX_INPUT_CHARS);
 
         String response = """
                 {
-                  "content": [{
-                    "type": "tool_use",
-                    "name": "extract_syllabus_items",
-                    "input": { "items": [] }
+                  "choices": [{
+                    "message": {
+                      "content": "{\\"items\\":[]}"
+                    }
                   }]
                 }
                 """;
-        server.expect(requestTo(config.getUrl()))
+        server.expect(requestTo(OPENAI_URL))
               .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
 
         ParsedSyllabusResult r = service.parseSyllabus(big, ZoneId.of("UTC"));
@@ -141,7 +130,7 @@ class AiSyllabusParserServiceTest {
         assertThat(r.isTruncated()).isTrue();
     }
 
-    // ── Empty input bypasses the HTTP call ────────────────────
+    // ── Empty input bypasses the HTTP call ────────────────────────
 
     @Test
     void parseSyllabus_emptyInput_returnsInvalidInput() {
@@ -151,14 +140,14 @@ class AiSyllabusParserServiceTest {
                 ParsedSyllabusResult.FailureReason.INVALID_INPUT);
     }
 
-    // ── Blank API key → AI_UNAVAILABLE ────────────────────────
+    // ── Blank API key → AI_UNAVAILABLE ────────────────────────────
 
     @Test
     void parseSyllabus_blankApiKey_returnsAiUnavailable() {
-        AnthropicConfig empty = new AnthropicConfig();
+        OpenAIConfig empty = new OpenAIConfig();
         empty.setKey("");
-        empty.setUrl(config.getUrl());
-        empty.setModel(config.getModel());
+        empty.setUrl(OPENAI_URL);
+        empty.setModel("gpt-4o-mini");
         empty.setTimeoutSeconds(15);
         AiSyllabusParserService s = new AiSyllabusParserService(empty, new RestTemplate());
 
@@ -168,14 +157,18 @@ class AiSyllabusParserServiceTest {
                 ParsedSyllabusResult.FailureReason.AI_UNAVAILABLE);
     }
 
-    // ── Missing tool_use block → AI_AMBIGUOUS ─────────────────
+    // ── Non-JSON content → AI_AMBIGUOUS ───────────────────────────
 
     @Test
-    void parseSyllabus_onlyTextBlock_returnsAmbiguous() {
+    void parseSyllabus_contentNotJson_returnsAmbiguous() {
         String response = """
-                { "content": [ {"type": "text", "text": "Sorry."} ] }
+                {
+                  "choices": [{
+                    "message": { "content": "Sorry, I cannot help with that." }
+                  }]
+                }
                 """;
-        server.expect(requestTo(config.getUrl()))
+        server.expect(requestTo(OPENAI_URL))
               .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
 
         ParsedSyllabusResult r = service.parseSyllabus("Hello", ZoneId.of("UTC"));
@@ -184,29 +177,20 @@ class AiSyllabusParserServiceTest {
                 ParsedSyllabusResult.FailureReason.AI_AMBIGUOUS);
     }
 
-    // ── Malformed item in the list is skipped, rest succeed ──
+    // ── Malformed item in the list is skipped, rest succeed ───────
 
     @Test
     void parseSyllabus_oneBadItem_skippedButOthersKept() {
         String response = """
                 {
-                  "content": [{
-                    "type": "tool_use",
-                    "name": "extract_syllabus_items",
-                    "input": {
-                      "items": [
-                        {"kind": "task", "title": "Valid task",
-                         "dueDate": "2026-05-12", "taskType": "HOMEWORK"},
-                        {"kind": "task", "title": "Bad date task",
-                         "dueDate": "soon-ish", "taskType": "HOMEWORK"},
-                        {"kind": "exam", "title": "Valid exam",
-                         "dateTime": "2026-06-15T09:00:00-04:00"}
-                      ]
+                  "choices": [{
+                    "message": {
+                      "content": "{\\"items\\":[{\\"kind\\":\\"task\\",\\"title\\":\\"Valid task\\",\\"dueDate\\":\\"2026-05-12\\",\\"taskType\\":\\"HOMEWORK\\"},{\\"kind\\":\\"task\\",\\"title\\":\\"Bad date task\\",\\"dueDate\\":\\"soon-ish\\",\\"taskType\\":\\"HOMEWORK\\"},{\\"kind\\":\\"exam\\",\\"title\\":\\"Valid exam\\",\\"dateTime\\":\\"2026-06-15T09:00:00-04:00\\"}]}"
                     }
                   }]
                 }
                 """;
-        server.expect(requestTo(config.getUrl()))
+        server.expect(requestTo(OPENAI_URL))
               .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
 
         ParsedSyllabusResult r = service.parseSyllabus("Syllabus", ZoneId.of("UTC"));

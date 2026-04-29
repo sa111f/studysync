@@ -1,9 +1,10 @@
 package StudySyncer;
 
-import StudySyncer.config.AnthropicConfig;
+import StudySyncer.config.OpenAIConfig;
 import StudySyncer.dto.ParsedExamResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
@@ -25,17 +26,19 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
  */
 class AiExamParserServiceTest {
 
-    private AnthropicConfig       config;
+    private static final String OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+
+    private OpenAIConfig          config;
     private RestTemplate          restTemplate;
     private MockRestServiceServer server;
     private AiExamParserService   service;
 
     @BeforeEach
     void setUp() {
-        config = new AnthropicConfig();
+        config = new OpenAIConfig();
         config.setKey("test-key");
-        config.setUrl("https://api.anthropic.com/v1/messages");
-        config.setModel("claude-haiku-4-5-20251001");
+        config.setUrl(OPENAI_URL);
+        config.setModel("gpt-4o-mini");
         config.setTimeoutSeconds(15);
 
         restTemplate = new RestTemplate();
@@ -43,27 +46,21 @@ class AiExamParserServiceTest {
         service      = new AiExamParserService(config, restTemplate);
     }
 
-    // ── Happy path: tool_use with ISO offset datetime ─────────────
+    // ── Happy path: ISO offset datetime ──────────────────────────
 
     @Test
-    void parseExam_validToolUse_mapsAllFields() {
+    void parseExam_validResponse_mapsAllFields() {
         String response = """
                 {
-                  "content": [{
-                    "type": "tool_use",
-                    "name": "create_exam",
-                    "input": {
-                      "title": "Chem Final",
-                      "dateTime": "2026-04-30T14:00:00-04:00",
-                      "course": "CHEM 101",
-                      "material": "Chapters 1-6",
-                      "location": "Dennis 109"
+                  "choices": [{
+                    "message": {
+                      "content": "{\\"title\\":\\"Chem Final\\",\\"dateTime\\":\\"2026-04-30T14:00:00-04:00\\",\\"course\\":\\"CHEM 101\\",\\"material\\":\\"Chapters 1-6\\",\\"location\\":\\"Dennis 109\\"}"
                     }
                   }]
                 }
                 """;
-        server.expect(requestTo(config.getUrl()))
-              .andExpect(header("x-api-key", "test-key"))
+        server.expect(requestTo(OPENAI_URL))
+              .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-key"))
               .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
 
         ParsedExamResult r = service.parseExam(
@@ -88,14 +85,14 @@ class AiExamParserServiceTest {
     void parseExam_unparseableDateTime_returnsAmbiguous() {
         String response = """
                 {
-                  "content": [{
-                    "type": "tool_use",
-                    "name": "create_exam",
-                    "input": { "title": "Midterm", "dateTime": "soonish" }
+                  "choices": [{
+                    "message": {
+                      "content": "{\\"title\\":\\"Midterm\\",\\"dateTime\\":\\"soonish\\"}"
+                    }
                   }]
                 }
                 """;
-        server.expect(requestTo(config.getUrl()))
+        server.expect(requestTo(OPENAI_URL))
               .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
 
         ParsedExamResult r = service.parseExam("Midterm soonish", ZoneId.of("UTC"));
@@ -103,7 +100,7 @@ class AiExamParserServiceTest {
         assertThat(r.getFailureReason()).isEqualTo(ParsedExamResult.FailureReason.AI_AMBIGUOUS);
     }
 
-    // ── Empty input short-circuits ───────────────────────────────
+    // ── Empty input short-circuits ────────────────────────────────
 
     @Test
     void parseExam_emptyInput_returnsInvalidInput() {
@@ -112,14 +109,14 @@ class AiExamParserServiceTest {
         assertThat(r.getFailureReason()).isEqualTo(ParsedExamResult.FailureReason.INVALID_INPUT);
     }
 
-    // ── Blank API key → AI_UNAVAILABLE (no HTTP fired) ───────────
+    // ── Blank API key → AI_UNAVAILABLE (no HTTP fired) ────────────
 
     @Test
     void parseExam_blankApiKey_returnsAiUnavailable() {
-        AnthropicConfig blank = new AnthropicConfig();
+        OpenAIConfig blank = new OpenAIConfig();
         blank.setKey("");
-        blank.setUrl(config.getUrl());
-        blank.setModel(config.getModel());
+        blank.setUrl(OPENAI_URL);
+        blank.setModel("gpt-4o-mini");
         blank.setTimeoutSeconds(15);
         AiExamParserService s = new AiExamParserService(blank, new RestTemplate());
 
@@ -128,7 +125,7 @@ class AiExamParserServiceTest {
         assertThat(r.getFailureReason()).isEqualTo(ParsedExamResult.FailureReason.AI_UNAVAILABLE);
     }
 
-    // ── Past-date coercion with "next" ───────────────────────────
+    // ── Past-date coercion with "next" ────────────────────────────
 
     @Test
     void coerceToFutureIfNext_bumpsPastInstantForwardByWeeks() {
@@ -141,7 +138,6 @@ class AiExamParserServiceTest {
         Instant rolled = AiExamParserService.coerceToFutureIfNext(
                 past, "Chem exam next Friday", today, zone);
 
-        // Bumped by one week — exam date is now today at the same local time.
         assertThat(rolled).isEqualTo(
                 LocalDateTime.of(2026, 5, 15, 14, 0).atZone(zone).toInstant());
     }
@@ -166,6 +162,6 @@ class AiExamParserServiceTest {
         Instant r = AiExamParserService.coerceToFutureIfNext(
                 past, "Overdue since last Monday", today, zone);
 
-        assertThat(r).isEqualTo(past);   // input doesn't say "next" — don't touch
+        assertThat(r).isEqualTo(past);
     }
 }

@@ -1,6 +1,6 @@
 package StudySyncer;
 
-import StudySyncer.config.AnthropicConfig;
+import StudySyncer.config.OpenAIConfig;
 import StudySyncer.dto.ParsedTaskResult;
 import StudySyncer.entity.Priority;
 import StudySyncer.entity.TaskType;
@@ -23,7 +23,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
  * Unit tests for {@link AiTaskParserService}.
  *
  * Approach: construct the service with a RestTemplate bound to a
- * MockRestServiceServer so we can stub Anthropic responses without
+ * MockRestServiceServer so we can stub OpenAI responses without
  * opening real sockets. No @SpringBootTest needed — faster and isolated.
  *
  * Past-date coercion is also covered by a direct unit test of the
@@ -31,17 +31,19 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
  */
 class AiTaskParserServiceTest {
 
-    private AnthropicConfig       config;
+    private static final String OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+
+    private OpenAIConfig          config;
     private RestTemplate          restTemplate;
     private MockRestServiceServer server;
     private AiTaskParserService   service;
 
     @BeforeEach
     void setUp() {
-        config = new AnthropicConfig();
+        config = new OpenAIConfig();
         config.setKey("test-key");
-        config.setUrl("https://api.anthropic.com/v1/messages");
-        config.setModel("claude-haiku-4-5-20251001");
+        config.setUrl(OPENAI_URL);
+        config.setModel("gpt-4o-mini");
         config.setTimeoutSeconds(15);
 
         restTemplate = new RestTemplate();
@@ -77,10 +79,10 @@ class AiTaskParserServiceTest {
 
     @Test
     void parseTask_blankApiKey_returnsAiUnavailable() {
-        AnthropicConfig empty = new AnthropicConfig();
+        OpenAIConfig empty = new OpenAIConfig();
         empty.setKey("");
-        empty.setUrl(config.getUrl());
-        empty.setModel(config.getModel());
+        empty.setUrl(OPENAI_URL);
+        empty.setModel("gpt-4o-mini");
         empty.setTimeoutSeconds(15);
         AiTaskParserService s = new AiTaskParserService(empty, new RestTemplate());
 
@@ -92,32 +94,20 @@ class AiTaskParserServiceTest {
     // ── Happy path ────────────────────────────────────────────────
 
     @Test
-    void parseTask_withValidToolUse_returnsSuccessWithMappedFields() {
+    void parseTask_withValidResponse_returnsSuccessWithMappedFields() {
         String response = """
                 {
-                  "id": "msg_1",
-                  "role": "assistant",
-                  "content": [
-                    {
-                      "type": "tool_use",
-                      "id": "tool_1",
-                      "name": "create_task",
-                      "input": {
-                        "title": "Lab 3",
-                        "dueDate": "2026-05-04",
-                        "course": "EECS",
-                        "type": "LAB",
-                        "priority": "MEDIUM"
-                      }
+                  "choices": [{
+                    "message": {
+                      "content": "{\\"title\\":\\"Lab 3\\",\\"dueDate\\":\\"2026-05-04\\",\\"course\\":\\"EECS\\",\\"type\\":\\"LAB\\",\\"priority\\":\\"MEDIUM\\"}"
                     }
-                  ]
+                  }]
                 }
                 """;
 
-        server.expect(requestTo(config.getUrl()))
+        server.expect(requestTo(OPENAI_URL))
               .andExpect(method(HttpMethod.POST))
-              .andExpect(header("x-api-key", "test-key"))
-              .andExpect(header("anthropic-version", "2023-06-01"))
+              .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-key"))
               .andExpect(header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE))
               .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
 
@@ -130,20 +120,21 @@ class AiTaskParserServiceTest {
         assertThat(r.getCourse()).isEqualTo("EECS");
         assertThat(r.getType()).isEqualTo(TaskType.LAB);
         assertThat(r.getPriority()).isEqualTo(Priority.MEDIUM);
-        // "Monday, May 4, 2026" — exact locale output depends on JVM default,
-        // but the weekday + month words should always be present.
         assertThat(r.getResolvedDateHuman()).contains("Monday").contains("May").contains("2026");
     }
 
     // ── Unparseable response ──────────────────────────────────────
 
     @Test
-    void parseTask_missingToolUseBlock_returnsAiAmbiguous() {
+    void parseTask_contentNotJson_returnsAiAmbiguous() {
         String response = """
-                { "id": "msg_x", "role": "assistant",
-                  "content": [ {"type": "text", "text": "Sorry, I can't help."} ] }
+                {
+                  "choices": [{
+                    "message": { "content": "Sorry, I can't help with that." }
+                  }]
+                }
                 """;
-        server.expect(requestTo(config.getUrl()))
+        server.expect(requestTo(OPENAI_URL))
               .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
 
         ParsedTaskResult r = service.parseTask("Lab 3", ZoneId.of("UTC"));
@@ -152,22 +143,17 @@ class AiTaskParserServiceTest {
     }
 
     @Test
-    void parseTask_toolUseWithBadDate_returnsAiAmbiguous() {
+    void parseTask_contentJsonWithBadDate_returnsAiAmbiguous() {
         String response = """
                 {
-                  "content": [{
-                    "type": "tool_use",
-                    "name": "create_task",
-                    "input": {
-                      "title": "Lab",
-                      "dueDate": "not-a-date",
-                      "type": "LAB",
-                      "priority": "MEDIUM"
+                  "choices": [{
+                    "message": {
+                      "content": "{\\"title\\":\\"Lab\\",\\"dueDate\\":\\"not-a-date\\",\\"type\\":\\"LAB\\",\\"priority\\":\\"MEDIUM\\"}"
                     }
                   }]
                 }
                 """;
-        server.expect(requestTo(config.getUrl()))
+        server.expect(requestTo(OPENAI_URL))
               .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
 
         ParsedTaskResult r = service.parseTask("Lab due Monday", ZoneId.of("UTC"));
@@ -176,8 +162,8 @@ class AiTaskParserServiceTest {
     }
 
     @Test
-    void parseTask_invalidJsonResponse_returnsAiAmbiguous() {
-        server.expect(requestTo(config.getUrl()))
+    void parseTask_invalidJsonResponseBody_returnsAiAmbiguous() {
+        server.expect(requestTo(OPENAI_URL))
               .andRespond(withSuccess("not even json", MediaType.APPLICATION_JSON));
 
         ParsedTaskResult r = service.parseTask("Lab", ZoneId.of("UTC"));
@@ -189,7 +175,7 @@ class AiTaskParserServiceTest {
 
     @Test
     void parseTask_serverError_returnsAiUnavailable() {
-        server.expect(requestTo(config.getUrl()))
+        server.expect(requestTo(OPENAI_URL))
               .andRespond(withServerError());
 
         ParsedTaskResult r = service.parseTask("Lab", ZoneId.of("UTC"));
@@ -199,7 +185,7 @@ class AiTaskParserServiceTest {
 
     @Test
     void parseTask_unauthorized_returnsAiUnavailable() {
-        server.expect(requestTo(config.getUrl()))
+        server.expect(requestTo(OPENAI_URL))
               .andRespond(withUnauthorizedRequest());
 
         ParsedTaskResult r = service.parseTask("Lab", ZoneId.of("UTC"));
@@ -217,7 +203,6 @@ class AiTaskParserServiceTest {
         LocalDate bumped = AiTaskParserService.coerceToFutureIfDue(past,
                 "Lab due Friday", today);
 
-        // Jumps forward one week — to 2026-05-15 (today itself, which is NOT before today).
         assertThat(bumped).isEqualTo(LocalDate.of(2026, 5, 15));
     }
 
@@ -234,7 +219,6 @@ class AiTaskParserServiceTest {
 
     @Test
     void coerceToFutureIfDue_leavesPastDateAloneWhenInputDoesNotSayDue() {
-        // Input is explicit about a past reference — no bump.
         LocalDate today = LocalDate.of(2026, 5, 15);
         LocalDate past  = LocalDate.of(2026, 5, 8);
 
