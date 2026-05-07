@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<!--
+    AI Task Modal — shared fragment (Phase 5.6).
+
+    Included on /tasks and the homepage dashboard via:
+        <div th:replace="~{fragments/ai-modal :: aiModal}"></div>
+
+    IDs are reused across both pages; ai-task.js looks them up by ID
+    without re-binding on every open so one script owns both hosts.
+    The spec called out an ID-collision concern between the confirm
+    and fallback states — resolved here by toggling visibility only
+    and sharing a single set of form field IDs (ai-field-*).
+-->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="aiModal"
+     id="ai-task-modal" class="ai-modal hidden"
+     role="dialog" aria-labelledby="ai-modal-title" aria-modal="true" aria-hidden="true">
+    <div class="ai-modal-box" role="document">
+
+        <button class="ai-modal-close" type="button"
+                onclick="closeAiModal()"
+                aria-label="Close">&times;</button>
+
+        <h3 id="ai-modal-title">Add Task with AI</h3>
+        <p class="ai-modal-hint">Describe your task in plain English — we'll extract the details.</p>
+
+        <!-- ── State 1: input ── -->
+        <div id="ai-state-input">
+            <label for="ai-input" class="sr-only">Task description</label>
+            <textarea id="ai-input" class="ai-textarea field-input"
+                      placeholder="e.g. Lab 3 due next Monday for EECS"
+                      maxlength="500" rows="3"></textarea>
+            <div class="ai-char-count"><span id="ai-char-count">0</span> / 500</div>
+            <div class="ai-error hidden" id="ai-error" role="alert"></div>
+            <div class="ai-modal-actions">
+                <button type="button" class="save-btn shine-btn"
+                        id="ai-parse-btn" onclick="submitAiParse()">Parse with AI</button>
+                <button type="button" class="apply-btn"
+                        onclick="closeAiModal()">Cancel</button>
+            </div>
+        </div>
+
+        <!-- ── State 2: loading ── -->
+        <div id="ai-state-loading" class="hidden" aria-live="polite">
+            <div class="ai-spinner" aria-hidden="true"></div>
+            <p class="ai-loading-text">Parsing your task…</p>
+        </div>
+
+        <!-- ── State 4: fallback ── -->
+        <div id="ai-state-fallback" class="hidden"></div>
+
+        <!-- ── State 3 + 4 combined:
+             Confirmation + fallback share the same form. The `ai-fallback-msg`
+             block shows above the form only when we enter fallback state;
+             the echo line shows only for a successful parse. JS handles
+             the toggles so there is never a conflicting form on screen. -->
+        <div id="ai-state-confirm" class="hidden">
+
+            <div id="ai-fallback-msg" class="ai-fallback-msg hidden">
+                <p><strong>Couldn't parse that.</strong>
+                   <span id="ai-fallback-reason"></span></p>
+                <p>Fill it in manually:</p>
+            </div>
+
+            <p class="ai-raw-echo" id="ai-raw-echo">
+                You said: "<span id="ai-raw-echo-text"></span>"
+            </p>
+
+            <div class="ai-confirm-form">
+                <div class="ai-field">
+                    <label class="ai-label" for="ai-field-title">Title</label>
+                    <input type="text" id="ai-field-title"
+                           class="field-input ai-input-field"
+                           maxlength="200" autocomplete="off" />
+                </div>
+
+                <div class="ai-field">
+                    <label class="ai-label" for="ai-field-duedate">Due date</label>
+                    <input type="date" id="ai-field-duedate"
+                           class="field-input ai-input-field" />
+                    <p class="ai-date-human" id="ai-date-human"></p>
+                </div>
+
+                <div class="ai-field-row">
+                    <div class="ai-field">
+                        <label class="ai-label" for="ai-field-course">Course <span class="ai-optional">(optional)</span></label>
+                        <input type="text" id="ai-field-course"
+                               class="field-input ai-input-field"
+                               maxlength="100" autocomplete="off" />
+                    </div>
+                    <div class="ai-field">
+                        <label class="ai-label" for="ai-field-type">Type</label>
+                        <select id="ai-field-type" class="field-input ai-input-field">
+                            <option value="ASSIGNMENT">Assignment</option>
+                            <option value="LAB">Lab</option>
+                            <option value="HOMEWORK">Homework</option>
+                            <option value="PROJECT">Project</option>
+                            <option value="READING">Reading</option>
+                            <option value="OTHER" selected>Other</option>
+                        </select>
+                    </div>
+                    <div class="ai-field">
+                        <label class="ai-label" for="ai-field-priority">Priority</label>
+                        <select id="ai-field-priority" class="field-input ai-input-field">
+                            <option value="LOW">Low</option>
+                            <option value="MEDIUM" selected>Medium</option>
+                            <option value="HIGH">High</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="ai-error hidden" id="ai-confirm-error" role="alert"></div>
+
+                <div class="ai-confirm-actions">
+                    <button type="button" class="save-btn shine-btn"
+                            id="ai-save-btn"
+                            onclick="saveAiTask()">Save Task</button>
+                    <button type="button" class="apply-btn"
+                            onclick="backToAiInput()">Try again</button>
+                    <button type="button" class="apply-btn"
+                            onclick="closeAiModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /ai-modal-box -->
+</div><!-- /ai-task-modal -->
+
+</body>
+</html>

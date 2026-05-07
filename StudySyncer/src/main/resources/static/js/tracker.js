@@ -32,6 +32,12 @@ async function initTracker() {
         isLoggedIn = false;
     }
 
+    // Expose the resolved user globally so deadlines.js (which runs on this
+    // page via the Deadlines tab) can read the auth state without a second
+    // /api/auth/me round-trip.
+    window.currentUser = isLoggedIn ? username : null;
+
+    updateHeaderAuthBar(username);
     loadGoal();       // restore saved goal before first render
     updateNextBtn();
 
@@ -41,6 +47,28 @@ async function initTracker() {
         showLoggedInState();
         loadAll();
     }
+}
+
+// Sync the tracker header auth bar with the auth state. The tracker page
+// has no auth modal of its own — Log in / Sign up buttons link to / where
+// the modal lives. Logout calls /api/auth/logout and bounces home.
+function updateHeaderAuthBar(username) {
+    const guest = document.getElementById('auth-guest');
+    const user  = document.getElementById('auth-user');
+    const name  = document.getElementById('auth-username');
+    if (isLoggedIn) {
+        guest?.classList.add('hidden');
+        user?.classList.remove('hidden');
+        if (name) name.textContent = `Hi, ${username}`;
+    } else {
+        guest?.classList.remove('hidden');
+        user?.classList.add('hidden');
+    }
+}
+
+async function trackerLogout() {
+    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (_) {}
+    window.location.href = '/';
 }
 
 // ── Auth UI helpers ────────────────────────────────────
@@ -69,8 +97,7 @@ function switchTab(tab) {
     document.querySelectorAll('.tracker-panel').forEach(p =>
         p.classList.add('hidden'));
     const panel = document.getElementById('tab-' + tab);
-    panel.classList.remove('hidden');
-    if (tab === 'ranking') _syncRankingStats();
+    if (panel) panel.classList.remove('hidden');
 }
 
 // ── Range filter ───────────────────────────────────────
@@ -145,9 +172,14 @@ async function loadChart() {
         document.getElementById('chart-total').textContent =
             data.totalMinutes > 0 ? `Total: ${totalStr}` : '';
 
+        // New total-label in the chart-card-header's center slot — e.g. "0h 45m this week".
+        // We always render something, even on empty, so the header layout stays stable.
+        setPeriodTotalLabels(totalStr, currentRange);
+
         const isEmpty = !data.values || data.values.every(v => v === 0);
         const emptyEl = document.getElementById('chart-empty');
         const canvas  = document.getElementById('focus-chart');
+        const editBtn = document.getElementById('chart-edit-btn');
 
         // Identify today's bar and extract today's actual minutes
         const todayIdx = (currentOffset === 0)
@@ -165,11 +197,14 @@ async function loadChart() {
 
             emptyEl.classList.add('hidden');
             canvas.style.display = '';
+            editBtn?.classList.remove('hidden');
             drawChart(canvas, data.labels, data.values, todayIdx, todayGoalMins);
         } else {
             todayActualMins = 0;
             emptyEl.classList.remove('hidden');
             canvas.style.display = 'none';
+            // No sessions in this period — hide the "Edit sessions" button (nothing to edit).
+            editBtn?.classList.add('hidden');
         }
 
         // Refresh goal progress UI with latest actual data
@@ -177,6 +212,19 @@ async function loadChart() {
 
         loadMaterials();
     } catch (_) {}
+}
+
+/** Writes "0h 45m this week" into each .period-total-label slot. */
+function setPeriodTotalLabels(totalStr, range) {
+    const rangeSuffix = range === 'today' ? 'today'
+                      : range === 'week'  ? 'this week'
+                      : range === 'month' ? 'this month'
+                      : range === 'year'  ? 'this year'
+                      : '';
+    const text = `${totalStr} ${rangeSuffix}`.trim();
+    document.querySelectorAll('.period-total-label').forEach(el => {
+        el.textContent = text;
+    });
 }
 
 // ── Material breakdown ─────────────────────────────────
@@ -188,7 +236,20 @@ async function loadMaterials() {
 
         const el = document.getElementById('material-list');
         if (!data || data.length === 0) {
-            el.innerHTML = '<p class="tracker-empty">No data for this period.</p>';
+            el.innerHTML = `
+                <div class="tracker-empty-cta">
+                    <div class="tracker-empty-cta-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                             stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8"  y1="2" x2="8"  y2="6"/>
+                            <line x1="3"  y1="10" x2="21" y2="10"/>
+                        </svg>
+                    </div>
+                    <p class="tracker-empty-cta-text">No study sessions recorded for this period.</p>
+                    <a href="/" class="apply-btn tracker-empty-cta-btn">Start your first Pomodoro →</a>
+                </div>`;
             return;
         }
 
@@ -222,18 +283,22 @@ async function loadSessions() {
 }
 
 function renderSessionRows(sessions) {
-    const emptyEl = document.getElementById('sessions-empty');
-    const table   = document.getElementById('sessions-table');
-    const body    = document.getElementById('sessions-body');
+    const emptyEl   = document.getElementById('sessions-empty');
+    const table     = document.getElementById('sessions-table');
+    const body      = document.getElementById('sessions-body');
+    const searchBox = document.getElementById('session-search-wrap');
 
     if (!sessions || sessions.length === 0) {
         emptyEl.classList.remove('hidden');
         table.classList.add('hidden');
+        // Hide the filter input when there's nothing to filter — re-shown below when data exists.
+        searchBox?.classList.add('hidden');
         return;
     }
 
     emptyEl.classList.add('hidden');
     table.classList.remove('hidden');
+    searchBox?.classList.remove('hidden');
     body.innerHTML = sessions.map(s => {
         const overtime = (s.overtimeMinutes || 0);
         const planned  = (s.plannedMinutes  || 0);
@@ -243,11 +308,20 @@ function renderSessionRows(sessions) {
         } else {
             durationCell = `<span style="font-variant-numeric:tabular-nums">${fmtMins(s.durationMinutes)}</span>`;
         }
+
+        // Phase 3.6 — if the session has a resolved task title, show it in
+        // the Material column with a small purple "Task" badge. When the
+        // referenced task has been deleted (soft reference from Phase 1)
+        // taskTitle is null and we fall back to the free-text material name.
+        const materialCell = s.taskTitle
+            ? `<span class="session-task-badge">Task</span>&nbsp;<span>${esc(s.taskTitle)}</span>`
+            : esc(s.materialName);
+
         return `
         <tr>
             <td>${esc(s.date)}</td>
             <td>${esc(s.time)}</td>
-            <td>${esc(s.materialName)}</td>
+            <td>${materialCell}</td>
             <td>${durationCell}</td>
             <td>${esc(s.timerMode)}</td>
             <td class="${s.completed ? 'tracker-status-done' : 'tracker-status-partial'}">
@@ -263,6 +337,7 @@ function filterSessions() {
     const filtered = _allSessions.filter(s =>
         (s.date         || '').toLowerCase().includes(q) ||
         (s.materialName || '').toLowerCase().includes(q) ||
+        (s.taskTitle    || '').toLowerCase().includes(q) ||
         (s.timerMode    || '').toLowerCase().includes(q)
     );
     renderSessionRows(filtered);
@@ -271,17 +346,6 @@ function filterSessions() {
 // ── Period label sync ──────────────────────────────────
 function setPeriodLabels(label) {
     document.querySelectorAll('.period-label').forEach(el => { el.textContent = label; });
-}
-
-// ── Ranking stats sync ─────────────────────────────────
-function _syncRankingStats() {
-    const hoursEl  = document.getElementById('lb-your-hours');
-    const streakEl = document.getElementById('lb-your-streak');
-    if (!hoursEl || !streakEl) return;
-    const hours  = document.getElementById('stat-hours-val')?.textContent;
-    const streak = document.getElementById('stat-streak-val')?.textContent;
-    if (hours  && hours  !== '—') hoursEl.textContent  = hours;
-    if (streak && streak !== '—') streakEl.textContent = `🔥 ${streak}`;
 }
 
 // ── Edit toast ─────────────────────────────────────────
@@ -640,4 +704,8 @@ function esc(str) {
 }
 
 // ── Kick off ───────────────────────────────────────────
-initTracker();
+// Expose a boot-complete promise on the same key auth.js uses, so that
+// deadlines.js — which awaits `window.authReady` — works identically
+// whether it runs on the homepage (auth.js owns the session) or here on
+// /tracker (tracker.js owns the session).
+window.authReady = initTracker();

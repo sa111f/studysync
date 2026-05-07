@@ -6,7 +6,10 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 @Entity
-@Table(name = "study_sessions")
+@Table(name = "study_sessions",
+       indexes = {
+           @Index(name = "idx_sessions_user_task", columnList = "user_id, task_id")
+       })
 public class StudySession {
 
     @Id
@@ -16,6 +19,16 @@ public class StudySession {
     @ManyToOne(optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    /**
+     * Soft reference to Task.id — no FK, no JPA relationship.
+     * If a task is deleted, sessions keep the id but it points nowhere;
+     * the Tracker Detail view renders such rows without a task badge.
+     * Nullable: sessions predate Phase 1, and a session may be logged
+     * with "No task selected".
+     */
+    @Column(name = "task_id")
+    private Long taskId;
 
     @Column(length = 200)
     private String materialName;
@@ -60,6 +73,7 @@ public class StudySession {
     // ── Getters ───────────────────────────────────────────
     public Long          getId()              { return id; }
     public User          getUser()            { return user; }
+    public Long          getTaskId()          { return taskId; }
     public String        getMaterialName()    { return materialName; }
     public int           getDurationMinutes() { return durationMinutes; }
     public int           getPlannedMinutes()  { return plannedMinutes; }
@@ -73,6 +87,7 @@ public class StudySession {
 
     // ── Setters ───────────────────────────────────────────
     public void setUser(User u)                  { this.user = u; }
+    public void setTaskId(Long taskId)           { this.taskId = taskId; }
     public void setMaterialName(String n)        { this.materialName = n; }
     public void setDurationMinutes(int d)        { this.durationMinutes = d; }
     public void setPlannedMinutes(int m)         { this.plannedMinutes = m; }

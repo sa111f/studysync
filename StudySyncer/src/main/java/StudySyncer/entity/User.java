@@ -2,6 +2,7 @@ package StudySyncer.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "users")
@@ -64,6 +65,34 @@ public class User {
     @Column(name = "timezone", length = 50)
     private String timezone;
 
+    // ── Phase 8: notification preferences ─────────────────────────────────────
+    //
+    // Three opt-in email types — each toggled independently. All require
+    // accountabilityEmail to be set (no fallback to login email, per spec).
+    // All times are user-local via the existing `timezone` field above.
+
+    /** Daily digest opt-in. */
+    @Column(name = "digest_enabled", nullable = false,
+            columnDefinition = "boolean NOT NULL DEFAULT false")
+    private boolean digestEnabled = false;
+
+    /** Wall-clock time to send the digest in the user's timezone. */
+    @Column(name = "digest_local_time")
+    private LocalTime digestLocalTime = LocalTime.of(8, 0);
+
+    /** Overdue reminder opt-in (fires only when a task went overdue yesterday). */
+    @Column(name = "overdue_reminder_enabled", nullable = false,
+            columnDefinition = "boolean NOT NULL DEFAULT false")
+    private boolean overdueReminderEnabled = false;
+
+    @Column(name = "overdue_reminder_local_time")
+    private LocalTime overdueReminderLocalTime = LocalTime.of(20, 0);
+
+    /** Exam reminder opt-in — thresholds are hardcoded at 7/3/1 days. */
+    @Column(name = "exam_reminder_enabled", nullable = false,
+            columnDefinition = "boolean NOT NULL DEFAULT false")
+    private boolean examReminderEnabled = false;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -92,6 +121,11 @@ public class User {
     public boolean       isEmailVerified()          { return emailVerified; }
     public String        getAccountabilityEmail()   { return accountabilityEmail; }
     public String        getTimezone()              { return timezone; }
+    public boolean       isDigestEnabled()          { return digestEnabled; }
+    public LocalTime     getDigestLocalTime()       { return digestLocalTime; }
+    public boolean       isOverdueReminderEnabled() { return overdueReminderEnabled; }
+    public LocalTime     getOverdueReminderLocalTime() { return overdueReminderLocalTime; }
+    public boolean       isExamReminderEnabled()    { return examReminderEnabled; }
     public LocalDateTime getCreatedAt()             { return createdAt; }
     public LocalDateTime getUpdatedAt()             { return updatedAt; }
 
@@ -104,4 +138,9 @@ public class User {
     public void setEmailVerified(boolean verified)              { this.emailVerified = verified; }
     public void setAccountabilityEmail(String email)            { this.accountabilityEmail = email; }
     public void setTimezone(String timezone)                    { this.timezone = timezone; }
+    public void setDigestEnabled(boolean b)                     { this.digestEnabled = b; }
+    public void setDigestLocalTime(LocalTime t)                 { this.digestLocalTime = t; }
+    public void setOverdueReminderEnabled(boolean b)            { this.overdueReminderEnabled = b; }
+    public void setOverdueReminderLocalTime(LocalTime t)        { this.overdueReminderLocalTime = t; }
+    public void setExamReminderEnabled(boolean b)               { this.examReminderEnabled = b; }
 }

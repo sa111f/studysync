@@ -1,31 +1,27 @@
 'use strict';
 /**
- * timer.js — Dashboard UI layer for the timer section.
+ * timer.js — Dashboard UI layer for the timer card.
  *
- * This file owns NO interval and NO timer state. Everything lives
- * in TimerCore (timer-core.js, loaded before this file).
+ * Owns no timer state. Subscribes to TimerCore and renders the
+ * countdown/overtime display, progress ring, and control buttons.
+ * POSTs completed sessions to /api/tracker/sessions on Stop.
  *
- * Responsibilities:
- *   - Subscribe to TimerCore events and update dashboard DOM
- *     (countdown until zero, then overtime overlay after zero).
- *   - Manage the in-page session log (results table).
- *   - Expose global shims that HTML onclick attributes and
- *     subjects.js / auth.js call.
- *   - POST completed study sessions to /api/tracker/sessions with
- *     planned / actual / overtime fields on manual stop.
+ * Phase 3 additions:
+ *   - "Studying:" <select> populated from /api/tasks?status=active
+ *   - currentTaskId cached on Start so mid-session switches don't leak
+ *   - taskId included in the POST body
+ *   - no-task hint visible only when logged-in + idle + empty selection
  */
 
-// ── DOM refs ──────────────────────────────────────────────────
-const display      = document.getElementById('timer-display');
-const pomodoroInfo = document.getElementById('pomodoro-info');
-const resultsEmpty = document.getElementById('results-empty');
-const resultsTable = document.getElementById('results-table');
-const resultsBody  = document.getElementById('results-body');
+const display        = document.getElementById('timer-display');
+const overtimeLabel  = document.getElementById('timer-overtime-label');
 
-// ── Session log (dashboard-only) ──────────────────────────────
-let sessions = [];
+// ── Task picker state ──────────────────────────────────────────
+// Cached the moment the user hits Start. Read back at sessionEnd so a
+// user changing the (locked) <select> via devtools can't re-target the
+// session. null => "No task selected" was picked.
+let _currentTaskId = null;
 
-// ── Helpers ───────────────────────────────────────────────────
 function _fmt(secs) {
     secs = Math.max(0, secs | 0);
     const m = String(Math.floor(secs / 60)).padStart(2, '0');
@@ -33,23 +29,8 @@ function _fmt(secs) {
     return `${m}:${s}`;
 }
 
-function _phaseLabel(phase) {
-    if (phase === 'shortbreak') return 'Short Break';
-    if (phase === 'longbreak')  return 'Long Break';
-    if (phase === 'countdown')  return 'Countdown';
-    return 'Pomodoro (work)';
-}
-
-function _activeSubject() {
-    return (typeof getActiveSubjectName === 'function')
-        ? getActiveSubjectName()
-        : 'General';
-}
-
-// ── Refresh dashboard timer display ───────────────────────────
 function _refreshDisplay(state, visState) {
     if (display) {
-        // Countdown MM:SS until zero, then OVERTIME +MM:SS
         if (state.isOvertime) {
             display.textContent = '+' + _fmt(state.overtimeSeconds);
         } else {
@@ -61,28 +42,27 @@ function _refreshDisplay(state, visState) {
         display.className = cls;
     }
 
-    // SVG progress ring — fills normally to 100%, then freezes (clamped).
+    if (overtimeLabel) {
+        overtimeLabel.classList.toggle('hidden', !state.isOvertime);
+    }
+
     const ring = document.getElementById('timer-ring-progress');
     if (ring) {
-        const circ     = 2 * Math.PI * 88;
-        let progress   = state.plannedSeconds > 0
-            ? state.elapsedSeconds / state.plannedSeconds
+        const circ = 2 * Math.PI * 88;
+        let progress = state.targetSeconds > 0
+            ? state.elapsedSeconds / state.targetSeconds
             : 0;
-        // In the existing UI the ring DEPLETES (remaining / planned).
-        // Keep that direction but clamp so overtime leaves it at zero.
         let remainingFrac = Math.max(0, 1 - progress);
         ring.style.strokeDasharray  = circ;
         ring.style.strokeDashoffset = circ * (1 - remainingFrac);
     }
 
-    // Wrapper classes for pulse / overtime glow.
     const wrap = document.getElementById('timer-ring-wrap');
     if (wrap) {
         wrap.classList.toggle('timer-running', visState === 'running');
         wrap.classList.toggle('timer-overtime', !!state.isOvertime);
     }
 
-    // Start/Pause toggle button
     const startBtn = document.getElementById('btn-start-pause');
     if (startBtn) {
         const running = visState === 'running';
@@ -90,63 +70,106 @@ function _refreshDisplay(state, visState) {
         startBtn.classList.toggle('is-pausing', running);
     }
 
-    // Stop button — visible whenever there is an active session
-    // (running, paused with progress, or in overtime).
     const stopBtn = document.getElementById('btn-stop');
     if (stopBtn) {
         const hasActive = state.isRunning || state.isPaused || state.elapsedSeconds > 0;
         stopBtn.classList.toggle('hidden', !hasActive);
     }
 
-    _updateSessionDots(state);
+    _refreshTaskPickerLockState(state);
+    _refreshNoTaskHint(state);
 }
 
-function _updateSessionDots(state) {
-    const completed = (state.sessionCount - 1) % 4;
-    for (let i = 1; i <= 4; i++) {
-        const dot = document.getElementById('dot-' + i);
-        if (dot) dot.classList.toggle('filled', i <= completed);
-    }
-}
+// ── Task picker lifecycle ─────────────────────────────────────
 
-function _updateTabs(state) {
-    ['pomodoro', 'shortbreak', 'longbreak'].forEach(p => {
-        const tab = document.getElementById('tab-' + p);
-        if (tab) tab.classList.toggle('active', p === state.phase);
-    });
-}
+/**
+ * Fetches active tasks and paints the <select>. Call on init and after
+ * each successful session POST (so a dashboard action that marks a task
+ * COMPLETED removes it from the list on the next render).
+ */
+async function _populateTaskPicker() {
+    const picker = document.getElementById('timer-task-picker');
+    const select = document.getElementById('timer-task-select');
+    if (!picker || !select) return;
 
-function _updatePomodoroInfo(state) {
-    if (!pomodoroInfo) return;
-
-    // Overtime banner wins over default phase info while in overtime.
-    if (state.isOvertime && (state.phase === 'pomodoro' || state.phase === 'countdown')) {
-        pomodoroInfo.textContent =
-            `Goal reached \u2014 still studying. +${_fmt(state.overtimeSeconds)} overtime.`;
+    // Hide the entire picker for guests — session POSTs are already gated
+    // behind window.currentUser, so no taskId ever leaves localStorage land.
+    if (!window.currentUser) {
+        picker.classList.add('hidden');
         return;
     }
 
-    switch (state.phase) {
-        case 'shortbreak':
-            pomodoroInfo.textContent =
-                `Short break \u2014 ${state.shortBreakMins} min. Session ${state.sessionCount - 1} done.`;
-            break;
-        case 'longbreak':
-            pomodoroInfo.textContent =
-                `Long break \u2014 ${state.longBreakMins} min. Great work!`;
-            break;
-        case 'countdown':
-            pomodoroInfo.textContent =
-                `Countdown \u2014 ${Math.round(state.plannedSeconds / 60)} min`;
-            break;
-        default: // pomodoro
-            pomodoroInfo.innerHTML =
-                `Session <span id="session-count">${state.sessionCount}</span> of 4 \u2014 `
-                + `work ${state.pomodoroMins} min, short break ${state.shortBreakMins} min.`;
+    try {
+        const res = await fetch('/api/tasks?status=active');
+        if (!res.ok) { picker.classList.add('hidden'); return; }
+
+        const tasks = await res.json();
+        // Sort by dueDate ASC (server already orders this way; defensive client-side sort).
+        tasks.sort((a, b) => {
+            const ad = a.dueDate || '9999-12-31';
+            const bd = b.dueDate || '9999-12-31';
+            return ad < bd ? -1 : ad > bd ? 1 : 0;
+        });
+
+        // Preserve current selection across re-populate so a mid-session
+        // refresh doesn't clobber the caller's choice.
+        const preserved = select.value;
+
+        const opts = ['<option value="">No task selected</option>']
+            .concat(tasks.map(t => {
+                const suffix = t.course ? ' · ' + _esc(t.course) : '';
+                return `<option value="${t.id}">${_esc(t.title)}${suffix}</option>`;
+            }));
+        select.innerHTML = opts.join('');
+
+        // Restore previously-selected option if it still exists in the list
+        // (e.g. because another tab hasn't completed it yet).
+        if (preserved && select.querySelector('option[value="' + preserved + '"]')) {
+            select.value = preserved;
+        }
+
+        picker.classList.remove('hidden');
+    } catch (_) {
+        // Network error — hide the picker rather than surface a stale list.
+        picker.classList.add('hidden');
     }
 }
 
+function _refreshTaskPickerLockState(state) {
+    const select = document.getElementById('timer-task-select');
+    if (!select) return;
+    // Disable during any active session (running or paused mid-way or in overtime).
+    const active = state.isRunning || state.isPaused || state.elapsedSeconds > 0;
+    select.disabled = active;
+}
+
+/**
+ * Show the "💡 Select a task above..." hint when all of these are true:
+ *   - user is logged in (guests have no task list to pick from)
+ *   - the <select> is empty (no task chosen)
+ *   - the timer is idle (not running / paused / in progress)
+ */
+function _refreshNoTaskHint(state) {
+    const hint = document.getElementById('timer-no-task-hint');
+    if (!hint) return;
+
+    const select  = document.getElementById('timer-task-select');
+    const hasSel  = !!(select && select.value);
+    const loggedIn = !!window.currentUser;
+    const idle    = !state.isRunning && !state.isPaused && state.elapsedSeconds <= 0;
+
+    const show = loggedIn && !hasSel && idle;
+    hint.classList.toggle('hidden', !show);
+}
+
 // ── TimerCore event subscriber ────────────────────────────────
+
+function _announceTimer(msg) {
+    const el = document.getElementById('timer-announcer');
+    if (!el) return;
+    el.textContent = msg;
+}
+
 function _onCoreEvent(event, state) {
     let visState;
     if      (event === 'pause') visState = 'paused';
@@ -154,155 +177,65 @@ function _onCoreEvent(event, state) {
     else if (state.isPaused)    visState = 'paused';
     else                        visState = '';
 
-    if (event !== 'sessionEnd' && event !== 'skip') {
-        _refreshDisplay(state, visState);
-        _updateTabs(state);
-        _updatePomodoroInfo(state);
+    if (event !== 'sessionEnd') _refreshDisplay(state, visState);
+
+    if      (event === 'start' && !state.isPaused) _announceTimer('Timer started');
+    else if (event === 'pause')                    _announceTimer('Timer paused');
+    else if (event === 'milestone')                _announceTimer('Target reached — overtime');
+
+    // Cache the selected task the moment the user hits Start so a locked-
+    // but-editable-via-devtools <select> can't re-target the ongoing session.
+    if (event === 'start' && !state.isPaused) {
+        const select = document.getElementById('timer-task-select');
+        const raw    = select ? select.value : '';
+        _currentTaskId = raw ? parseInt(raw, 10) : null;
     }
 
-    // --- Session logging on manual stop / skip ---
     if (event === 'sessionEnd') {
-        // state is the frozen pre-stop snapshot. Only study phases credit
-        // the daily goal; breaks are intentionally ignored here.
-        if (state.phase === 'pomodoro' || state.phase === 'countdown') {
-            const actualMins  = Math.max(0, Math.round(state.actualDurationSeconds / 60));
-            const plannedMins = Math.max(0, Math.round(state.plannedSeconds       / 60));
-            if (actualMins > 0) {
-                logSession(
-                    _activeSubject(),
-                    _phaseLabel(state.phase),
-                    actualMins,
-                    plannedMins,
-                    true,
-                );
-            }
+        const actualMins = Math.max(0, Math.round(state.actualDurationSeconds / 60));
+        const plannedMin = Math.max(0, Math.round(state.plannedSeconds       / 60));
+        const overtime   = Math.max(0, actualMins - plannedMin);
+
+        if (actualMins > 0 && window.currentUser) {
+            fetch('/api/tracker/sessions', {
+                method:    'POST',
+                headers:   { 'Content-Type': 'application/json' },
+                keepalive: true,
+                body: JSON.stringify({
+                    materialName:    'Study Session',
+                    durationMinutes: actualMins,
+                    plannedMinutes:  plannedMin,
+                    overtimeMinutes: overtime,
+                    timerMode:       'study',
+                    completed:       true,
+                    taskId:          _currentTaskId,
+                }),
+            })
+            .then(() => {
+                // Refresh the picker (a completed task may have been marked
+                // from another tab) and nudge the dashboard if it's present.
+                _populateTaskPicker();
+                if (typeof window.refreshDashboard === 'function') window.refreshDashboard();
+            })
+            .catch(() => {});
         }
-    } else if (event === 'skip') {
-        if (state.phase === 'pomodoro' || state.phase === 'countdown') {
-            const actualMins  = Math.max(0, Math.round(state.actualDurationSeconds / 60));
-            const plannedMins = Math.max(0, Math.round(state.plannedSeconds       / 60));
-            if (actualMins > 0) {
-                logSession(
-                    _activeSubject(),
-                    _phaseLabel(state.phase),
-                    actualMins,
-                    plannedMins,
-                    false,
-                );
-            }
-        }
+
+        // Reset picker state after the session is sealed.
+        _currentTaskId = null;
+        _refreshDisplay(state, '');
     }
 }
 
 TimerCore.subscribe(_onCoreEvent);
-
-// ── Session log ───────────────────────────────────────────────
-function logSession(subject, mode, mins, plannedMins, completed = true) {
-    const now  = new Date();
-    const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const date = now.toISOString().split('T')[0];
-    const overtime = Math.max(0, mins - (plannedMins | 0));
-    sessions.push({
-        subject,
-        mode,
-        duration:     mins + ' min',
-        durationMins: mins,
-        plannedMins:  plannedMins | 0,
-        overtimeMins: overtime,
-        time,
-        date,
-        completed,
-    });
-    renderResults();
-
-    if (window.currentUser) {
-        const docEl = document.getElementById('doc-subject-name');
-        const name  = (docEl && docEl.value.trim()) ? docEl.value.trim() : subject;
-        fetch('/api/tracker/sessions', {
-            method:    'POST',
-            headers:   { 'Content-Type': 'application/json' },
-            keepalive: true,
-            body: JSON.stringify({
-                materialName:    name,
-                durationMinutes: mins,
-                plannedMinutes:  plannedMins | 0,
-                overtimeMinutes: overtime,
-                timerMode:       mode,
-                completed,
-            }),
-        })
-        .then(() => {
-            if (typeof onSessionCompleted === 'function') onSessionCompleted(subject, mins, date);
-        })
-        .catch(() => {
-            if (typeof onSessionCompleted === 'function') onSessionCompleted(subject, mins, date);
-        });
-    } else {
-        if (typeof onSessionCompleted === 'function') onSessionCompleted(subject, mins, date);
-    }
-}
-
-function renderResults() {
-    if (!resultsEmpty || !resultsTable || !resultsBody) return;
-    if (sessions.length === 0) {
-        resultsEmpty.classList.remove('hidden');
-        resultsTable.classList.add('hidden');
-        return;
-    }
-    resultsEmpty.classList.add('hidden');
-    resultsTable.classList.remove('hidden');
-    resultsBody.innerHTML = sessions.map((s, i) => {
-        let durationCell = htmlEsc(s.duration);
-        if (s.overtimeMins > 0 && s.plannedMins > 0) {
-            durationCell = `${s.plannedMins}m planned · ${s.durationMins}m actual <span class="ot-badge">+${s.overtimeMins}m</span>`;
-        }
-        return `
-        <tr>
-            <td>${i + 1}</td>
-            <td>${htmlEsc(s.subject)}</td>
-            <td>${htmlEsc(s.mode)}</td>
-            <td>${durationCell}</td>
-            <td>${htmlEsc(s.time)}</td>
-            <td class="${s.completed ? 'tracker-status-done' : 'tracker-status-partial'}">
-                ${s.completed ? '&#10003; Completed' : '&#9679; Skipped'}
-            </td>
-        </tr>`;
-    }).join('');
-}
-
-function htmlEsc(str) {
-    if (str == null) return '';
-    return String(str)
-        .replace(/&/g,  '&amp;')
-        .replace(/</g,  '&lt;')
-        .replace(/>/g,  '&gt;')
-        .replace(/"/g,  '&quot;');
-}
-
-function clearResults() {
-    sessions = [];
-    renderResults();
-    if (typeof onSessionsCleared === 'function') onSessionsCleared();
-}
-
-// ── Global shims — called from HTML onclick and other scripts ──
 
 function startTimer()  { TimerCore.start();  }
 function pauseTimer()  { TimerCore.pause();  }
 function toggleTimer() { TimerCore.toggle(); }
 function stopTimer()   { TimerCore.stop();   }
 function skipTimer()   { TimerCore.skip();   }
-function setTimerPhase(phase) { TimerCore.setPhase(phase); }
 
 function applyTimerDuration(mins) {
-    console.log('[StudySyncer] applyTimerDuration:', mins, 'min');
-    TimerCore.applyCountdownDuration(mins);
-    const inp = document.getElementById('duration');
-    if (inp) inp.value = mins;
-}
-
-function resetTimerForNewMaterial() {
-    TimerCore.setPhase('pomodoro');
+    TimerCore.setTargetMinutes(mins);
 }
 
 function restoreTimerState(state) {
@@ -311,7 +244,6 @@ function restoreTimerState(state) {
 
 function saveTimerState() { /* intentionally empty */ }
 
-// ── Settings panel ────────────────────────────────────────────
 function toggleTimerSettings() {
     const panel  = document.getElementById('timer-settings-panel');
     const toggle = document.getElementById('timer-settings-toggle');
@@ -321,10 +253,8 @@ function toggleTimerSettings() {
 }
 
 function applyTimerSettings() {
-    const pd = parseInt(document.getElementById('dur-pomodoro')?.value,   10);
-    const sd = parseInt(document.getElementById('dur-shortbreak')?.value, 10);
-    const ld = parseInt(document.getElementById('dur-longbreak')?.value,  10);
-    TimerCore.setDurations(pd, sd, ld);
+    const t = parseInt(document.getElementById('dur-target')?.value, 10);
+    if (!isNaN(t)) TimerCore.setTargetMinutes(t);
 
     const panel  = document.getElementById('timer-settings-panel');
     const toggle = document.getElementById('timer-settings-toggle');
@@ -332,19 +262,6 @@ function applyTimerSettings() {
     if (toggle) toggle.classList.remove('open');
 }
 
-// ── Legacy shims ──────────────────────────────────────────────
-function setMode(mode) {
-    if (mode === 'pomodoro') TimerCore.setPhase('pomodoro');
-}
-
-function applyDuration() {
-    const inp  = document.getElementById('duration');
-    const mins = inp ? Math.max(1, parseInt(inp.value, 10) || 25) : 25;
-    if (inp) inp.value = mins;
-    TimerCore.applyCountdownDuration(mins);
-}
-
-// ── Space-bar shortcut ────────────────────────────────────────
 document.addEventListener('keydown', e => {
     if (e.key === ' ' && e.target === document.body) {
         e.preventDefault();
@@ -352,21 +269,42 @@ document.addEventListener('keydown', e => {
     }
 });
 
-// ── Initial render ────────────────────────────────────────────
+// Selecting a task should instantly hide the no-task hint without waiting
+// for the next TimerCore tick.
+document.addEventListener('DOMContentLoaded', () => {
+    const select = document.getElementById('timer-task-select');
+    if (select) {
+        select.addEventListener('change', () => _refreshNoTaskHint(TimerCore.getState()));
+    }
+});
+
+// Exposed for the dashboard (Phase 4) to refresh the picker after it flips
+// a task to COMPLETED or IN_PROGRESS, without the dashboard knowing the
+// picker internals.
+window.refreshTimerTaskPicker = _populateTaskPicker;
+
 (function () {
     const state = TimerCore.getState();
     const _initVis = state.isRunning ? 'running' : (state.isPaused ? 'paused' : '');
     _refreshDisplay(state, _initVis);
-    _updateTabs(state);
-    _updatePomodoroInfo(state);
 
-    const inp = document.getElementById('duration');
-    if (inp) inp.value = Math.round(state.plannedSeconds / 60);
+    const tgt = document.getElementById('dur-target');
+    if (tgt) tgt.value = state.targetMins;
 
-    const pd = document.getElementById('dur-pomodoro');
-    const sd = document.getElementById('dur-shortbreak');
-    const ld = document.getElementById('dur-longbreak');
-    if (pd) pd.value = state.pomodoroMins;
-    if (sd) sd.value = state.shortBreakMins;
-    if (ld) ld.value = state.longBreakMins;
+    // Populate the task picker after auth resolves — the /api/tasks call
+    // 401s for guests, so waiting avoids a flash of an empty picker.
+    (async function () {
+        try { await window.authReady; } catch (_) {}
+        await _populateTaskPicker();
+        _refreshNoTaskHint(TimerCore.getState());
+    })();
 })();
+
+function _esc(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}

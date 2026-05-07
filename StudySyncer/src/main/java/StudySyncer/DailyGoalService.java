@@ -193,6 +193,9 @@ public class DailyGoalService {
                 goal.setGoalReachedEmailSent(true);
                 goal.setGoalReachedEmailSentAt(LocalDateTime.now(TORONTO));
                 repo.save(goal);
+                // Phase 8 retrofit — unified send-log row for auditing + cap.
+                emailService.recordGoalEmailSent(
+                        goal.getUser(), StudySyncer.entity.EmailType.GOAL_REACHED, goal.getGoalDate());
                 log.info("[EMAIL] Goal-reached email sent and recorded — goalId={} userId={}",
                         goal.getId(), goal.getUser().getId());
             } else {

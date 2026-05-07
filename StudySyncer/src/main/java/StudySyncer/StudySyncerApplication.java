@@ -32,7 +32,7 @@ public class StudySyncerApplication {
         return args -> {
             String port     = env.getProperty("server.port", "8080");
             String profiles = String.join(", ", env.getActiveProfiles());
-            System.out.println("=== StudySync started on port " + port
+            System.out.println("=== StudySyncer started on port " + port
                                + " | profiles: " + (profiles.isEmpty() ? "default" : profiles)
                                + " ===");
         };

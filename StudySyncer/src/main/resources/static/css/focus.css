@@ -443,7 +443,8 @@ html.is-fullscreen .focus-phase-tabs,
 html.is-fullscreen .focus-bar-track,
 html.is-fullscreen .focus-session-label,
 html.is-fullscreen .focus-controls,
-html.is-fullscreen .focus-keyboard-hint {
+html.is-fullscreen .focus-keyboard-hint,
+html.is-fullscreen .site-footer {
     display: none !important;
 }
 

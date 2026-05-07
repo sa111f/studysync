@@ -3,7 +3,46 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>StudySync</title>
+    <title>StudySyncer — Focus Timer with Accountability Emails</title>
+    <meta name="description" content="StudySyncer is a free focus timer with accountability emails. Set daily study goals, track focus sessions, and stay on target." />
+    <link rel="canonical" href="https://www.studysyncer.com/" />
+
+    <!-- Favicons -->
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Open Graph -->
+    <meta property="og:site_name" content="StudySyncer" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.studysyncer.com/" />
+    <meta property="og:title" content="StudySyncer — Focus Timer with Accountability Emails" />
+    <meta property="og:description" content="Free focus timer with accountability emails. Stay focused. Study smarter." />
+    <meta property="og:image" content="https://www.studysyncer.com/og-image.png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="StudySyncer — Focus Timer with Accountability Emails" />
+    <meta name="twitter:description" content="Free focus timer with accountability emails. Stay focused. Study smarter." />
+    <meta name="twitter:image" content="https://www.studysyncer.com/og-image.png" />
+
+    <!-- JSON-LD structured data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "StudySyncer",
+      "description": "Focus timer with accountability emails. Set daily study goals and track focus sessions.",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Web",
+      "url": "https://www.studysyncer.com/",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
@@ -14,10 +53,12 @@
 
 <header>
     <div class="nav-inner">
-        <a href="/" class="nav-logo-link"><span class="logo-study">Study</span><span class="logo-sync">Sync</span></a>
+        <a href="/" class="nav-logo-link"><span class="logo-study">Study</span><span class="logo-sync">Syncer</span></a>
 
         <nav class="nav-links">
             <a href="/focus"   class="header-nav-link">Focus Mode</a>
+            <a href="/tasks"   class="header-nav-link">Tasks</a>
+            <a href="/exams"   class="header-nav-link">Exams</a>
             <a href="/tracker" class="header-nav-link">Study Tracker</a>
         </nav>
 
@@ -26,7 +67,8 @@
              if the session check succeeds, avoiding a flash of empty nav. -->
         <div id="auth-bar" class="auth-bar">
             <div id="auth-guest" class="auth-guest">
-                <button class="auth-link-btn shine-btn" onclick="openModal('login')">Log in</button>
+                <button class="auth-link-btn" onclick="openModal('login')">Log in</button>
+                <button class="auth-link-btn accent shine-btn" onclick="openModal('register')">Sign up</button>
             </div>
             <div id="auth-user" class="auth-user hidden">
                 <span id="auth-username" class="auth-username"></span>
@@ -35,8 +77,6 @@
         </div>
     </div>
 </header>
-
-<div class="hero-tagline">Stay focused. Study smarter.</div>
 
 <!-- Post-auth notification banner (email verified, OAuth errors, etc.) -->
 <div id="auth-banner" class="auth-banner hidden">
@@ -49,7 +89,7 @@
      ══════════════════════════════════════════════════════════ -->
 <div id="auth-modal" class="auth-modal hidden">
     <div class="auth-modal-box" id="auth-modal-box">
-        <div class="auth-modal-logo"><span class="logo-study">Study</span><span class="logo-sync">Sync</span></div>
+        <div class="auth-modal-logo"><span class="logo-study">Study</span><span class="logo-sync">Syncer</span></div>
         <p class="auth-tagline">Stay focused. Study smarter.</p>
         <h3 id="auth-modal-title">Log in</h3>
 
@@ -184,20 +224,145 @@
 
 <main>
 
-<div class="top-panel">
+<!-- Guest-only intro strip — explains what StudySyncer is.
+     Hidden when logged in (auth.js) or permanently dismissed (localStorage). -->
+<aside id="intro-strip" class="intro-strip hidden" aria-labelledby="intro-strip-title">
+    <div class="intro-strip-header">
+        <h1 id="intro-strip-title" class="intro-strip-title">What is StudySyncer?</h1>
+        <button type="button" class="intro-strip-dismiss"
+                onclick="dismissIntroStrip()"
+                aria-label="Dismiss intro">&#10005;&nbsp;Dismiss</button>
+    </div>
+    <p class="intro-strip-tag">Stay focused. Study smarter.</p>
+    <ul class="intro-strip-list">
+        <li>⏱ A focus timer that actually holds you accountable</li>
+        <li>📩 Get a reminder email if you miss your daily study goal</li>
+    </ul>
+    <div class="intro-strip-cta-row">
+        <button type="button" class="auth-link-btn accent intro-strip-cta shine-btn"
+                onclick="openModal('register')">Sign up free</button>
+    </div>
+</aside>
 
-    <!-- ── Timer + Today's Goal column ── -->
-    <div class="timer-col">
+<!-- ══════════════════════════════════════════════════════════════
+     Phase 4 homepage layout.
+       - Logged-in: 2-column dashboard (sections + sidebar).
+       - Guest:     intro-strip above, single-column with timer +
+                    Today's Goal (localStorage) in the sidebar slot.
+     JS (dashboard.js) toggles the .is-logged-in / .is-guest classes
+     on <main> once window.authReady resolves so there is no flash
+     of either state.
+     ══════════════════════════════════════════════════════════════ -->
 
-    <!-- ── Timer hero ── -->
-    <section class="timer-card">
+<div class="home-dashboard-layout">
 
-        <!-- Phase tabs -->
-        <div class="timer-phase-tabs">
-            <button class="phase-tab active" id="tab-pomodoro"   onclick="setTimerPhase('pomodoro')">Pomodoro</button>
-            <button class="phase-tab"        id="tab-shortbreak" onclick="setTimerPhase('shortbreak')">Short Break</button>
-            <button class="phase-tab"        id="tab-longbreak"  onclick="setTimerPhase('longbreak')">Long Break</button>
+    <!-- ── Dashboard column (logged-in users) ── -->
+    <section class="dashboard-col">
+
+        <!-- Guest fallback — swapped in by dashboard.js when window.currentUser is null. -->
+        <div id="dashboard-guest" class="dashboard-guest hidden">
+            <h1 class="dashboard-guest-title">Stay focused. Study smarter.</h1>
+            <p class="dashboard-guest-sub">
+                Track tasks, run a focus timer, and get an accountability email if you miss your daily goal.
+            </p>
+            <div class="dashboard-guest-cta-row">
+                <button class="auth-link-btn accent shine-btn" onclick="openModal('register')">Sign up free</button>
+                <button class="auth-link-btn" onclick="openModal('login')">Log in</button>
+            </div>
         </div>
+
+        <!-- Authenticated dashboard sections. Hidden until auth resolves. -->
+        <div id="dashboard-sections" class="dashboard-sections hidden">
+
+            <!-- Dashboard toolbar — quick-add actions for task + exam AI
+                 flows. Mirrors the /tasks and /exams page headers so users
+                 discover either "Add with AI" from this entry point.
+                 Spec 6.8 recommendation: separate buttons per intent
+                 (task vs exam) instead of a single button with a type
+                 picker — less friction. -->
+            <div class="dashboard-toolbar">
+                <button class="dl-add-trigger-btn ai-trigger-btn"
+                        onclick="openAiModal()"
+                        aria-label="Add a task using AI">
+                    <span aria-hidden="true">🤖</span> Add Task with AI
+                </button>
+                <button class="dl-add-trigger-btn ai-trigger-btn"
+                        onclick="openAiExamModal()"
+                        aria-label="Add an exam using AI">
+                    <span aria-hidden="true">🤖</span> Add Exam with AI
+                </button>
+                <button class="dl-add-trigger-btn syllabus-trigger-btn"
+                        onclick="openSyllabusModal()"
+                        aria-label="Import tasks and exams from a syllabus PDF">
+                    <span aria-hidden="true">📄</span> Import from Syllabus
+                </button>
+                <a href="/tasks" class="dashboard-toolbar-link"
+                   aria-label="Go to the full Tasks page">+ Task</a>
+                <a href="/exams" class="dashboard-toolbar-link"
+                   aria-label="Go to the full Exams page">+ Exam</a>
+            </div>
+
+            <!-- ── Today ── -->
+            <section class="dash-section" id="dash-today" aria-label="Tasks due today">
+                <div class="dash-section-header">
+                    <h2 class="dash-section-title">Today</h2>
+                    <span class="dash-section-count hidden" id="dash-today-count"></span>
+                </div>
+                <div class="dash-task-list" id="dash-today-list"></div>
+                <div class="dash-empty hidden" id="dash-today-empty">
+                    Nothing due today. <a href="/tasks">Add a task →</a>
+                </div>
+            </section>
+
+            <!-- ── Overdue ── -->
+            <section class="dash-section dash-section-overdue" id="dash-overdue" aria-label="Overdue tasks">
+                <div class="dash-section-header">
+                    <h2 class="dash-section-title dash-section-title-danger">Overdue</h2>
+                    <span class="dash-section-count danger-count hidden" id="dash-overdue-count"></span>
+                </div>
+                <div class="dash-task-list" id="dash-overdue-list"></div>
+                <div class="dash-empty hidden" id="dash-overdue-empty">
+                    Nothing overdue. You're on top of it. 🎯
+                </div>
+            </section>
+
+            <!-- ── Upcoming ── -->
+            <section class="dash-section" id="dash-upcoming" aria-label="Tasks due in the next 7 days">
+                <div class="dash-section-header">
+                    <h2 class="dash-section-title">Upcoming (next 7 days)</h2>
+                    <span class="dash-section-count hidden" id="dash-upcoming-count"></span>
+                </div>
+                <div class="dash-task-list" id="dash-upcoming-list"></div>
+                <div class="dash-empty hidden" id="dash-upcoming-empty">
+                    No tasks due this week. <a href="/tasks">Plan something →</a>
+                </div>
+            </section>
+
+            <!-- ── Next Exams (stub until Phase 6) ── -->
+            <section class="dash-section" id="dash-exams" aria-label="Upcoming exams">
+                <div class="dash-section-header">
+                    <h2 class="dash-section-title">Next Exams</h2>
+                    <span class="dash-section-count hidden" id="dash-exams-count"></span>
+                </div>
+                <div class="dash-task-list" id="dash-exams-list"></div>
+                <div class="dash-empty" id="dash-exams-empty">
+                    No upcoming exams.
+                    <span class="dash-empty-note">Exam tracking coming soon.</span>
+                </div>
+            </section>
+
+        </div><!-- /dashboard-sections -->
+    </section><!-- /dashboard-col -->
+
+    <!-- ── Sidebar (timer + goal) ── -->
+    <aside class="sidebar-col">
+
+    <!-- ── Timer hero (compact on homepage) ── -->
+    <section class="timer-card timer-card-compact" id="home-timer-card">
+
+        <!-- Off-screen live region — announces phase transitions + start/stop
+             events. Every-second countdown ticks are NOT announced. -->
+        <div class="sr-only" aria-live="polite" aria-atomic="true" id="timer-announcer"></div>
 
         <!-- Circular progress ring — timer display sits exactly in center -->
         <div class="timer-ring-wrap" id="timer-ring-wrap">
@@ -210,6 +375,17 @@
             <div class="timer-display" id="timer-display">25:00</div>
         </div>
 
+        <!-- "Studying:" task picker (Phase 3.4) — populated by timer.js.
+             Hidden entirely for guests. Disabled while a session is running
+             so the tracked task can't silently switch mid-session. -->
+        <div class="timer-task-picker hidden" id="timer-task-picker">
+            <label for="timer-task-select" class="timer-task-label">Studying:</label>
+            <select id="timer-task-select" class="timer-task-select">
+                <option value="">No task selected</option>
+                <!-- <option value="{id}">{title}{course ? ' · ' + course : ''}</option> -->
+            </select>
+        </div>
+
         <!-- Controls: Start/Pause toggle · Stop · Skip -->
         <div class="timer-controls">
             <button class="ctrl-btn start shine-btn" id="btn-start-pause" onclick="toggleTimer()">Start</button>
@@ -217,18 +393,14 @@
             <button class="ctrl-btn skip"            onclick="skipTimer()">Skip</button>
         </div>
 
-        <!-- Pomodoro session info -->
-        <p class="pomodoro-info" id="pomodoro-info">
-            Session <span id="session-count">1</span> of 4 &mdash; work 25 min, break 5 min.
+        <!-- Phase 3.7 hint — only when: logged in AND no task selected
+             AND timer idle. Toggled by timer.js _refreshNoTaskHint(). -->
+        <p class="timer-no-task-hint hidden" id="timer-no-task-hint">
+            💡 Select a task above to track time against it.
         </p>
 
-        <!-- Session progress dots -->
-        <div class="session-dots" id="session-dots">
-            <span class="session-dot" id="dot-1"></span>
-            <span class="session-dot" id="dot-2"></span>
-            <span class="session-dot" id="dot-3"></span>
-            <span class="session-dot" id="dot-4"></span>
-        </div>
+        <!-- Overtime indicator — shown only when elapsed > target -->
+        <p class="timer-overtime-label hidden" id="timer-overtime-label">Overtime</p>
 
         <p class="space-hint">Press Space to pause / resume</p>
 
@@ -246,23 +418,9 @@
             <div class="timer-settings-panel hidden" id="timer-settings-panel">
                 <div class="dur-row">
                     <div class="dur-field">
-                        <label class="dur-label" for="dur-pomodoro">Pomodoro</label>
+                        <label class="dur-label" for="dur-target">Target duration</label>
                         <div class="dur-input-wrap">
-                            <input type="number" id="dur-pomodoro" class="dur-input" value="25" min="1" max="99" />
-                            <span class="dur-unit">min</span>
-                        </div>
-                    </div>
-                    <div class="dur-field">
-                        <label class="dur-label" for="dur-shortbreak">Short Break</label>
-                        <div class="dur-input-wrap">
-                            <input type="number" id="dur-shortbreak" class="dur-input" value="5" min="1" max="99" />
-                            <span class="dur-unit">min</span>
-                        </div>
-                    </div>
-                    <div class="dur-field">
-                        <label class="dur-label" for="dur-longbreak">Long Break</label>
-                        <div class="dur-input-wrap">
-                            <input type="number" id="dur-longbreak" class="dur-input" value="15" min="1" max="99" />
+                            <input type="number" id="dur-target" class="dur-input" value="25" min="1" max="999" />
                             <span class="dur-unit">min</span>
                         </div>
                     </div>
@@ -341,169 +499,88 @@
             <div class="accountability-status-row" id="accountability-status-row" style="display:none">
                 <span class="accountability-status-badge" id="accountability-status-badge"></span>
             </div>
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 Phase 8 — additional email notification toggles.
+                 Shown only for logged-in users; initNotif() hydrates the
+                 controls from GET /api/notifications/preferences.
+                 ═══════════════════════════════════════════════════════════ -->
+            <div class="notifications-section" id="notifications-section">
+                <h3 class="notifications-title">Email Notifications</h3>
+
+                <div class="notif-row">
+                    <label class="notif-toggle">
+                        <input type="checkbox" id="notif-digest-enabled" onchange="saveNotif()" />
+                        <span>Daily morning digest</span>
+                    </label>
+                    <p class="notif-hint">Your tasks + exams at a glance, sent every morning.</p>
+                    <div class="notif-time-row" id="notif-digest-time-row">
+                        <label for="notif-digest-time">At</label>
+                        <input type="time" id="notif-digest-time" value="08:00" onchange="saveNotif()" />
+                        <span class="notif-tz-hint">(your local time)</span>
+                    </div>
+                </div>
+
+                <div class="notif-row">
+                    <label class="notif-toggle">
+                        <input type="checkbox" id="notif-overdue-enabled" onchange="saveNotif()" />
+                        <span>Overdue task reminders</span>
+                    </label>
+                    <p class="notif-hint">Evening nudge if a task just went overdue.</p>
+                    <div class="notif-time-row" id="notif-overdue-time-row">
+                        <label for="notif-overdue-time">At</label>
+                        <input type="time" id="notif-overdue-time" value="20:00" onchange="saveNotif()" />
+                        <span class="notif-tz-hint">(your local time)</span>
+                    </div>
+                </div>
+
+                <div class="notif-row">
+                    <label class="notif-toggle">
+                        <input type="checkbox" id="notif-exam-enabled" onchange="saveNotif()" />
+                        <span>Exam reminders</span>
+                    </label>
+                    <p class="notif-hint">Automatic nudges 7 days, 3 days, and 1 day before each exam.</p>
+                </div>
+
+                <p id="notif-save-status" class="notif-save-status"></p>
+            </div>
         </div><!-- /accountability-section -->
 
         <p class="goal-save-status" id="goal-save-status" style="display:none"></p>
     </section><!-- /goal-card-main -->
 
-    </div><!-- /timer-col -->
+    </aside><!-- /sidebar-col -->
 
-    <!-- ── Study Material ── -->
-    <section class="syllabus-card">
-        <div class="syllabus-header">
-            <h2>Study Material</h2>
-            <button class="clear-btn" onclick="startNewMaterial()">New Material</button>
-        </div>
-        <p class="card-hint">Paste notes or upload a PDF — AI will estimate how long to study</p>
+</div><!-- /home-dashboard-layout -->
 
-        <div id="document-input-panel">
-
-            <div class="subject-field">
-                <input type="text" id="doc-subject-name" class="field-input"
-                       placeholder="Topic / subject name (optional)" />
-            </div>
-
-            <div class="doc-section">
-                <label class="doc-label">Paste notes or syllabus text</label>
-                <textarea id="doc-notes-input" class="field-input doc-notes-textarea"
-                          placeholder="Paste your lecture notes, topics, or syllabus here..."></textarea>
-                <div class="char-count" id="doc-notes-count">0 / 5000</div>
-            </div>
-
-            <div class="doc-section">
-                <label class="doc-label">Or upload a PDF <span class="doc-limit-note">(max 10 MB)</span></label>
-                <div class="drop-zone doc-upload-row" id="pdf-drop-zone"
-                     ondragover="handlePdfDragOver(event)"
-                     ondragleave="handlePdfDragLeave(event)"
-                     ondrop="handlePdfDrop(event)">
-                    <input type="file" id="doc-pdf-input" accept=".pdf" class="doc-file-input" />
-                    <button id="btn-extract-pdf" class="apply-btn" onclick="extractPdfText()">Extract Text from PDF</button>
-                </div>
-                <span id="doc-file-error" class="field-error hidden"></span>
-                <span id="doc-extract-status" class="save-status"></span>
-            </div>
-
-            <div class="syllabus-footer">
-                <button id="btn-estimate" class="save-btn shine-btn" onclick="estimateStudyTime()"
-                        title="AI estimates how long to study based on your notes">Estimate Study Time</button>
-                <span id="doc-save-status" class="save-status"></span>
-            </div>
-        </div>
-    </section><!-- /syllabus-card -->
-
-</div><!-- /top-panel -->
-
-    <!-- ── Study Priority Widget ── -->
-    <section class="priority-widget-section">
-        <div id="priority-widget" class="priority-widget">
-            <!-- Populated by deadlines.js -->
-        </div>
-    </section>
-
-    <!-- Study time estimation options -->
-    <section id="estimation-card" class="estimation-card hidden">
-        <div class="estimation-header">
-            <h2>Study Time Options</h2>
-            <span id="estimate-source-badge" class="estimate-source-badge"></span>
-            <span id="estimation-rationale" class="estimation-rationale"></span>
-        </div>
-        <div id="estimation-options" class="estimation-options"></div>
-
-        <div id="custom-time-card" class="custom-time-card">
-            <span class="est-label">Custom Time</span>
-            <div class="custom-time-inputs">
-                <input type="number" id="custom-hours" class="field-input custom-time-input"
-                       placeholder="0" min="0" max="23" />
-                <span class="custom-time-sep">h</span>
-                <input type="number" id="custom-minutes" class="field-input custom-time-input"
-                       placeholder="0" min="0" max="59" />
-                <span class="custom-time-sep">m</span>
-            </div>
-            <span id="custom-time-error" class="field-error hidden"></span>
-            <button class="apply-btn" onclick="applyCustomTime()">Apply Custom Time</button>
-        </div>
-    </section>
-
-    <!-- Study plan output -->
-    <section id="study-plan-card" class="study-plan-card hidden">
-        <div class="study-plan-header">
-            <h2>Study Plan</h2>
-            <span id="study-plan-total" class="study-plan-total"></span>
-        </div>
-        <div id="plan-stale-notice" class="plan-stale-notice hidden">
-            Inputs changed &mdash; click <strong>Save Subjects</strong> to refresh the plan.
-        </div>
-        <div id="study-plan-items" class="study-plan-items"></div>
-    </section>
-
-    <!-- Session results / log -->
-    <section class="results-card">
-        <h2>Session Results</h2>
-        <div id="progress-summary" class="progress-summary"></div>
-        <div id="results-empty" class="results-empty">No sessions completed yet. Start a timer to track your progress.</div>
-        <div class="table-wrap">
-        <table id="results-table" class="results-table hidden">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Subject</th>
-                    <th>Mode</th>
-                    <th>Duration</th>
-                    <th>Completed At</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody id="results-body"></tbody>
-        </table>
-        </div>
-        <button class="clear-btn" onclick="clearResults()">Clear Results</button>
-    </section>
 </main>
 
-<script th:src="@{/js/subjects.js}"></script>
+<footer class="site-footer">
+    <span>© 2026 StudySyncer</span>
+    <div class="site-footer-links">
+        <a href="/privacy">Privacy</a>
+        <span class="site-footer-sep">·</span>
+        <a href="/terms">Terms</a>
+        <span class="site-footer-sep">·</span>
+        <a href="/about">About</a>
+        <span class="site-footer-sep">·</span>
+        <a href="mailto:[CONTACT_EMAIL_TO_FILL]">Contact</a>
+    </div>
+</footer>
+
+<!-- Shared modals — task AI (Phase 5) + exam AI (Phase 6) + syllabus (Phase 7) -->
+<div th:replace="~{fragments/ai-modal :: aiModal}"></div>
+<div th:replace="~{fragments/ai-exam-modal :: aiExamModal}"></div>
+<div th:replace="~{fragments/syllabus-modal :: syllabusModal}"></div>
+
+<script th:src="@{/js/util.js}"></script>
 <script th:src="@{/js/timer-core.js}"></script>
 <script th:src="@{/js/timer.js}"></script>
 <script th:src="@{/js/auth.js}"></script>
-<script th:src="@{/js/deadlines.js}"></script>
-<script>
-    // Boot the priority widget after auth is resolved
-    // auth.js calls initAuth() which sets up the session; we run deadlines after.
-    document.addEventListener('DOMContentLoaded', function() {
-        // Small delay so auth.js has time to resolve the session
-        setTimeout(initDeadlines, 400);
-    });
-</script>
-<script>
-/* ── Drag-and-drop PDF handler ── */
-function handlePdfDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-    document.getElementById('pdf-drop-zone').classList.add('drag-over');
-}
-
-function handlePdfDragLeave(e) {
-    document.getElementById('pdf-drop-zone').classList.remove('drag-over');
-}
-
-function handlePdfDrop(e) {
-    e.preventDefault();
-    document.getElementById('pdf-drop-zone').classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
-    if (file.type !== 'application/pdf') {
-        const errEl = document.getElementById('doc-file-error');
-        if (errEl) { errEl.textContent = 'Only PDF files are supported.'; errEl.classList.remove('hidden'); }
-        return;
-    }
-    // Assign the dropped file to the hidden file input via DataTransfer
-    const dt   = new DataTransfer();
-    dt.items.add(file);
-    const inp = document.getElementById('doc-pdf-input');
-    inp.files = dt.files;
-    // Trigger extraction immediately
-    if (typeof extractPdfText === 'function') extractPdfText();
-}
-</script>
+<script th:src="@{/js/dashboard.js}"></script>
+<script th:src="@{/js/ai-task.js}"></script>
+<script th:src="@{/js/ai-exam.js}"></script>
+<script th:src="@{/js/syllabus-import.js}"></script>
 <script>
 /* ── Today's Goal + Email Accountability ── */
 (function () {
@@ -521,11 +598,13 @@ function handlePdfDrop(e) {
     //   - Including in POST /api/daily-goal body
     //   - Including in POST /api/auth/accountability-email body
     // This is the canonical IANA timezone string, e.g. "America/Toronto".
+    // Fallback is "UTC" — using a Canadian timezone when Intl fails would
+    // silently misreport every non-Canadian user's day boundary.
     const USER_TIMEZONE = (function () {
         try {
-            return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Toronto';
+            return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
         } catch (_) {
-            return 'America/Toronto';
+            return 'UTC';
         }
     })();
 
@@ -903,15 +982,104 @@ function handlePdfDrop(e) {
     window.fetchTodayGoal = fetchTodayGoal;
 
     // ════════════════════════════════════════════════════
-    // Init — fallback: fire after 800 ms in case auth
-    // resolves before this listener runs (rare).
-    // The definitive call comes from auth.js after /api/auth/me
-    // completes, so there is no race condition.
+    // Init — chain off window.authReady so there is no race.
+    // auth.js's initAuth() calls fetchTodayGoal() itself on the
+    // logged-in branch; this block covers the guest branch
+    // (otherwise the localStorage goal would never render).
     // ════════════════════════════════════════════════════
 
-    document.addEventListener('DOMContentLoaded', function () {
-        setTimeout(fetchTodayGoal, 800);
-    });
+    (async function () {
+        try { await window.authReady; } catch (_) {}
+        if (!window.currentUser) fetchTodayGoal();
+    })();
+})();
+</script>
+<script>
+/* ── Phase 8 — notification preferences (digest / overdue / exam) ────
+   Lives on the homepage next to the existing accountability controls.
+   Load on auth-resolve, save on every onchange with a 500ms debounce so
+   a rapid toggle-flip doesn't spawn a POST per click. ─────────────────── */
+(function () {
+    const el = id => document.getElementById(id);
+    const section = () => el('notifications-section');
+
+    let _saveTimer = null;
+    let _hydrating = false;
+
+    function setStatus(msg, isError) {
+        const s = el('notif-save-status');
+        if (!s) return;
+        s.textContent = msg || '';
+        s.classList.toggle('is-error', !!isError);
+        if (msg) setTimeout(() => {
+            if (s.textContent === msg) s.textContent = '';
+        }, 2500);
+    }
+
+    function syncTimeVisibility() {
+        const dOn = el('notif-digest-enabled')?.checked;
+        const oOn = el('notif-overdue-enabled')?.checked;
+        el('notif-digest-time-row')?.classList.toggle('hidden', !dOn);
+        el('notif-overdue-time-row')?.classList.toggle('hidden', !oOn);
+    }
+
+    async function hydrate() {
+        if (!window.currentUser) { if (section()) section().style.display = 'none'; return; }
+        try {
+            const res = await fetch('/api/notifications/preferences');
+            if (!res.ok) return;
+            const p = await res.json();
+
+            _hydrating = true;
+            el('notif-digest-enabled').checked  = !!p.digestEnabled;
+            el('notif-digest-time').value       = p.digestLocalTime || '08:00';
+            el('notif-overdue-enabled').checked = !!p.overdueReminderEnabled;
+            el('notif-overdue-time').value      = p.overdueReminderLocalTime || '20:00';
+            el('notif-exam-enabled').checked    = !!p.examReminderEnabled;
+            _hydrating = false;
+
+            syncTimeVisibility();
+            if (section()) section().style.display = '';
+        } catch (_) { /* silent */ }
+    }
+
+    window.saveNotif = function () {
+        // Hydrate also fires onchange events — short-circuit so we don't
+        // POST the same state we just loaded.
+        if (_hydrating) return;
+        syncTimeVisibility();
+
+        clearTimeout(_saveTimer);
+        _saveTimer = setTimeout(async () => {
+            const body = {
+                digestEnabled:            el('notif-digest-enabled').checked,
+                digestLocalTime:          el('notif-digest-time').value,
+                overdueReminderEnabled:   el('notif-overdue-enabled').checked,
+                overdueReminderLocalTime: el('notif-overdue-time').value,
+                examReminderEnabled:      el('notif-exam-enabled').checked,
+            };
+            try {
+                const res = await fetch('/api/notifications/preferences', {
+                    method:  'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify(body),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    setStatus(data.error || 'Could not save.', true);
+                    return;
+                }
+                setStatus('Saved.', false);
+            } catch (_) {
+                setStatus('Could not reach the server.', true);
+            }
+        }, 500);
+    };
+
+    (async function () {
+        try { await window.authReady; } catch (_) {}
+        await hydrate();
+    })();
 })();
 </script>
 </body>

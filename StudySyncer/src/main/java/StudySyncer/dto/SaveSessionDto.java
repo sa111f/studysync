@@ -17,12 +17,21 @@ public class SaveSessionDto {
     private String  timerMode;
     private boolean completed;
 
+    /**
+     * Optional soft reference to the Task the session was logged against.
+     * When non-null the server validates ownership before saving (400 if it
+     * doesn't belong to the current user). When null the session is a generic
+     * one — same behaviour as the pre-Phase-3 pipeline.
+     */
+    private Long    taskId;
+
     public String  getMaterialName()    { return materialName; }
     public int     getDurationMinutes() { return durationMinutes; }
     public Integer getPlannedMinutes()  { return plannedMinutes; }
     public Integer getOvertimeMinutes() { return overtimeMinutes; }
     public String  getTimerMode()       { return timerMode; }
     public boolean isCompleted()        { return completed; }
+    public Long    getTaskId()          { return taskId; }
 
     public void setMaterialName(String n)       { this.materialName = n; }
     public void setDurationMinutes(int d)       { this.durationMinutes = d; }
@@ -30,4 +39,5 @@ public class SaveSessionDto {
     public void setOvertimeMinutes(Integer m)   { this.overtimeMinutes = m; }
     public void setTimerMode(String m)          { this.timerMode = m; }
     public void setCompleted(boolean c)         { this.completed = c; }
+    public void setTaskId(Long taskId)          { this.taskId = taskId; }
 }

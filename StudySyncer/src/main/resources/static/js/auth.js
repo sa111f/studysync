@@ -1,7 +1,7 @@
 'use strict';
 
 // ── Auth state ─────────────────────────────────────────
-// window.currentUser is read by subjects.js and timer.js
+// window.currentUser is read by timer.js and tracker.js
 window.currentUser = null;
 
 let authModalMode = 'login'; // 'login' | 'register'
@@ -17,7 +17,6 @@ async function initAuth() {
             const data = await res.json();
             window.currentUser = data.username;
             showLoggedIn(data.username);
-            await loadSavedPlan();
             await loadSavedTimer();
             // Refresh today's goal now that we know the user — fixes the race where
             // fetchTodayGoal() fired before /api/auth/me resolved (window.currentUser
@@ -60,11 +59,28 @@ function showLoggedIn(username) {
     document.getElementById('auth-guest').classList.add('hidden');
     document.getElementById('auth-user').classList.remove('hidden');
     document.getElementById('auth-username').textContent = `Hi, ${username}`;
+    // Hide the guest-only intro strip on the homepage
+    const intro = document.getElementById('intro-strip');
+    if (intro) intro.classList.add('hidden');
 }
 
 function showLoggedOut() {
     document.getElementById('auth-guest').classList.remove('hidden');
     document.getElementById('auth-user').classList.add('hidden');
+    // Re-show the intro strip for guests — unless they previously dismissed it
+    const intro = document.getElementById('intro-strip');
+    if (intro) {
+        let dismissed = false;
+        try { dismissed = localStorage.getItem('studysync_hide_intro') === '1'; } catch (_) {}
+        if (!dismissed) intro.classList.remove('hidden');
+    }
+}
+
+/** Persist dismissal across page loads for this browser. */
+function dismissIntroStrip() {
+    try { localStorage.setItem('studysync_hide_intro', '1'); } catch (_) {}
+    const el = document.getElementById('intro-strip');
+    if (el) el.classList.add('hidden');
 }
 
 // ── Modal open / close ─────────────────────────────────
@@ -275,7 +291,6 @@ async function doLogin() {
             window.currentUser = data.username;
             showLoggedIn(data.username);
             closeModal();
-            await loadSavedPlan();
             await loadSavedTimer();
             if (typeof window.fetchTodayGoal === 'function') window.fetchTodayGoal();
             return;
@@ -339,24 +354,9 @@ async function logout() {
     try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (_) {}
     window.currentUser = null;
     showLoggedOut();
-    const planCard = document.getElementById('study-plan-card');
-    if (planCard) planCard.classList.add('hidden');
 }
 
 // ── Load saved data on login ───────────────────────────
-async function loadSavedPlan() {
-    if (!window.currentUser) return;
-    try {
-        const res = await fetch('/api/plans/latest');
-        if (res.ok) {
-            const plan = await res.json();
-            if (plan && Array.isArray(plan.subjectPlans) && plan.subjectPlans.length > 0) {
-                renderStudyPlan(plan);  // defined in subjects.js
-            }
-        }
-    } catch (e) { /* silent */ }
-}
-
 async function loadSavedTimer() {
     if (!window.currentUser) return;
     try {
@@ -372,9 +372,16 @@ async function loadSavedTimer() {
 }
 
 // ── Boot ───────────────────────────────────────────────
-// Guard against rare cases where the script executes before DOM is fully parsed
+// `window.authReady` resolves once /api/auth/me has completed and
+// `window.currentUser` is settled. Other bootstrap code (deadlines.js,
+// the inline Today's Goal block) awaits this instead of using setTimeout
+// hacks.
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initAuth);
+    window.authReady = new Promise(function (resolve) {
+        document.addEventListener('DOMContentLoaded', function () {
+            initAuth().then(resolve, resolve);
+        });
+    });
 } else {
-    initAuth();
+    window.authReady = initAuth();
 }

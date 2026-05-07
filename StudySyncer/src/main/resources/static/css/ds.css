@@ -1,5 +1,5 @@
 /*
- * ds.css — StudySync Design System  v1.0
+ * ds.css — StudySyncer Design System  v1.0
  * ═══════════════════════════════════════════════════════════════════
  * Loaded AFTER style.css / focus.css on every page.
  * Strategy: enhance existing class names — no HTML renames needed.
@@ -2137,3 +2137,1947 @@ main,
     }
 }
 
+
+/* ════════════════════════════════════════════════════════════════
+   22. LEGAL / INFO PAGES (privacy, terms, about)
+   Reuses .tracker-main layout + .tracker-card surface.
+   ════════════════════════════════════════════════════════════════ */
+.legal-prose h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+    letter-spacing: -0.02em;
+}
+.legal-prose .legal-updated {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 22px;
+}
+.legal-prose h2 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 22px 0 8px;
+}
+.legal-prose h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 18px 0 6px;
+}
+.legal-prose p,
+.legal-prose li {
+    color: var(--muted);
+    font-size: 0.95rem;
+    line-height: 1.65;
+    margin-bottom: 10px;
+}
+.legal-prose ul,
+.legal-prose ol {
+    padding-left: 22px;
+    margin-bottom: 10px;
+}
+.legal-prose strong { color: var(--text); }
+.legal-prose a {
+    color: var(--accent);
+    text-decoration: none;
+}
+.legal-prose a:hover { text-decoration: underline; }
+.legal-prose .legal-placeholder {
+    color: var(--accent2);
+    background: rgba(255,107,107,0.08);
+    border: 1px dashed rgba(255,107,107,0.35);
+    border-radius: 4px;
+    padding: 0 6px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.82em;
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   23. SITE FOOTER  (all pages)
+   ════════════════════════════════════════════════════════════════ */
+.site-footer {
+    max-width: 1100px;
+    margin: 40px auto 0;
+    padding: 18px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+.site-footer-links {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.site-footer-links a {
+    color: var(--muted);
+    text-decoration: none;
+    transition: color var(--t);
+}
+.site-footer-links a:hover { color: var(--accent); }
+.site-footer-sep {
+    color: var(--border);
+}
+/* Focus page uses its own black background — give the footer a subtle
+   surface so it reads against the focus main. */
+body.focus-body .site-footer {
+    border-top-color: rgba(124,92,252,0.18);
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   24. GUEST INTRO STRIP  (homepage, above timer)
+   Shown only to guests; collapses permanently via localStorage.
+   ════════════════════════════════════════════════════════════════ */
+.intro-strip {
+    max-width: 1100px;
+    margin: 0 auto 18px;
+    padding: 16px 20px 18px;
+    background:
+        linear-gradient(145deg, rgba(124,92,252,0.10), rgba(124,92,252,0.02)),
+        var(--surface);
+    border: 1px solid var(--border-hover);
+    border-radius: var(--r-card);
+    position: relative;
+    display: block;
+}
+/* Two-class specificity fix (see .auth-guest.hidden for the same reasoning). */
+.intro-strip.hidden { display: none; }
+.intro-strip-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+.intro-strip-title {
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+.intro-strip-tag {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 2px 0 12px;
+}
+.intro-strip-list {
+    list-style: none;
+    padding: 0;
+    margin: 4px 0 14px;
+    display: grid;
+    gap: 6px;
+}
+.intro-strip-list li {
+    font-size: 0.88rem;
+    color: var(--text);
+    opacity: 0.92;
+}
+.intro-strip-cta-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.intro-strip-dismiss {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: color var(--t);
+}
+.intro-strip-dismiss:hover { color: var(--accent); }
+
+/* Primary CTA inside the intro strip */
+.auth-link-btn.accent.intro-strip-cta {
+    padding: 8px 20px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    border-radius: var(--r-btn);
+    background: var(--accent);
+    color: #fff;
+    border: 1px solid var(--accent);
+    cursor: pointer;
+}
+
+/* Fix: .apply-btn is used as an <a> on tracker — remove underline */
+a.apply-btn,
+a.apply-btn:hover,
+a.apply-btn:focus {
+    text-decoration: none;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   25. TRACKER — chart header layout + total focus time
+   ════════════════════════════════════════════════════════════════ */
+.tracker-card-header-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    min-width: 180px;
+}
+.period-total-label {
+    font-size: 0.82rem;
+    color: var(--muted);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Tooltip on the locked Year button — visible on hover OR keyboard focus */
+.range-btn-year-wrap {
+    position: relative;
+    display: inline-flex;
+}
+.range-btn-year-wrap .year-lock-tip {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface2, #22263a);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-size: 0.72rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--t);
+    z-index: 10;
+}
+.range-btn-year-wrap:hover .year-lock-tip,
+.range-btn-year-wrap:focus-within .year-lock-tip,
+.range-btn-year-wrap .range-btn:focus-visible + .year-lock-tip {
+    opacity: 1;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   26. TRACKER — empty-state CTAs (icon + text + button)
+   ════════════════════════════════════════════════════════════════ */
+.tracker-empty-cta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 28px 16px;
+    text-align: center;
+}
+/* ds.css loads after style.css, so raw `.tracker-empty-cta` would override
+   the global `.hidden { display:none }`. This two-class rule beats both. */
+.tracker-empty-cta.hidden { display: none; }
+.tracker-empty-cta-icon svg {
+    width: 40px;
+    height: 40px;
+    stroke: var(--muted);
+    opacity: 0.85;
+}
+.tracker-empty-cta-text {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0;
+}
+.tracker-empty-cta-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   26.1 TRACKER HEADER — right side holds Back-to-App + auth bar
+   ════════════════════════════════════════════════════════════════ */
+.tracker-header-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.tracker-header-right .auth-bar {
+    margin-top: 0;
+}
+@media (max-width: 600px) {
+    .tracker-header-right { gap: 8px; }
+    .tracker-header-right .tracker-back-btn {
+        font-size: 0.76rem;
+        padding: 6px 10px;
+    }
+}
+
+/* Ranking You-row — empty-account CTA line replaces 🔥 0 / 0m. */
+.lb-you-empty-msg {
+    grid-column: span 2;
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* Chart-card header — three-column layout.
+   Keeps range-toggle left, total-label centred, period-nav right. */
+.chart-card-header {
+    align-items: center;
+}
+.chart-card-header .tracker-card-header-left { flex: 0 0 auto; }
+.chart-card-header .tracker-card-header-right { flex: 0 0 auto; }
+.chart-card-header .tracker-card-header-center {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+@media (max-width: 720px) {
+    /* On narrow screens: stack toggle, then nav+total in a second row. */
+    .chart-card-header .tracker-card-header-center {
+        order: 3;
+        flex-basis: 100%;
+        justify-content: flex-start;
+        padding-top: 4px;
+    }
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   27. Screen-reader-only helper
+   ════════════════════════════════════════════════════════════════ */
+.sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TIMER  —  "Studying:" task picker  (Phase 3)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.timer-task-picker {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.45rem 0.75rem;
+    margin: 0.5rem 0 0.3rem;
+    background: rgba(124, 92, 252, 0.06);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.85rem;
+}
+.timer-task-picker.hidden { display: none; }
+.timer-task-label {
+    color: var(--muted);
+    flex-shrink: 0;
+    font-weight: 500;
+}
+.timer-task-select {
+    flex: 1;
+    background: transparent;
+    color: var(--text);
+    border: none;
+    padding: 0.25rem 0.4rem;
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    outline: none;
+    min-width: 0; /* allow shrinking inside flex */
+}
+.timer-task-select:focus {
+    background: rgba(124, 92, 252, 0.1);
+    border-radius: 4px;
+}
+.timer-task-select:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+.timer-task-select option {
+    background: var(--surface);
+    color: var(--text);
+}
+
+/* Phase 3.7 — no-task hint */
+.timer-no-task-hint {
+    color: var(--muted);
+    font-size: 0.78rem;
+    text-align: center;
+    margin: 0.3rem 0 0;
+    opacity: 0.85;
+}
+.timer-no-task-hint.hidden { display: none; }
+
+/* Phase 3.6 — small purple "Task" badge next to the Material column
+   in the Tracker Detail table. */
+.session-task-badge {
+    display: inline-block;
+    padding: 0.08rem 0.45rem;
+    border-radius: 999px;
+    background: rgba(124, 92, 252, 0.18);
+    color: var(--accent);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TASKS PAGE  —  /tasks (Phase 2)
+   Dark-theme tokens: var(--accent / --success / --muted / --surface /
+   --text / --border) already defined in style.css and ds.css above.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.tasks-page {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem 1.25rem 4rem;
+}
+
+.tasks-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+    gap: 1rem;
+}
+.tasks-page-title {
+    margin: 0;
+    font-size: 1.6rem;
+    color: var(--text);
+}
+
+/* ── Dashboard preview strip (homepage) ───────────────────────── */
+.tasks-dashboard-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.6rem 1rem;
+    margin: 0 auto 1rem;
+    max-width: 720px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 0.9rem;
+}
+.tasks-dashboard-strip a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+}
+.tasks-dashboard-strip a:hover { text-decoration: underline; }
+
+/* ── Create / edit form ───────────────────────────────────────── */
+.task-create-form,
+.task-edit-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.1rem 1.15rem;
+    margin-bottom: 1.1rem;
+    display: grid;
+    gap: 0.8rem;
+}
+.task-create-form.hidden,
+.task-edit-panel.hidden { display: none; }
+
+.task-form-row {
+    display: grid;
+    gap: 0.8rem;
+}
+.task-form-row-2 { grid-template-columns: 2fr 1fr; }
+.task-form-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+@media (max-width: 560px) {
+    .task-form-row-2, .task-form-row-3 { grid-template-columns: 1fr; }
+}
+
+.task-field { display: flex; flex-direction: column; gap: 0.3rem; }
+.task-label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-weight: 500;
+}
+.task-required { color: #ef4444; }
+.task-optional { color: var(--muted); font-weight: 400; font-style: italic; font-size: 0.75rem; }
+
+.task-input { width: 100%; }
+.task-textarea { resize: vertical; min-height: 56px; font-family: inherit; }
+
+.task-form-actions {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: flex-end;
+    margin-top: 0.3rem;
+}
+
+/* ── Filter bar ───────────────────────────────────────────────── */
+.task-filter-bar {
+    display: flex;
+    gap: 0.35rem;
+    margin: 0.4rem 0 1rem;
+    flex-wrap: wrap;
+}
+.task-filter-btn {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.task-filter-btn:hover {
+    color: var(--text);
+    border-color: var(--accent);
+}
+.task-filter-btn.active {
+    background: rgba(124, 92, 252, 0.12);
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+/* ── Task list ────────────────────────────────────────────────── */
+.task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.task-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 0.85rem;
+    align-items: center;
+    padding: 0.75rem 0.9rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+.task-row:hover {
+    border-color: var(--accent);
+}
+.task-row.editing { border-color: var(--accent); }
+
+/* ── Three-state checkbox ─────────────────────────────────────── */
+.task-checkbox {
+    width: 22px; height: 22px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 2px solid var(--muted);
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: border-color 0.15s, background 0.15s;
+}
+.task-checkbox:hover { border-color: var(--accent); }
+.task-checkbox[data-status="NOT_STARTED"] { /* empty circle, default */ }
+.task-checkbox[data-status="IN_PROGRESS"] {
+    border-color: var(--accent);
+    background: linear-gradient(to right, var(--accent) 50%, transparent 50%);
+}
+.task-checkbox[data-status="COMPLETED"] {
+    border-color: var(--success);
+    background: var(--success);
+}
+.task-checkbox[data-status="COMPLETED"]::after {
+    content: "";
+    width: 6px; height: 11px;
+    border: solid #0f1117;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) translate(-1px, -1px);
+}
+
+/* ── Task main text block ─────────────────────────────────────── */
+.task-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0; /* allow ellipsis */
+}
+.task-title {
+    color: var(--text);
+    font-weight: 500;
+    font-size: 0.98rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.task-title.completed {
+    text-decoration: line-through;
+    color: var(--muted);
+}
+
+.task-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    font-size: 0.78rem;
+    color: var(--muted);
+}
+.task-meta .sep { opacity: 0.5; }
+
+.task-type-badge {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(124, 92, 252, 0.1);
+    color: var(--accent);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+/* ── Priority dot ─────────────────────────────────────────────── */
+.task-priority-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 6px currentColor;
+}
+.task-priority-dot.low    { background: var(--muted); color: var(--muted); box-shadow: none; opacity: 0.6; }
+.task-priority-dot.medium { background: #f5c96b; color: #f5c96b; }
+.task-priority-dot.high   { background: #ef4444; color: #ef4444; }
+
+/* ── Overdue badge ────────────────────────────────────────────── */
+.task-overdue-badge {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(239, 68, 68, 0.18);
+    color: #ef4444;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+/* ── Row actions (edit / delete) ──────────────────────────────── */
+.task-row-actions {
+    display: flex;
+    gap: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.task-row:hover .task-row-actions,
+.task-row:focus-within .task-row-actions { opacity: 1; }
+
+.task-icon-btn {
+    background: transparent;
+    border: none;
+    padding: 0.35rem;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, background 0.15s;
+}
+.task-icon-btn:hover { color: var(--accent); background: rgba(124, 92, 252, 0.12); }
+.task-icon-btn.danger:hover { color: #ef4444; background: rgba(239, 68, 68, 0.12); }
+.task-icon-btn svg { width: 15px; height: 15px; }
+
+/* ── Inline edit panel ────────────────────────────────────────── */
+.task-edit-panel {
+    margin-top: 0.35rem;
+    margin-bottom: 0.85rem;
+    border-color: var(--accent);
+}
+.task-edit-panel .task-form-actions .delete-btn {
+    margin-right: auto;
+    background: transparent;
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    padding: 0.45rem 0.9rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.15s;
+}
+.task-edit-panel .task-form-actions .delete-btn:hover {
+    background: rgba(239, 68, 68, 0.14);
+}
+
+/* ── Logged-time note under a task title (Phase 3 hook) ───────── */
+.task-logged-note {
+    color: var(--muted);
+    font-size: 0.78rem;
+}
+
+/* ── Empty state ──────────────────────────────────────────────── */
+.tasks-empty {
+    padding: 2.5rem 1rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.95rem;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    background: rgba(26, 29, 39, 0.4);
+}
+.tasks-empty a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+}
+.tasks-empty a:hover { text-decoration: underline; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   /tasks — focus-pulse (Phase 4.3 row-click from dashboard)
+   ═══════════════════════════════════════════════════════════════════ */
+@keyframes task-row-focus-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(124, 92, 252, 0.55); }
+    70%  { box-shadow: 0 0 0 8px rgba(124, 92, 252, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(124, 92, 252, 0); }
+}
+.task-row-focus-pulse {
+    border-color: var(--accent) !important;
+    animation: task-row-focus-pulse 1.5s ease-out;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   HOMEPAGE DASHBOARD (Phase 4)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Shared danger color — only defined here if not already present elsewhere. */
+:root {
+    --danger:         #ef4444;
+    --danger-muted:   rgba(239, 68, 68, 0.15);
+    --success-muted:  rgba(52, 211, 153, 0.15);
+}
+
+.home-dashboard-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr); /* ≈ 65 / 35 */
+    gap: 1.5rem;
+    max-width: 1200px;
+    margin: 1rem auto 2rem;
+    padding: 0 1.25rem;
+    align-items: start;
+}
+
+.dashboard-col { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.sidebar-col   { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+
+@media (max-width: 900px) {
+    .home-dashboard-layout {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    /* Mobile order: Timer → dashboard sections → Today's Goal.
+       The sidebar-col contains [timer, goal] in that DOM order, so we
+       split them visually with flex order inside a flattened grid. */
+    .sidebar-col   { display: contents; }
+    .dashboard-col { order: 2; }
+    /* Timer inside .sidebar-col gets order 1; Today's Goal gets order 3. */
+    .sidebar-col > .timer-card { order: 1; }
+    .sidebar-col > .goal-card-main { order: 3; }
+}
+
+/* ── Guest pane ───────────────────────────────────────────────── */
+.dashboard-guest {
+    padding: 2rem 1.5rem;
+    text-align: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+.dashboard-guest.hidden { display: none; }
+.dashboard-guest-title {
+    font-size: 1.5rem;
+    color: var(--text);
+    margin: 0 0 0.5rem;
+}
+.dashboard-guest-sub {
+    color: var(--muted);
+    margin: 0 0 1.25rem;
+    font-size: 0.95rem;
+}
+.dashboard-guest-cta-row {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* ── Section cards ────────────────────────────────────────────── */
+.dashboard-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.dashboard-sections.hidden { display: none; }
+
+.dash-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+}
+.dash-section-overdue {
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+.dash-section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.75rem;
+}
+.dash-section-title {
+    font-size: 1.05rem;
+    color: var(--text);
+    margin: 0;
+    font-weight: 600;
+}
+.dash-section-title-danger {
+    color: var(--danger);
+}
+.dash-section-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 22px;
+    padding: 0 0.5rem;
+    border-radius: 999px;
+    background: rgba(124, 92, 252, 0.14);
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1;
+}
+.dash-section-count.hidden { display: none; }
+.dash-section-count.danger-count {
+    background: var(--danger-muted);
+    color: var(--danger);
+}
+
+/* ── Task list + row ──────────────────────────────────────────── */
+.dash-task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.dash-task-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, opacity 0.3s;
+}
+.dash-task-row:hover {
+    background: rgba(124, 92, 252, 0.05);
+    border-color: var(--border);
+}
+.dash-task-row.dash-row-fading-out {
+    opacity: 0;
+    transform: translateX(12px);
+    pointer-events: none;
+}
+
+/* Checkbox — mirrors the /tasks page checkbox but sized slightly down. */
+.dash-task-checkbox {
+    width: 22px; height: 22px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 2px solid var(--muted);
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: border-color 0.15s, background 0.15s;
+}
+.dash-task-checkbox:hover { border-color: var(--accent); }
+.dash-task-checkbox[data-status="IN_PROGRESS"] {
+    border-color: var(--accent);
+    background: linear-gradient(to right, var(--accent) 50%, transparent 50%);
+}
+.dash-task-checkbox[data-status="COMPLETED"] {
+    border-color: var(--success);
+    background: var(--success);
+}
+.dash-task-checkbox[data-status="COMPLETED"]::after {
+    content: "";
+    width: 6px; height: 11px;
+    border: solid #0f1117;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) translate(-1px, -1px);
+}
+
+.dash-task-body { min-width: 0; /* so title can ellipsize */ }
+.dash-task-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+.dash-task-title {
+    color: var(--text);
+    font-weight: 500;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-task-priority-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.dash-task-priority-low    { background: var(--muted); opacity: 0.6; }
+.dash-task-priority-medium { background: #f5c96b; }
+.dash-task-priority-high   { background: var(--danger); box-shadow: 0 0 6px rgba(239, 68, 68, 0.55); }
+
+.dash-task-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+    color: var(--muted);
+    font-size: 0.78rem;
+    margin-top: 0.15rem;
+}
+.dash-task-meta-sep { opacity: 0.5; }
+.dash-task-course { color: var(--muted); }
+.dash-task-due    { color: var(--muted); }
+.dash-section-overdue .dash-task-due {
+    color: var(--danger);
+    font-weight: 500;
+}
+.dash-task-logged {
+    color: var(--success);
+    background: var(--success-muted);
+    padding: 0.08rem 0.45rem;
+    border-radius: 999px;
+    font-weight: 500;
+}
+
+/* Start button */
+.dash-task-start-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--accent);
+    background: rgba(124, 92, 252, 0.12);
+    color: var(--accent);
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+.dash-task-start-btn:hover {
+    background: var(--accent);
+    color: #0f1117;
+}
+.dash-task-start-btn svg {
+    display: block;
+}
+
+/* Empty states */
+.dash-empty {
+    padding: 1rem 0.5rem 0.2rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.88rem;
+}
+.dash-empty.hidden { display: none; }
+.dash-empty a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+}
+.dash-empty a:hover { text-decoration: underline; }
+.dash-empty-note {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 0.75rem;
+    opacity: 0.7;
+    font-style: italic;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   COMPACT TIMER (Phase 4.6 — used on homepage, not /focus)
+   ═══════════════════════════════════════════════════════════════════ */
+.timer-card-compact .timer-ring-wrap {
+    max-width: 200px;
+    margin: 0.5rem auto 0.75rem;
+}
+.timer-card-compact .timer-ring { width: 100%; height: auto; }
+.timer-card-compact .timer-display {
+    font-size: 2.6rem;       /* ~42–44px vs default ~56px */
+}
+.timer-card-compact .timer-controls {
+    gap: 0.4rem;
+}
+.timer-card-compact .timer-controls .ctrl-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+.timer-card-compact .space-hint {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+.timer-card-compact .timer-task-picker {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.82rem;
+}
+.timer-card-compact .timer-settings-btn {
+    font-size: 0.8rem;
+}
+
+/* Pulse ring (dashboard "Start" click) */
+@keyframes timer-card-pulse-kf {
+    0%   { box-shadow: 0 0 0 0 rgba(124, 92, 252, 0.55); }
+    70%  { box-shadow: 0 0 0 14px rgba(124, 92, 252, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(124, 92, 252, 0); }
+}
+.timer-card-pulse {
+    animation: timer-card-pulse-kf 1.5s ease-out;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   AI TASK MODAL (Phase 5) — matches the auth-modal pattern so the
+   two dialogs feel part of the same family.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Lock body scroll while the modal is open (JS also sets body.top). */
+body.ai-body-locked {
+    position: fixed;
+    width: 100%;
+    overflow: hidden;
+}
+
+.ai-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(7, 8, 14, 0.72);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    animation: ai-modal-fade-in 0.2s ease-out;
+}
+.ai-modal.hidden { display: none; }
+
+@keyframes ai-modal-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+@keyframes ai-modal-box-in {
+    from { transform: scale(0.96); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+}
+
+.ai-modal-box {
+    position: relative;
+    width: 100%;
+    max-width: 520px;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem 1.4rem 1.25rem;
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+    animation: ai-modal-box-in 0.2s ease-out;
+}
+
+.ai-modal-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.65rem;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: color 0.15s, background 0.15s;
+}
+.ai-modal-close:hover {
+    color: var(--text);
+    background: rgba(124, 92, 252, 0.12);
+}
+
+#ai-modal-title {
+    margin: 0 0 0.25rem;
+    font-size: 1.2rem;
+    color: var(--text);
+}
+
+.ai-modal-hint {
+    margin: 0 0 0.9rem;
+    color: var(--muted);
+    font-size: 0.88rem;
+}
+
+/* ── Input state ─────────────────────────────────────────────── */
+.ai-textarea {
+    width: 100%;
+    resize: vertical;
+    min-height: 80px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+.ai-char-count {
+    text-align: right;
+    color: var(--muted);
+    font-size: 0.75rem;
+    margin: 0.25rem 0 0.6rem;
+}
+
+.ai-error {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    border-radius: 6px;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.85rem;
+    margin: 0.25rem 0 0.75rem;
+}
+.ai-error.hidden { display: none; }
+
+.ai-modal-actions,
+.ai-confirm-actions {
+    display: flex;
+    gap: 0.55rem;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    margin-top: 0.75rem;
+}
+
+/* ── Loading state ───────────────────────────────────────────── */
+#ai-state-loading:not(.hidden) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 1rem 1.5rem;
+    gap: 0.85rem;
+}
+
+.ai-spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid rgba(124, 92, 252, 0.22);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: ai-spinner-spin 0.8s linear infinite;
+}
+@keyframes ai-spinner-spin {
+    to { transform: rotate(360deg); }
+}
+.ai-loading-text {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+/* ── Confirm state ───────────────────────────────────────────── */
+.ai-raw-echo {
+    margin: 0.25rem 0 0.9rem;
+    color: var(--muted);
+    font-style: italic;
+    font-size: 0.88rem;
+    line-height: 1.4;
+    padding-left: 0.7rem;
+    border-left: 2px solid var(--border);
+}
+.ai-raw-echo.hidden { display: none; }
+
+.ai-confirm-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.ai-field { display: flex; flex-direction: column; gap: 0.25rem; }
+.ai-field-row {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr;
+    gap: 0.65rem;
+}
+@media (max-width: 560px) {
+    .ai-field-row { grid-template-columns: 1fr; }
+}
+
+.ai-label {
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-weight: 500;
+}
+.ai-optional {
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-style: italic;
+    font-weight: 400;
+}
+.ai-input-field { width: 100%; }
+.ai-date-human {
+    margin: 0.1rem 0 0;
+    color: var(--muted);
+    font-size: 0.78rem;
+}
+
+/* ── Fallback banner (shown above the shared form) ───────────── */
+.ai-fallback-msg {
+    background: rgba(245, 201, 107, 0.1);
+    border: 1px solid rgba(245, 201, 107, 0.3);
+    color: var(--text);
+    padding: 0.7rem 0.85rem;
+    border-radius: 8px;
+    margin: 0 0 0.9rem;
+    font-size: 0.88rem;
+}
+.ai-fallback-msg.hidden { display: none; }
+.ai-fallback-msg p { margin: 0.1rem 0; }
+
+/* ── Trigger button variant (🤖 Add with AI) ─────────────────── */
+.ai-trigger-btn {
+    background: rgba(124, 92, 252, 0.1);
+    border: 1px solid rgba(124, 92, 252, 0.35);
+    color: var(--text);
+}
+.ai-trigger-btn:hover {
+    background: rgba(124, 92, 252, 0.18);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* ── Tasks page header: two buttons stacked on narrow, row on wide ─ */
+.tasks-header-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* ── Homepage dashboard toolbar ──────────────────────────────── */
+.dashboard-toolbar {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    margin-bottom: 0.4rem;
+}
+.dashboard-toolbar-link {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.86rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 6px;
+    transition: color 0.15s, background 0.15s;
+}
+.dashboard-toolbar-link:hover {
+    color: var(--accent);
+    background: rgba(124, 92, 252, 0.08);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TOAST (shared) — bottom-right, slide-in, 2.5s auto-dismiss.
+   ═══════════════════════════════════════════════════════════════════ */
+.toast-container {
+    position: fixed;
+    bottom: 1.25rem;
+    right: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    z-index: 1100;
+    pointer-events: none;
+}
+
+.toast {
+    pointer-events: auto;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--success);
+    border-radius: 8px;
+    padding: 0.6rem 0.9rem;
+    font-size: 0.88rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    transition: transform 0.22s ease-out, opacity 0.22s ease-out;
+    transform: translateX(0);
+    opacity: 1;
+}
+.toast.toast-enter {
+    transform: translateX(20px);
+    opacity: 0;
+}
+.toast.toast-exit {
+    transform: translateX(20px);
+    opacity: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EXAMS PAGE  — /exams (Phase 6)
+   Uses the same tasks-page container + tokens as /tasks. Exam-specific
+   styles handle the date badge, bucket sections, and inline detail
+   panel that expands below a row on click.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.exam-bucket-section {
+    margin-top: 1.25rem;
+}
+.exam-bucket-section.hidden { display: none; }
+
+.exam-bucket-title {
+    margin: 0 0 0.5rem;
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.exam-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.exam-list.hidden { display: none; }
+
+.exam-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.85rem;
+    align-items: center;
+    padding: 0.7rem 0.9rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+.exam-row:hover   { border-color: var(--accent); }
+.exam-row.expanded {
+    border-color: var(--accent);
+    background: rgba(124, 92, 252, 0.04);
+}
+
+/* Compact month/day badge on the left of each row. */
+.exam-date-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 48px;
+    padding: 0.3rem 0.5rem;
+    background: rgba(124, 92, 252, 0.12);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+.exam-date-month {
+    font-size: 0.62rem;
+    color: var(--accent);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    line-height: 1;
+}
+.exam-date-day {
+    font-size: 1.15rem;
+    color: var(--text);
+    font-weight: 600;
+    line-height: 1.1;
+    margin-top: 0.1rem;
+}
+
+.exam-row-body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+.exam-row-title {
+    color: var(--text);
+    font-weight: 500;
+    font-size: 0.98rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.exam-row-meta {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    color: var(--muted);
+    font-size: 0.78rem;
+    flex-wrap: wrap;
+}
+.exam-row-course { color: var(--muted); font-weight: 500; }
+.exam-row-loc    { color: var(--muted); }
+
+.exam-row-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.15rem;
+    flex-shrink: 0;
+}
+.exam-row-time {
+    color: var(--text);
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+}
+.exam-row-relative {
+    color: var(--muted);
+    font-size: 0.75rem;
+}
+.exam-row-relative.past {
+    color: var(--danger);
+    opacity: 0.85;
+}
+
+/* Inline detail panel — rendered in the same list so the hit area
+   flows naturally below the expanded row. */
+.exam-detail-panel {
+    padding: 0.9rem 1rem;
+    margin: 0;
+    background: rgba(124, 92, 252, 0.04);
+    border: 1px solid var(--accent);
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.exam-detail-field {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 0.75rem;
+    color: var(--text);
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+.exam-detail-label {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding-top: 0.1rem;
+}
+.exam-detail-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 0.4rem;
+}
+.exam-detail-actions .delete-btn {
+    background: transparent;
+    color: var(--danger);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    padding: 0.45rem 0.9rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.15s;
+}
+.exam-detail-actions .delete-btn:hover {
+    background: rgba(239, 68, 68, 0.14);
+}
+
+.exam-edit-form {
+    margin: 0 !important;
+    border-radius: 0 0 10px 10px !important;
+    border: 1px solid var(--accent) !important;
+    border-top: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DASHBOARD — Next Exams row (Phase 6.9)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.dash-exam-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.55rem 0.7rem;
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid transparent;
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.15s, border-color 0.15s;
+}
+.dash-exam-row:hover {
+    background: rgba(124, 92, 252, 0.05);
+    border-color: var(--border);
+}
+
+.dash-exam-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 42px;
+    padding: 0.2rem 0.4rem;
+    background: rgba(124, 92, 252, 0.12);
+    border-radius: 6px;
+}
+.dash-exam-month {
+    font-size: 0.58rem;
+    color: var(--accent);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    line-height: 1;
+}
+.dash-exam-day {
+    font-size: 1rem;
+    color: var(--text);
+    font-weight: 600;
+    line-height: 1.1;
+    margin-top: 0.1rem;
+}
+
+.dash-exam-body { min-width: 0; }
+.dash-exam-title {
+    color: var(--text);
+    font-weight: 500;
+    font-size: 0.92rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.dash-exam-meta {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    color: var(--muted);
+    font-size: 0.74rem;
+    margin-top: 0.1rem;
+}
+
+.dash-exam-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1rem;
+}
+.dash-exam-time {
+    color: var(--text);
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+}
+.dash-exam-relative {
+    color: var(--muted);
+    font-size: 0.72rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SYLLABUS IMPORT MODAL (Phase 7)
+   Inherits .ai-modal / .ai-modal-box / .ai-spinner from Phase 5.
+   Overrides + adds dropzone, progress steps, review table.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Wider box for the review table (spec 7.6). */
+.syllabus-modal-box {
+    max-width: 720px;
+}
+
+/* Dashboard trigger button variant (📄 Import from Syllabus). */
+.syllabus-trigger-btn {
+    background: rgba(52, 211, 153, 0.08);
+    border: 1px solid rgba(52, 211, 153, 0.3);
+    color: var(--text);
+}
+.syllabus-trigger-btn:hover {
+    background: rgba(52, 211, 153, 0.16);
+    border-color: var(--success);
+    color: var(--success);
+}
+
+/* Progress breadcrumb. */
+.syllabus-progress-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    margin: 0.5rem 0 1.25rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+    flex-wrap: wrap;
+}
+.syllabus-step {
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: transparent;
+    transition: background 0.15s, color 0.15s;
+}
+.syllabus-step.active {
+    background: rgba(124, 92, 252, 0.14);
+    color: var(--accent);
+    font-weight: 600;
+}
+.syllabus-step-sep { opacity: 0.5; }
+
+/* ── Upload state ────────────────────────────────────────────── */
+.syllabus-dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 2rem 1.25rem;
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: center;
+    background: rgba(124, 92, 252, 0.02);
+    transition: background 0.15s, border-color 0.15s;
+    margin-bottom: 0.75rem;
+}
+.syllabus-dropzone:hover   { border-color: var(--accent); background: rgba(124, 92, 252, 0.06); }
+.syllabus-dropzone.dragging {
+    border-color: var(--accent);
+    background: rgba(124, 92, 252, 0.12);
+}
+.syllabus-dropzone.has-file {
+    border-color: var(--success);
+    background: rgba(52, 211, 153, 0.08);
+}
+
+.syllabus-dropzone-icon {
+    width: 36px; height: 36px;
+    color: var(--muted);
+}
+.syllabus-dropzone.has-file .syllabus-dropzone-icon { color: var(--success); }
+.syllabus-dropzone-primary {
+    color: var(--text);
+    font-size: 0.92rem;
+    font-weight: 500;
+    word-break: break-word;
+}
+.syllabus-dropzone-sub {
+    color: var(--muted);
+    font-size: 0.76rem;
+}
+
+/* Hide the <input type="file"> but keep it clickable via the label wrapper. */
+.syllabus-file-input {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+/* ── Review state ─────────────────────────────────────────────── */
+.syllabus-review-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+}
+.syllabus-review-count {
+    margin: 0;
+    color: var(--text);
+    font-size: 0.95rem;
+}
+.syllabus-course-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.syllabus-course-row label {
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+.syllabus-course-row input {
+    width: 160px;
+    padding: 0.3rem 0.55rem;
+    font-size: 0.88rem;
+}
+
+.syllabus-truncated-banner {
+    background: rgba(245, 201, 107, 0.1);
+    border: 1px solid rgba(245, 201, 107, 0.3);
+    border-radius: 8px;
+    padding: 0.55rem 0.8rem;
+    color: var(--text);
+    font-size: 0.82rem;
+    margin-bottom: 0.6rem;
+}
+.syllabus-truncated-banner.hidden { display: none; }
+
+.syllabus-review-table-wrap {
+    max-height: 50vh;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 0.6rem;
+}
+.syllabus-review-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.syllabus-review-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--surface);
+    padding: 0.5rem 0.6rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--border);
+}
+.syllabus-review-table tbody td {
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+.syllabus-review-table tbody tr:last-child td { border-bottom: none; }
+
+.syllabus-review-row.excluded {
+    opacity: 0.4;
+}
+.syllabus-review-row.excluded .field-input {
+    text-decoration: line-through;
+}
+
+.syllabus-col-include { width: 36px; text-align: center; }
+.syllabus-col-kind    { width: 64px; }
+.syllabus-col-title   { width: auto; }
+.syllabus-col-when    { width: 170px; }
+.syllabus-col-type    { width: 160px; }
+.syllabus-col-remove  { width: 36px; text-align: center; }
+
+.syllabus-review-table .field-input {
+    width: 100%;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.85rem;
+}
+
+.syllabus-empty-row {
+    text-align: center;
+    color: var(--muted);
+    padding: 1.25rem 0.5rem !important;
+    font-style: italic;
+}
+
+.syllabus-kind-badge {
+    display: inline-block;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.syllabus-kind-badge.task {
+    background: rgba(124, 92, 252, 0.16);
+    color: var(--accent);
+}
+.syllabus-kind-badge.exam {
+    background: rgba(245, 201, 107, 0.18);
+    color: #f5c96b;
+}
+
+/* ── Done state ──────────────────────────────────────────────── */
+#syllabus-state-done {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem 0.75rem;
+    gap: 0.75rem;
+    text-align: center;
+}
+.syllabus-done-check {
+    color: var(--success);
+}
+.syllabus-done-check svg { width: 48px; height: 48px; }
+.syllabus-done-title {
+    margin: 0;
+    color: var(--text);
+    font-size: 1.1rem;
+}
+.syllabus-done-sub {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.88rem;
+}
+
+/* ── Error state ─────────────────────────────────────────────── */
+#syllabus-state-error {
+    padding-top: 0.5rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   NOTIFICATIONS — Phase 8 settings block inside Today's Goal card
+   ═══════════════════════════════════════════════════════════════════ */
+
+.notifications-section {
+    margin-top: 1.1rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--border);
+}
+.notifications-title {
+    margin: 0 0 0.6rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+}
+
+.notif-row {
+    margin: 0 0 0.9rem;
+}
+.notif-row:last-child { margin-bottom: 0; }
+
+.notif-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.92rem;
+    color: var(--text);
+    cursor: pointer;
+    user-select: none;
+}
+.notif-toggle input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.notif-hint {
+    color: var(--muted);
+    font-size: 0.76rem;
+    margin: 0.2rem 0 0.35rem 1.7rem;
+    line-height: 1.4;
+}
+
+.notif-time-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: 1.7rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+}
+.notif-time-row.hidden { display: none; }
+.notif-time-row input[type="time"] {
+    padding: 0.25rem 0.45rem;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.85rem;
+}
+.notif-tz-hint {
+    color: var(--muted);
+    font-size: 0.72rem;
+    opacity: 0.8;
+}
+
+.notif-save-status {
+    margin: 0.5rem 0 0;
+    font-size: 0.78rem;
+    min-height: 1em;
+    color: var(--success);
+}
+.notif-save-status.is-error { color: var(--danger); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   UNSUBSCRIBE CONFIRMATION PAGE (Phase 8.7)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.unsubscribed-page {
+    max-width: 520px;
+    margin: 3rem auto;
+    padding: 0 1.25rem;
+}
+.unsubscribed-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 2.2rem 1.6rem 2rem;
+    text-align: center;
+}
+.unsubscribed-check {
+    color: var(--success);
+    display: flex;
+    justify-content: center;
+    margin-bottom: 0.75rem;
+}
+.unsubscribed-check svg { width: 52px; height: 52px; }
+.unsubscribed-title {
+    margin: 0 0 0.5rem;
+    color: var(--text);
+    font-size: 1.3rem;
+}
+.unsubscribed-sub {
+    color: var(--muted);
+    margin: 0 0 0.75rem;
+    font-size: 0.92rem;
+    line-height: 1.55;
+}
+.unsubscribed-actions {
+    margin-top: 1.25rem;
+}
+.unsubscribed-actions .save-btn {
+    display: inline-block;
+    text-decoration: none;
+}

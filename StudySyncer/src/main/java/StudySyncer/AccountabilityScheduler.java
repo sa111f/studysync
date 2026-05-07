@@ -169,6 +169,9 @@ public class AccountabilityScheduler {
 
         if (ok) {
             dailyGoalService.markEmailAlertSent(goal);
+            // Phase 8 retrofit — unified send-log row.
+            emailService.recordGoalEmailSent(
+                    goal.getUser(), StudySyncer.entity.EmailType.GOAL_MISSED, goal.getGoalDate());
             return true;
         } else {
             log.error("[SCHEDULER] Email failed for goalId={} — will retry on next run", goal.getId());

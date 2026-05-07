@@ -123,9 +123,12 @@ public class TimerSaveController {
                                        HttpSession session) {
         User user = resolveUser(session);
         if (user == null) return unauthorized();
+        // New client sends targetMinutes; legacy client sent pomodoroMinutes.
+        Integer target = body.get("targetMinutes");
+        Integer pomodoro = target != null ? target : body.get("pomodoroMinutes");
         return ResponseEntity.ok(timerStateService.setDurations(
                 user,
-                body.get("pomodoroMinutes"),
+                pomodoro,
                 body.get("shortBreakMinutes"),
                 body.get("longBreakMinutes")));
     }
